@@ -125,6 +125,23 @@ removed via `x-confirm` (a hard delete for mistakes; the confirm text points at
 "set status to Ended" to keep history). Read-only roles (`staff.view`) see lists
 and profiles with no create / edit / status / link / assignment controls.
 
+The **Timetable** area (`resources/views/timetables/`,
+`docs/timetable-management.md`, gated `timetable.*` + `module:timetable`) is a
+top-level nav item. **List** — timetables filterable by session / status,
+paginated, each badged **Draft** / **Published**. The **timetable page** is the
+core view: a `<x-card>` "Weekly schedule" holding a **day × time-slot grid** on
+desktop (`hidden md:block`, wrapped in `overflow-x-auto`) and a **stacked
+day-by-day list** on mobile (`md:hidden`) — never a forced horizontal-overflow
+grid on a phone. It carries a status/publish control block, a red conflict
+banner listing clashing lesson pairs (which blocks publishing), and filters
+(class → arm, teacher, weekday). The lesson form
+(`timetables/entries/_form.blade.php`) is an Alpine level → arm cascade plus
+subject / teacher / weekday / `type="time"` start+end / optional room; every rule
+is re-checked server-side. A separate **teacher-view** page (`_day-list.blade.php`
+in `mode="teacher"`) lists one teacher's lessons across all timetables, grouped
+by day. Read-only roles (`timetable.view`) see the grid and teacher view with no
+add / edit / publish controls.
+
 Flash messages (`session('success' | 'error' | 'status')`) are rendered
 automatically by `<x-layouts.app>` as alerts.
 
@@ -155,6 +172,6 @@ automatically by `<x-layouts.app>` as alerts.
 
 Dark mode, dense/table layouts, data-grid, charts, iconography system,
 notification/toast system. The primary nav is permission- and
-module-filtered (Dashboard · Members · Students · Guardians · Teachers · Academic ·
-School settings · Schools · Account) but not yet role-specific / collapsible. Add
-here when built.
+module-filtered (Dashboard · Members · Students · Guardians · Teachers ·
+Timetable · Academic · School settings · Schools · Account) but not yet
+role-specific / collapsible. Add here when built.

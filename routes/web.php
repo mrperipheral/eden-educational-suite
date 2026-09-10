@@ -20,6 +20,8 @@ use App\Http\Controllers\Student\EnrollmentController;
 use App\Http\Controllers\Student\StudentController;
 use App\Http\Controllers\Teacher\TeacherAssignmentController;
 use App\Http\Controllers\Teacher\TeacherController;
+use App\Http\Controllers\Timetable\TimetableController;
+use App\Http\Controllers\Timetable\TimetableEntryController;
 use App\Models\School;
 use Illuminate\Support\Facades\Route;
 
@@ -287,6 +289,49 @@ Route::middleware(['auth', 'verified', 'active'])->group(function () {
                 ->whereNumber('teacher')->can('staff.manage')->name('status');
             Route::patch('{teacher}/user', [TeacherController::class, 'updateUser'])
                 ->whereNumber('teacher')->can('staff.manage')->name('user');
+        });
+
+        /*
+        | Timetable management (see docs/timetable-management.md). Two gates:
+        |   module:timetable  — is the feature on? (depends on academics + staff)
+        |   ->can('timetable.view' | 'timetable.manage')  — may this user?
+        | Tenant-owned ids ({timetable}, {entry}) resolved by tenant-scoped
+        | `findOrFail` in the controller (after `tenant`), so another school's id
+        | 404s. Every academic / teacher id in a payload is validated to belong to
+        | the active school; scheduling clashes are rejected server-side.
+        */
+        Route::middleware('module:timetable')->prefix('timetables')->name('timetables.')->group(function () {
+            Route::get('/', [TimetableController::class, 'index'])
+                ->can('timetable.view')->name('index');
+            Route::get('create', [TimetableController::class, 'create'])
+                ->can('timetable.manage')->name('create');
+            Route::post('/', [TimetableController::class, 'store'])
+                ->can('timetable.manage')->name('store');
+            Route::get('teacher-view', [TimetableController::class, 'teacherView'])
+                ->can('timetable.view')->name('teacher');
+
+            // Lessons — literal prefixes so they never collide with {timetable}.
+            Route::get('{timetable}/entries/create', [TimetableEntryController::class, 'create'])
+                ->whereNumber('timetable')->can('timetable.manage')->name('entries.create');
+            Route::post('{timetable}/entries', [TimetableEntryController::class, 'store'])
+                ->whereNumber('timetable')->can('timetable.manage')->name('entries.store');
+            Route::get('entries/{entry}/edit', [TimetableEntryController::class, 'edit'])
+                ->whereNumber('entry')->can('timetable.manage')->name('entries.edit');
+            Route::patch('entries/{entry}', [TimetableEntryController::class, 'update'])
+                ->whereNumber('entry')->can('timetable.manage')->name('entries.update');
+            Route::delete('entries/{entry}', [TimetableEntryController::class, 'destroy'])
+                ->whereNumber('entry')->can('timetable.manage')->name('entries.destroy');
+
+            Route::get('{timetable}', [TimetableController::class, 'show'])
+                ->whereNumber('timetable')->can('timetable.view')->name('show');
+            Route::get('{timetable}/edit', [TimetableController::class, 'edit'])
+                ->whereNumber('timetable')->can('timetable.manage')->name('edit');
+            Route::patch('{timetable}', [TimetableController::class, 'update'])
+                ->whereNumber('timetable')->can('timetable.manage')->name('update');
+            Route::patch('{timetable}/status', [TimetableController::class, 'updateStatus'])
+                ->whereNumber('timetable')->can('timetable.manage')->name('status');
+            Route::delete('{timetable}', [TimetableController::class, 'destroy'])
+                ->whereNumber('timetable')->can('timetable.manage')->name('destroy');
         });
     });
 });

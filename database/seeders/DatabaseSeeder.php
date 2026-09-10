@@ -16,6 +16,7 @@ use App\Models\SchoolModule;
 use App\Models\Student;
 use App\Models\Subject;
 use App\Models\Teacher;
+use App\Models\Timetable;
 use App\Models\User;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Database\Seeder;
@@ -217,6 +218,44 @@ class DatabaseSeeder extends Seeder
                 'ended_on' => '2025-07-24',
             ]);
         });
+
+        // A published timetable for the current session's first term. Every
+        // lesson lines up with an active teacher assignment and nothing clashes.
+        $firstTerm = $session->periods()->orderBy('position')->first();
+        $staffList = $staff->values();
+
+        $timetable = Timetable::create([
+            'academic_session_id' => $session->id,
+            'academic_period_id' => $firstTerm?->id,
+            'name' => 'First Term 2025/26',
+        ]);
+
+        foreach ([
+            // [staffIndex, weekday(Mon=1), start, end, room]
+            [0, 1, '08:00', '09:00', 'Room 1'],
+            [1, 1, '09:00', '10:00', 'Room 2'],
+            [2, 2, '08:00', '09:00', 'Lab'],
+            [3, 2, '09:00', '10:00', 'Room 4'],
+            [0, 3, '08:00', '09:00', 'Room 1'],
+            [1, 3, '09:00', '10:00', 'Room 2'],
+            [2, 4, '10:00', '11:00', 'Lab'],
+            [3, 5, '08:00', '09:00', 'Room 4'],
+        ] as [$i, $weekday, $start, $end, $room]) {
+            $level = $levels[$i % $levels->count()];
+
+            $timetable->entries()->create([
+                'academic_level_id' => $level->id,
+                'level_arm_id' => $level->arms->first()->id,
+                'subject_id' => $subjectList[$i % $subjectList->count()]->id,
+                'teacher_id' => $staffList[$i]->id,
+                'weekday' => $weekday,
+                'start_time' => $start,
+                'end_time' => $end,
+                'room' => $room,
+            ]);
+        }
+
+        $timetable->publish();
 
         // One graduated student with a completed placement — history is kept.
         $alumnus = Student::factory()->status(StudentStatus::Graduated)->create(['first_name' => 'Ada', 'last_name' => 'Obi']);

@@ -113,6 +113,14 @@ class School extends Model
         return $this->hasMany(Teacher::class);
     }
 
+    /**
+     * @return HasMany<Timetable, $this>
+     */
+    public function timetables(): HasMany
+    {
+        return $this->hasMany(Timetable::class);
+    }
+
     public function isActive(): bool
     {
         return $this->status === SchoolStatus::Active;

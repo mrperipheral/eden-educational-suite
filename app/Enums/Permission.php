@@ -44,6 +44,10 @@ enum Permission: string
     case StaffView = 'staff.view';
     case StaffManage = 'staff.manage';
 
+    // ---- Timetable (enforced: Timetable Management M12) -------------------
+    case TimetableView = 'timetable.view';
+    case TimetableManage = 'timetable.manage';
+
     // ---- Declared for later domain milestones (coarse; not yet enforced) -----
     case AttendanceView = 'attendance.view';
     case AttendanceRecord = 'attendance.record';

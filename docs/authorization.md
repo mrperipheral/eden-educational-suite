@@ -14,7 +14,7 @@ role set, composed with the strict `TenantContext` from Milestone 3.
 | Runtime check | `User::hasPermission()` / `roleIn()` / `permissionsIn()` / `canGrantRole()` |
 | Gate wiring | `App\Providers\AuthServiceProvider` — one `Gate::define()` per permission |
 | Fine-grained rules | `App\Policies\MembershipPolicy` (self / escalation guards) |
-| Features that use it | Members (`/members*`), school settings + module activation (`school.settings.*`), academic structure (`/academic/*`, `academics.*` — M8), students (`/students/*`, `student.*` — M9), guardians (`/guardians/*`, `guardian.*` — M10), teachers (`/teachers/*`, `staff.*` — M11), school provisioning (`SchoolPolicy`) |
+| Features that use it | Members (`/members*`), school settings + module activation (`school.settings.*`), academic structure (`/academic/*`, `academics.*` — M8), students (`/students/*`, `student.*` — M9), guardians (`/guardians/*`, `guardian.*` — M10), teachers (`/teachers/*`, `staff.*` — M11), timetable (`/timetables/*`, `timetable.*` — M12), school provisioning (`SchoolPolicy`) |
 
 ```
 Request → auth · verified · active · tenant  (TenantContext::set(School))
@@ -48,7 +48,7 @@ and `hasPermission()` are the only things that would change.
 
 ## 3. Permissions (`App\Enums\Permission`)
 
-24 coarse permissions, dotted strings, grouped in the enum (order is
+26 coarse permissions, dotted strings, grouped in the enum (order is
 presentational only — nothing depends on it):
 
 - **School config (enforced — M5/M6):** `school.settings.view`,
@@ -75,6 +75,13 @@ presentational only — nothing depends on it):
   to Bursar / Teacher / Staff in M11 (Principal already held `staff.view`). A
   Teacher role holder can *see* the staff area but cannot manage other teachers.
   See `docs/teacher-management.md`.
+- **Timetable (enforced — M12):** `timetable.view`, `timetable.manage` — gate
+  `/timetables/*` (weekly class/teacher schedules + conflict detection + a
+  draft/published lifecycle). School Admin + Principal manage; Teacher + Staff
+  read; **Bursar / Parent / Student get 403** (Bursar has no academic access, so
+  no timetable access — the same shape as `academics.*`). `timetable.manage` +
+  `timetable.view` were added to Principal, `timetable.view` to Teacher / Staff
+  in M12. See `docs/timetable-management.md`.
 - **People & access (enforced):** `member.view`, `member.assign-role`
   (also gates *adding* an existing user — M5), `member.remove`
 - **Declared for later domain milestones** (not yet enforced — the modules that
@@ -108,10 +115,10 @@ Seven per-school roles, each a static bundle of permissions plus a `tier`:
 | Role | tier | Holds |
 |------|-----:|-------|
 | `school_admin` | 100 | **every** permission |
-| `principal` | 80 | school settings (view), member view + assign-role, all student/guardian/staff/academics/attendance/result permissions, finance (view) |
+| `principal` | 80 | school settings (view), member view + assign-role, all student/guardian/staff/academics/timetable/attendance/result permissions, finance (view) |
 | `bursar` | 50 | school settings (view), student/guardian/staff (view), finance (view + manage) |
-| `teacher` | 50 | student/guardian/staff (view), academics (view), attendance (view + record), result (view + enter) |
-| `staff` | 30 | student (view), guardian (view), staff (view), academics (view), attendance (view) |
+| `teacher` | 50 | student/guardian/staff/academics/timetable (view), attendance (view + record), result (view + enter) |
+| `staff` | 30 | student (view), guardian (view), staff (view), academics (view), timetable (view), attendance (view) |
 | `parent` | 10 | `portal.parent` |
 | `student` | 10 | `portal.student` |
 
@@ -202,8 +209,8 @@ school, so a cross-school membership can never reach the policy.
 | One role per (user, school), nullable | matches "roles are bundles"; multi-role is a rare need, deferred |
 | Tier-based escalation guard (`target.tier ≤ granter.tier`) | models org hierarchy; the hard invariant "never grant a role above your own" is simple and testable |
 | Platform admin = all permissions *within an entered school* | "retain platform-wide administration" without weakening row-level isolation (`SchoolScope` still applies) |
-| `member.*` + `academics.*` (M8) + `student.*` (M9) + `guardian.*` (M10) + `staff.*` (M11) enforced; the rest declared but dormant | the vocabulary the role bundles need, activated module by module |
-| `guardian.view` added to Staff in M10, `staff.*` widened in M11 (Principal → manage; Bursar/Teacher/Staff → view) | the read-only roles that see students/guardians also see teachers; a Teacher must not manage other teachers, so Teacher gets `staff.view` only — no escalation |
+| `member.*` + `academics.*` (M8) + `student.*` (M9) + `guardian.*` (M10) + `staff.*` (M11) + `timetable.*` (M12) enforced; the rest declared but dormant | the vocabulary the role bundles need, activated module by module |
+| `guardian.view` added to Staff in M10, `staff.*` widened in M11, `timetable.*` added in M12 (Principal → manage; Teacher/Staff → view; Bursar → none) | `timetable.*` follows `academics.*` exactly — the roles with academic access get it; Bursar has no academic access, so no timetable access |
 | Module activation (M7) reuses `school.settings.*`, stays orthogonal to permissions | it is configuration ("is the feature on for this school?"), not "may this user…"; a domain route checks both |
 | `academics.*` (M8) reused as-is, no finer split; sessions re-gated from `school.settings.*` | coarse-on-purpose; the academic structure is one thing under one permission (see `docs/academic-foundation.md`) |
 
@@ -214,6 +221,6 @@ school, so a cross-school membership can never reach the policy.
 - Admin UI for `users.status` and `users.is_platform_admin`.
 - Enforcing the remaining dormant permissions — happens in each domain module's
   milestone (`academics.*` in M8, `student.*` in M9, `guardian.*` in M10,
-  `staff.*` in M11).
+  `staff.*` in M11, `timetable.*` in M12).
 - Audit logging of role changes.
 - `@role` / permission Blade directives beyond the built-in `@can`.

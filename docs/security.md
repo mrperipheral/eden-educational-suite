@@ -220,6 +220,26 @@ Full detail in `docs/teacher-management.md`. Summary of controls:
 | No hard delete | teachers are never deleted (a leaver is `resigned`); assignments are `ended`, not dropped — `DELETE` stays only for a mis-entered row |
 | CSRF | every form; `@method('PATCH'|'DELETE')` spoofing |
 
+## Implemented in Milestone 12 (Timetable Management)
+
+Full detail in `docs/timetable-management.md`. Summary of controls:
+
+| Control | State |
+|---------|-------|
+| Two gates on every timetable route | `module:timetable` (feature on? else 404) **and** `->can('timetable.view'|'.manage')`; write Form Requests re-check `timetable.manage` |
+| Enforced permissions | `timetable.view` (School Admin, Principal, Teacher, Staff) / `timetable.manage` (School Admin, Principal); **Bursar / Parent / Student / role-less → 403** (Bursar has no academic access, so no timetable access — tested) |
+| Activation ≠ authorization | Timetable module on does not give a Bursar `timetable.view` (tested) |
+| Tenant isolation | `Timetable` and `TimetableEntry` are `BelongsToSchool`; the entry also carries `timetable_id`. School A cannot view / edit / delete / publish School B's timetable, cannot create one with School B's session, and cannot schedule a lesson with School B's level / arm / subject / teacher (explicit HTTP + model tests) |
+| `school_id` protection | never in `$fillable`, never from input, stamped from `TenantContext`, immutable (`TenantMismatchException`, tested); a `school_id` in the create payload is ignored (tested) |
+| `status` / `published_at` protection | **not mass-assignable** — publishing goes through `PATCH /timetables/{t}/status`, which is refused unless the timetable has lessons and no clash |
+| Route-model binding | `{timetable}` / `{entry}` resolved by tenant-scoped `findOrFail`; the Form Requests `abort(404)` on a cross-school route parent before validation |
+| Cross-school id leakage | every session / period / level / arm / subject / teacher id validated with `Rule::exists(...)->where('school_id', <tenant>)` → plain "invalid"; the conflict self-join is filtered by `timetable_id` **and** `school_id` |
+| Overlap correctness | half-open `[start, end)`, same weekday, per timetable; `HH:MM` string comparison; DB existence queries only — entries are never loaded into PHP to detect clashes |
+| Teacher authorization not duplicated | a lesson is only allowed when an **active M11 `TeacherAssignment`** backs `(teacher, subject, level)` for the session — the timetable asks M11, it does not re-implement the rule |
+| PII minimisation | no personal data on the timetable — it references existing records only |
+| Data integrity | published timetables cannot be deleted (draft first); FK deletes cascade for the required parents (never hard-deleted in practice), `academic_period_id` is `nullOnDelete` |
+| CSRF | every form; `@method('PATCH'|'DELETE')` spoofing |
+
 ## Deferred (with the milestone that owns them)
 
 - **Auth follow-ups:** 2FA, "log out other devices" on password change, session
@@ -228,7 +248,7 @@ Full detail in `docs/teacher-management.md`. Summary of controls:
   / brand-new-account onboarding, admin UI for `status` / `is_platform_admin`,
   audit logging of role & membership changes, enforcing the remaining dormant
   domain permissions (each in its module — `academics.*` in M8, `student.*` in
-  M9, `guardian.*` in M10, `staff.*` in M11).
+  M9, `guardian.*` in M10, `staff.*` in M11, `timetable.*` in M12).
 - **Tenancy follow-ups:** queue-job tenant propagation, per-tenant rate limiting,
   per-tenant cache keys, audit logging of context switches.
 - **Later:** audit logging (who did what, per school — incl. student record /

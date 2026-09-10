@@ -104,7 +104,7 @@ enum Module: string
             self::Students => [self::Academics],
             self::Guardians => [self::Students],
             self::Staff => [self::Academics],
-            self::Timetable => [self::Academics],
+            self::Timetable => [self::Academics, self::Staff],
             self::Attendance => [self::Students],
             self::Assessments => [self::Academics, self::Students],
             self::Results => [self::Assessments],
@@ -131,11 +131,14 @@ enum Module: string
      *     student ↔ guardian relationships (`docs/guardian-management.md`).
      *   - `staff` — Teacher Management (M11): teacher records, optional account
      *     link, teaching-assignment foundation (`docs/teacher-management.md`).
+     *   - `timetable` — Timetable Management (M12): weekly class/teacher
+     *     schedules with conflict detection (`docs/timetable-management.md`).
+     *     Still **off** by default — a specialised tool a school opts into.
      */
     public function isAvailable(): bool
     {
         return match ($this) {
-            self::Academics, self::Students, self::Guardians, self::Staff => true,
+            self::Academics, self::Students, self::Guardians, self::Staff, self::Timetable => true,
             default => false,
         };
     }

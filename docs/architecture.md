@@ -1,6 +1,6 @@
 # Architecture
 
-Status: Milestone 11 (Teacher Management) complete. This describes the intended
+Status: Milestone 12 (Timetable Management) complete. This describes the intended
 shape of the system and what exists today.
 
 ## 1. High-level model
@@ -251,16 +251,47 @@ timetable/attendance/marks, no payroll.
   user ids, are rejected in the Form Request with generic messages (no leak);
   the assignment Form Request `abort(404)`s on a cross-school route parent.
 
+## 2j. Timetable management (implemented — Milestone 12)
+
+Full reference: **`docs/timetable-management.md`**. A tenant-scoped, configurable
+weekly timetable with server-side conflict detection and a draft → published
+lifecycle. Scheduling foundation only — no attendance, marks, notifications,
+rooms module, workload/payroll, auto-optimisation or student/parent views.
+
+- **`App\Models\Timetable`** — school-owned. Scoped to one `AcademicSession`
+  (fixed at creation) + optional `AcademicPeriod`; lessons inherit that scope so
+  they can't cross sessions. `status` (`draft` / `published`) and `published_at`
+  are **not** mass-assignable — `publish()` runs behind a conflict guard.
+- **`App\Models\TimetableEntry`** — school-owned *and* timetable-scoped. A lesson
+  = level + **arm (required — scheduled per class)** + subject + teacher +
+  `weekday` (`App\Enums\Weekday`, no Mon–Fri assumption) + `start_time` /
+  `end_time` (`HH:MM` strings, **half-open** `[start, end)`) + optional text
+  `room`.
+- **Scheduling rules** (`TimetableEntryRequest`, all server-side DB existence
+  queries): end after start; arm↔level; subject offered by the level
+  (`level_subject`); an **active M11 `TeacherAssignment`** backs `(teacher,
+  subject, level)` for the session; no teacher / class / room double-booking.
+  `App\Support\Timetable\TimetableConflictScanner` (one indexed self-join) backs
+  the publish guard.
+- **`App\Http\Controllers\Timetable\*`**, `/timetables/*` routes behind
+  `['tenant', 'module:timetable']`, gated `timetable.view` / `timetable.manage`
+  (new M4 permissions). `Module::Timetable->isAvailable()` is now `true` (still
+  **off by default**); it **depends on `Module::Academics` and `Module::Staff`**.
+  `timetable.*` added to Principal / Teacher / Staff (the roles with academic
+  access) — Bursar has none.
+- Desktop **day × time grid**, mobile **stacked day list**; a **teacher
+  timetable** view; filters by class / arm / teacher / weekday.
+
 ### Deferred
 
 - Queue jobs capture/restore the tenant id (no jobs exist yet — see
   `docs/tenancy.md` §7).
 - Invitations / brand-new-account onboarding, school suspension / subscription,
   notification & payment config, the remaining domain modules behind the M7
-  catalogue (class rosters, timetable, attendance, results, fees, CBT, portals,
-  promotion workflow, bulk student / guardian / teacher import), the Parent
-  Portal (guardian sign-in) and Teacher Portal (teacher sign-in), non-teaching
-  staff records, admin UI for `status` / `is_platform_admin`, subdomain routing.
+  catalogue (attendance, results, fees, CBT, portals, promotion workflow, bulk
+  import), a rooms/facilities module + timetable templates, the Parent Portal
+  (guardian sign-in) and Teacher Portal (teacher sign-in), non-teaching staff
+  records, admin UI for `status` / `is_platform_admin`, subdomain routing.
 
 ## 3. Application layers & conventions
 
@@ -353,3 +384,6 @@ pre-auth screens.
 | 2026-09-19 | Teacher record is separate from `User`; `user_id` nullable, set via a dedicated endpoint, linked only to an existing member | a teacher is a professional record first, not automatically a login; M11 builds no invitation / credential / portal flow (see `docs/teacher-management.md`) |
 | 2026-09-19 | Teaching assignments are a `TeacherAssignment` model (session req, period/arm opt, subject req); duplicate-active check in the Form Request, not a DB constraint | history is first-class and the Timetable / Attendance / Results modules extend one model; a hard unique key would over-constrain future scheduling |
 | 2026-09-19 | `Module::Staff` depends on `Module::Academics` | a teaching assignment is meaningless without sessions / levels / subjects — a minimal, correct extension of the M7 catalogue |
+| 2026-09-20 | Timetable = a `Timetable` (session-scoped) + `TimetableEntry` (lesson) pair; session/period on the parent only | lessons structurally can't cross sessions; the entry stays lean for the Attendance module to extend (see `docs/timetable-management.md`) |
+| 2026-09-20 | Lesson times are `HH:MM` strings + half-open `[start, end)`; overlap checks are DB existence queries / one self-join, never loaded into PHP | portable string comparison across SQLite/MySQL; back-to-back lessons don't clash; conflict detection stays index-bound on a busy board |
+| 2026-09-20 | `room` is plain text, not a FK / facilities module; `Module::Timetable` depends on Academics + Staff and stays off by default | M12 is scheduling, not facilities management; a timetable needs the academic structure *and* teachers-with-assignments; timetable is a specialised opt-in (unchanged M7 intent) |

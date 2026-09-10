@@ -19,6 +19,11 @@ below, not a rewrite.
   production so violations surface in dev and tests.
 - Prefer `select` of needed columns on hot paths; avoid `SELECT *` for wide rows.
 - Aggregate in the database, not in PHP loops.
+- **Consistency / conflict checks are DB queries, not PHP scans.** Timetable
+  overlap detection (M12) uses one narrow indexed existence query per booked
+  resource, and the publish guard is a single self-join — timetable entries are
+  never loaded into PHP to find clashes. The same pattern applies to any future
+  "does a conflicting row exist" rule.
 
 ### Caching
 - Cache expensive, read-mostly, tenant-scoped computations with a

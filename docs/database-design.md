@@ -1,14 +1,14 @@
 # Database Design
 
-Status: Milestone 11. Tenant + roles + onboarding + school settings + module
+Status: Milestone 12. Tenant + roles + onboarding + school settings + module
 activation + academic foundation + student management + guardian management +
-teacher management. School-owned tables: `school_settings` (M6),
-`school_modules` (M7), the academic structure — `academic_sessions`,
-`academic_periods`, `academic_levels`, `level_arms`, `subjects`, `level_subject`
-(M8) — `students` + `enrollments` (M9), `guardians` + `guardian_student` (M10),
-and `teachers` + `teacher_assignments` (M11). No timetable / attendance /
-results / fees tables yet. This document records the conventions every future
-migration follows.
+teacher management + timetable management. School-owned tables:
+`school_settings` (M6), `school_modules` (M7), the academic structure —
+`academic_sessions`, `academic_periods`, `academic_levels`, `level_arms`,
+`subjects`, `level_subject` (M8) — `students` + `enrollments` (M9), `guardians` +
+`guardian_student` (M10), `teachers` + `teacher_assignments` (M11), and
+`timetables` + `timetable_entries` (M12). No attendance / results / fees tables
+yet. This document records the conventions every future migration follows.
 
 ## Current schema
 
@@ -30,6 +30,8 @@ migration follows.
 | `guardian_student` | student ↔ guardian link. School-owned **+** `student_id` **+** `guardian_id`. `unique(student_id, guardian_id)`, `index(school_id, student_id, is_primary)`, `index(school_id, guardian_id)`. `relationship`, `is_primary` (at most one per student). |
 | `teachers` | teacher professional records. School-owned. Optional `user_id` FK (`nullOnDelete`). `unique(school_id, employee_number)`, `unique(school_id, user_id)`, `index(school_id, status)`, `index(school_id, last_name, first_name)`. Minimal professional data (no ID / financial / medical / credential fields); never hard-deleted. |
 | `teacher_assignments` | a teacher's teaching assignment over time. School-owned **+** `teacher_id`. FKs to session (req) / period (opt) / level (req) / arm (opt) / subject (req). `index(school_id, teacher_id, status)`, class-roster index `(school_id, session, level, arm)`, `index(school_id, subject_id)`. `status` (`active` / `ended`); history preserved. |
+| `timetables` | a weekly schedule. School-owned. `academic_session_id` (req, fixed) + optional `academic_period_id`. `status` (`draft`/`published`, not mass-assignable), `published_at`. `index(school_id, session, period)`, `index(school_id, status)`. |
+| `timetable_entries` | one scheduled lesson. School-owned **+** `timetable_id`. FKs level / arm / subject / teacher (all required — scheduled per class). `weekday`, `start_time`/`end_time` (`HH:MM` strings, half-open), optional text `room`. Overlap indexes on `(school_id, timetable_id, {weekday|teacher|arm|room}, …)`. |
 | `school_modules` | per-school feature-module on/off overrides. School-owned. `unique(school_id, module)`. Override-only — a row exists only where a school departs from the `App\Enums\Module` default. |
 | `password_reset_tokens`, `sessions` | auth/session plumbing |
 | `cache`, `cache_locks` | `CACHE_STORE=database` |
@@ -161,6 +163,32 @@ Two migrations, both school-owned (`BelongsToSchool`). See `docs/teacher-managem
   not by a DB constraint. History preserved — an assignment is `ended`, never
   deleted (the `DELETE` route stays for a mis-entered row).
 
+### `2026_09_20_100000_*` — Timetable Management (Milestone 12)
+Two migrations, both school-owned (`BelongsToSchool`). See `docs/timetable-management.md`.
+
+- **`timetables`** — `academic_session_id` FK (cascade, required, fixed at
+  creation), `academic_period_id` FK (`nullOnDelete`, optional), `name`,
+  `status` (`App\Enums\TimetableStatus` `draft` / `published`, default `draft`,
+  **not** mass-assignable), `published_at` (nullable, **not** mass-assignable).
+  `index(school_id, academic_session_id, academic_period_id)`,
+  `index(school_id, status)`. Several timetables per session allowed (no
+  uniqueness — history); a published one can't be deleted.
+- **`timetable_entries`** — one lesson. `timetable_id` FK (cascade),
+  `academic_level_id` / `level_arm_id` / `subject_id` / `teacher_id` FK (cascade,
+  all **required** — a lesson is scheduled *per class*, so `level_arm_id` is not
+  nullable here unlike M9/M11), `weekday` (`unsignedTinyInteger`,
+  `App\Enums\Weekday`), `start_time` / `end_time` (`string(5)`, `HH:MM` — **not**
+  a `TIME` type, so string comparison is portable and unambiguous), `room`
+  (`string(60)`, nullable, plain text — not a facilities module). No
+  `academic_session_id` / `academic_period_id` — inherited from the parent
+  timetable so lessons can't cross sessions. Overlap indexes:
+  `(school_id, timetable_id, weekday, start_time)`,
+  `(school_id, timetable_id, teacher_id, weekday)`,
+  `(school_id, timetable_id, level_arm_id, weekday)`,
+  `(school_id, timetable_id, room, weekday)`. All scheduling rules (half-open
+  `[start, end)` overlap, subject↔level, an active teacher assignment) are
+  enforced in `TimetableEntryRequest`; the publish guard runs one self-join scan.
+
 ### `2026_09_15_100000_create_school_modules_table`
 Milestone 7 — per-school feature/module activation. `module` (`string(40)`, an
 `App\Enums\Module` value, **not** cast so an unknown id can't break a page),
@@ -201,7 +229,12 @@ written only via `App\Support\Modules\SchoolModules`. See `docs/module-activatio
 7. **Enums** as short strings with a DB-level `check`/`enum` or an app cast, not
    magic integers.
 
-8. **Migrations are additive and reversible.** No editing a shipped migration;
+8. **Times of day** (not timestamps) stored as zero-padded `HH:MM` strings
+   (`string(5)`), not a `TIME` column — string comparison is then correct and
+   identical across SQLite and MySQL, which matters for range/overlap queries
+   (first used by `timetable_entries`, M12).
+
+9. **Migrations are additive and reversible.** No editing a shipped migration;
    add a new one. `down()` is implemented.
 
 ## Indexing checklist for new tables
@@ -215,7 +248,7 @@ written only via `App\Support\Modules\SchoolModules`. See `docs/module-activatio
 ## Not yet designed (later milestones, will be added here)
 
 `school_user.is_default`, holiday / calendar events, non-teaching staff, class
-rosters, timetable, attendance, assessments/results, fees/invoices/payments, CBT,
-audit log. Each gets an entry here when built.
+rosters, attendance, assessments/results, fees/invoices/payments, CBT,
+rooms/facilities, audit log. Each gets an entry here when built.
 
 Permissions and roles are **not** in the database — they are code (`App\Enums`).

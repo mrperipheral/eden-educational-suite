@@ -169,11 +169,33 @@ records, class rosters ("who teaches JSS1"), timetable, attendance, marks,
 payroll / workload, qualifications & documents, bulk teacher import,
 head-of-department / form-teacher designations.
 
-## Milestone 12+ — Domain Modules
+## ✅ Milestone 12 — Timetable Management (complete, 2026-09-20)
 
-Class rosters · Timetable · Attendance · Assessments & Results ·
-Fees / Invoices / Payments (Paystack) · CBT · Role-specific portals &
-dashboards · Notifications · Reporting · Promotion.
+A tenant-scoped, configurable weekly timetable with server-side conflict
+detection and a draft → published lifecycle. `App\Models\Timetable`
+(session-scoped, fixed at creation; `status` draft/published not mass-assignable;
+publishing runs behind a conflict guard) + `App\Models\TimetableEntry` (one
+lesson: level + **arm (required — scheduled per class)** + subject + teacher +
+`Weekday` + `HH:MM` half-open times + optional text `room`; session/period
+inherited from the parent). Scheduling rules (`TimetableEntryRequest`): end after
+start, arm↔level, subject offered by the level, an **active M11
+`TeacherAssignment`** backing the pairing, no teacher/class/room double-booking —
+all DB existence queries. `TimetableConflictScanner` (one self-join) backs the
+publish guard. `/timetables/*` gated `timetable.view` / `timetable.manage` (new
+M4 permissions) **and** `module:timetable` — which now depends on
+`module:academics` **and** `module:staff`. `Module::Timetable->isAvailable()` is
+`true` but still **off by default**. `timetable.*` added to Principal / Teacher /
+Staff (not Bursar). Desktop day×time grid, mobile stacked list, teacher-view.
+Full detail in `docs/timetable-management.md`.
+
+Deferred: student/parent timetable views (portals), publish notifications, a
+rooms/facilities module, timetable templates / term cloning, named period grids,
+teacher workload limits, recurring exceptions / cover, auto-generation.
+
+## Milestone 13+ — Domain Modules
+
+Attendance · Assessments & Results · Fees / Invoices / Payments (Paystack) ·
+CBT · Role-specific portals & dashboards · Notifications · Reporting · Promotion.
 
 Each domain module checks its `App\Enums\Module` flag (`module:` middleware /
 `@module`) **and** its M4 permissions — the two stay orthogonal.

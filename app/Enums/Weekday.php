@@ -29,4 +29,33 @@ enum Weekday: int
             self::Saturday => __('Saturday'),
         };
     }
+
+    /** Three-letter abbreviation, for compact grid headers. */
+    public function short(): string
+    {
+        return match ($this) {
+            self::Sunday => __('Sun'),
+            self::Monday => __('Mon'),
+            self::Tuesday => __('Tue'),
+            self::Wednesday => __('Wed'),
+            self::Thursday => __('Thu'),
+            self::Friday => __('Fri'),
+            self::Saturday => __('Sat'),
+        };
+    }
+
+    /**
+     * All seven days, Monday-first (the ISO / common school-week order). The
+     * timetable never assumes *which* days a school teaches on — this is only
+     * the order options are listed in.
+     *
+     * @return list<self>
+     */
+    public static function all(): array
+    {
+        return [
+            self::Monday, self::Tuesday, self::Wednesday, self::Thursday,
+            self::Friday, self::Saturday, self::Sunday,
+        ];
+    }
 }
