@@ -60,14 +60,22 @@ Account settings (`resources/views/settings/profile.blade.php`) uses
 `<x-layouts.authenticated>` with three stacked `<x-card>` sections (profile,
 password, delete) — restrained card use, one concern per card.
 
-School settings (`resources/views/settings/school/`) is split into three pages —
-Profile, Branding, Regional — sharing a `_nav.blade.php` sub-nav partial (fourth
-tab: Academic sessions). Rather than one long form, each page holds a focused
-form with its own validation and success state, and each renders a read-only
-`<dl>` fallback for roles that hold `school.settings.view` but not `.update`.
+School settings (`resources/views/settings/school/`) is split into pages —
+Profile, Branding, Regional, Modules — sharing a `_nav.blade.php` sub-nav
+partial (with Academic sessions). Rather than one long form, each page holds a
+focused form with its own validation and success state, and each renders a
+read-only fallback for roles that hold `school.settings.view` but not `.update`.
 The branding page uploads a logo (`enctype="multipart/form-data"`), previews it
 via the gated serve route, and removes it through `x-confirm`. See
 `docs/school-settings.md`.
+
+The **Modules** page (`settings/school/modules`, `docs/module-activation.md`)
+lists feature modules grouped by area. Each row: name, a status badge
+(**Available** green / **Planned** amber), an **Enabled/Disabled** badge, the
+dependency list, and a one-button `PATCH` form to flip it. Not-yet-built modules
+are badged **Planned** and the card intro states plainly that the toggle is a
+saved preference — no control implies a module is already implemented (no
+"open"/"configure" links). View-only roles see the list with no buttons.
 
 Flash messages (`session('success' | 'error' | 'status')`) are rendered
 automatically by `<x-layouts.app>` as alerts.

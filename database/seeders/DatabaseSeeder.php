@@ -2,9 +2,11 @@
 
 namespace Database\Seeders;
 
+use App\Enums\Module;
 use App\Enums\Role;
 use App\Models\AcademicSession;
 use App\Models\School;
+use App\Models\SchoolModule;
 use App\Models\User;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Database\Seeder;
@@ -71,6 +73,11 @@ class DatabaseSeeder extends Seeder
             'starts_on' => '2025-09-01',
             'ends_on' => '2026-07-31',
         ])->makeCurrent();
+
+        // Alpha has tweaked two modules away from the catalogue defaults; every
+        // other module (and all of Beta) simply uses the default.
+        SchoolModule::create(['module' => Module::Timetable->value, 'enabled' => true]);
+        SchoolModule::create(['module' => Module::Fees->value, 'enabled' => false]);
 
         $tenant->forget();
     }

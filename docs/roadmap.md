@@ -79,11 +79,30 @@ Deferred: grading scheme / term structure / holiday calendar (Academic
 Management), notification & payment-gateway config (their own modules), feature
 activation, app-wide render-time application of the formatting preferences.
 
-## Milestone 7+ — Domain Modules
+## ✅ Milestone 7 — Feature / Module Activation (complete, 2026-09-10)
+
+Per-school enable/disable of the application's feature modules. `App\Enums\Module`
+(14 code-defined modules with label / description / group / dependencies /
+default / `isAvailable()`), `school_modules` override-only table +
+`App\Models\SchoolModule` (`BelongsToSchool`), the request-scoped
+`App\Support\Modules\SchoolModules` resolver (one query per request, memoised),
+a Modules admin page under school settings (`/settings/school/modules`, gated
+`school.settings.*`), and the reusable `module:` route middleware + `@module`
+Blade directive for future modules. Activation is configuration only — it grants
+no permissions. Full detail in `docs/module-activation.md`.
+
+Deferred: the modules themselves (each domain milestone), preset bundles,
+disable-with-cascade, per-module config pages, activation audit trail,
+plan-based entitlements.
+
+## Milestone 8+ — Domain Modules
 
 Staff · Students & Guardians · Classes/Sections/Subjects · Enrolment ·
 Attendance · Assessments & Results · Fees / Invoices / Payments (Paystack) ·
 CBT · Role-specific portals & dashboards · Notifications · Reporting.
+
+Each domain module checks its `App\Enums\Module` flag (`module:` middleware /
+`@module`) **and** its M4 permissions — the two stay orthogonal.
 
 ## Cross-cutting, introduced when first needed
 

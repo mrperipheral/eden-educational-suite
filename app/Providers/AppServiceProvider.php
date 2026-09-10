@@ -2,8 +2,11 @@
 
 namespace App\Providers;
 
+use App\Enums\Module;
+use App\Support\Modules\SchoolModules;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
@@ -17,6 +20,10 @@ class AppServiceProvider extends ServiceProvider
     {
         // One tenant context per request; every tenant-aware query reads from it.
         $this->app->scoped(TenantContext::class);
+
+        // One module-activation resolver per request; the school's module
+        // overrides are read from the database once and memoised.
+        $this->app->scoped(SchoolModules::class);
     }
 
     /**
@@ -39,6 +46,15 @@ class AppServiceProvider extends ServiceProvider
             // regardless of what the environment file says.
             config(['session.secure' => true]);
         }
+
+        // `@module('attendance') … @endmodule` — is a feature module switched on
+        // for the current school? A convenience for views (nav, dashboards);
+        // it is not an authorization check.
+        Blade::if('module', function (string $module): bool {
+            $case = Module::tryFrom($module);
+
+            return $case !== null && app(SchoolModules::class)->enabled($case);
+        });
 
         // Single definition of "an acceptable password", used by every
         // registration / reset / change form via Password::defaults().

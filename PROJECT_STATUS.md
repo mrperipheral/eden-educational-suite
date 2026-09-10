@@ -4,11 +4,12 @@ _Last updated: 2026-09-10_
 
 ## Current milestone
 
-**Milestone 6 — School Settings & Configuration: COMPLETE.**
+**Milestone 7 — Feature / Module Activation: COMPLETE.**
 
-Next up: **Domain Modules** (Milestone 7+) — Staff, Students & Guardians,
-Classes/Subjects, Enrolment, Attendance, Results, Fees, CBT, portals. Not
-started — do not begin without picking it up explicitly. See `docs/roadmap.md`.
+Next up: **Domain Modules** (Milestone 8+) — Academic Management, Students,
+Guardians, Staff, Timetable, Attendance, Assessments, Results, Fees, Learning
+Materials, CBT, Notifications, Portals. Not started — do not begin without
+picking it up explicitly. See `docs/roadmap.md`.
 
 ## What the application is
 
@@ -23,8 +24,8 @@ Vite · PHPUnit · Pint.
 | PHP | 8.3.30 (Laragon) |
 | Laravel | 13.31.0 |
 | Node / npm | 22.x |
-| Database | MySQL 8 `schoolmanagement_db` |
-| Tests | `php artisan test` — 231 passing |
+| Database | MySQL 8 (app) · SQLite `:memory:` (tests) |
+| Tests | `php artisan test` — 264 passing |
 | Build | `npm run build` — passing |
 | Formatting | `vendor/bin/pint --test` — passing |
 
@@ -38,108 +39,102 @@ Vite · PHPUnit · Pint.
 - **M4 — Roles & Permissions** (`roles-permissions-complete`) —
   `docs/authorization.md`.
 - **M5 — School Onboarding** (`school-onboarding-complete`) — `docs/onboarding.md`.
-- **M6 — School Settings & Configuration** (this milestone,
-  `school-settings-complete`) — `docs/school-settings.md`; see below.
+- **M6 — School Settings & Configuration** (`school-settings-complete`) —
+  `docs/school-settings.md`.
+- **M7 — Feature / Module Activation** (this milestone,
+  `feature-activation-complete`) — `docs/module-activation.md`; see below.
 
-## Delivered in Milestone 6
+## Delivered in Milestone 7
 
-Expands the M5 `SchoolSetting` foundation (1:1, `BelongsToSchool`) into the full
-per-school configuration record. Typed columns, no JSON blob. Built on the
-existing M3/M4 tenant + permission architecture — no new authorization or
-tenancy mechanism, no new packages, no Redis/queues.
+Per-school enable/disable of the application's feature modules, built on the
+existing M3/M4 tenant + permission architecture. No new authorization or tenancy
+mechanism, no new packages, no Redis/queues. M7 ships the **activation system** —
+not the modules, which are each a later milestone.
 
-- **Migration** `2026_09_14_100000_add_configuration_to_school_settings_table` —
-  13 columns: `address_line1/2`, `city`, `state`, `postal_code`, `country`,
-  `website_url`, `logo_path` (guarded), `brand_color`, `currency`, `date_format`,
-  `week_starts_on`, `academic_year_start_month`. No new index (1:1 on unique
-  `school_id`). Column defaults kept in sync with the model `$attributes` and
-  `config('school-settings.defaults')`.
-- **`App\Models\SchoolSetting`** — expanded `$fillable` (still excludes
-  `school_id`, `completed_at`, `logo_path`); `$attributes` defaults; casts
-  `date_format` → `App\Enums\DateFormat`, `week_starts_on` → `App\Enums\Weekday`.
-  `putLogo()` / `clearLogo()` / `hasLogo()` manage the private-disk file;
-  `markReviewed()` unchanged.
-- **Enums** — `App\Enums\DateFormat` (string-backed, value is a PHP `date()`
-  format), `App\Enums\Weekday` (int-backed, Carbon 0=Sun…6=Sat numbering).
-- **`config/school-settings.php`** — curated `currencies` (16, ISO 4217),
-  `countries` (17, ISO 3166-1 alpha-2), `locales` (4), `defaults`. Config-cacheable.
-- **`SchoolSettingsController`** — three sections, each with a read page
-  (`school.settings.view`) and a write (`school.settings.update`):
-  - **Profile** — `GET/PATCH /settings/school` (`UpdateSchoolProfileRequest`).
-  - **Branding** — `GET/PATCH /settings/school/branding`
-    (`UpdateSchoolBrandingRequest`), `DELETE /settings/school/branding/logo`,
-    `GET /settings/school/branding/logo` (serves the logo, gated, no path param).
-  - **Regional** — `GET/PATCH /settings/school/regional`
-    (`UpdateSchoolRegionalRequest`).
-- **Branding upload** — logo validated by content MIME (jpeg/png/webp), size
-  (≤2 MB), dimensions (48–1600px); stored on the private `local` disk at
-  `school-logos/{tenant_id}/…`; served only through the gated route (no path
-  parameter → no traversal; tenant-scoped).
-- **Views** — `resources/views/settings/school/{profile,branding,regional}.blade.php`
-  + shared `_nav.blade.php` sub-nav (Profile · Branding · Regional · Academic
-  sessions). Editable form for `.update` holders, read-only `<dl>` fallback for
-  view-only roles. `academic-sessions.blade.php` switched to the shared nav; the
-  old single `settings/school.blade.php` deleted.
-- **Authorization** — School Admin edits; Principal & Bursar read-only (no new
-  permission — documented in `docs/authorization.md` / `docs/school-settings.md`);
-  Teacher/Staff/Parent/Student 403. Platform Admin only through a selected
-  context (no context → school-picker redirect).
-- **Seeder** — Alpha Academy now seeded with full settings values.
-- **Docs** — new `docs/school-settings.md`; updated `architecture.md`,
-  `security.md`, `database-design.md`, `authorization.md`, `tenancy.md`,
-  `onboarding.md`, `roadmap.md`, `ui-ux-guidelines.md`, `CLAUDE.md`, `AGENTS.md`.
+- **`App\Enums\Module`** — the code-defined catalogue: 14 modules (Academic
+  Management, Student Management, Parent/Guardian Management, Teacher/Staff
+  Management, Timetable, Attendance, Assessments, Results & Report Cards, Fees &
+  Payments, Learning Materials, CBT, Notifications, Parent Portal, Student
+  Portal). Each case has `label()`, `description()`, `group()`,
+  `dependencies()`, `enabledByDefault()`, `isAvailable()` (all `false` in M7 —
+  each domain milestone flips its own), plus `grouped()` / `defaults()` helpers.
+- **Migration** `2026_09_15_100000_create_school_modules_table` —
+  `school_modules` (`school_id`, `module` string(40) uncast, `enabled` bool),
+  `unique(['school_id','module'])` (also the lookup index). **Override-only**: a
+  row exists only where a school departs from a default, so a new school writes
+  nothing.
+- **`App\Models\SchoolModule`** — `BelongsToSchool`; `$fillable` = `module`,
+  `enabled` only (never `school_id`); `enabled` cast bool, `module` left a plain
+  string so a retired identifier can't break a page.
+- **`App\Support\Modules\SchoolModules`** — request-scoped resolver
+  (`AppServiceProvider::scoped`). `enabled(Module)` / `states()` / `set()`. Reads
+  the override rows **once per request** (cache keyed by active school id, so it
+  self-heals if the instance outlives a context), tenant-scoped, fails closed.
+- **`App\Http\Controllers\SchoolModuleController`** + `UpdateSchoolModuleRequest`
+  — `GET /settings/school/modules` (`school.settings.view`),
+  `PATCH /settings/school/modules/{module}` (`school.settings.update`). Unknown
+  `{module}` → 404. Single-level dependency validation (enable needs deps on;
+  disable blocked by enabled dependents) → `module` validation error.
+- **Reuse seam for future modules** — `App\Http\Middleware\EnsureModuleEnabled`
+  registered as the **`module:`** alias (404s when the module is off; runs after
+  `tenant`), and the **`@module('…')`** Blade directive. Both check the flag
+  only — activation grants no permission.
+- **View** — `resources/views/settings/school/modules.blade.php`: modules grouped
+  by area, each row with name / description / Available|Planned badge /
+  Enabled|Disabled badge / dependency list / one-button toggle form. Read-only
+  (no buttons) for `school.settings.view`-only roles. New "Modules" tab in
+  `settings/school/_nav.blade.php`.
+- **Seeder** — Alpha Academy overrides two modules (Timetable on, Fees off);
+  everything else (and all of Beta) uses catalogue defaults.
+- **Docs** — new `docs/module-activation.md`; updated `architecture.md`,
+  `security.md`, `database-design.md`, `authorization.md`, `roadmap.md`,
+  `ui-ux-guidelines.md`, `CLAUDE.md`, `AGENTS.md`.
 
 ## Explicitly NOT done (by design)
 
-Feature activation / per-school module toggles · grading scheme / result
-templates / term structure / holiday calendar (Academic Management) ·
-notification channel config · payment-gateway credentials (Fees module) ·
-app-wide render-time application of `date_format` / `timezone` / `locale` ·
-logo virus scanning · CDN / `s3` logo delivery · everything from the M5 "NOT
-done" list (invitations, suspension, billing, domain modules, portals, …).
+The domain modules themselves (Academic Management, Students, Guardians, Staff,
+Timetable, Attendance, Assessments, Results, Fees, Learning Materials, CBT,
+Notifications, Portals) · preset/bundle activation · disable-with-cascade or
+"this will hide X" confirmation flow · per-module configuration sub-pages ·
+activation audit trail · plan-based module entitlements (subscription/billing) ·
+everything from the M5/M6 "NOT done" lists.
 
 ## Database
 
-Milestone 6 adds 13 typed columns to `school_settings` (still 1:1, unique
-`school_id`, no new index). No other schema changes. `logo_path` is guarded
-(written only via the model).
+Milestone 7 adds `school_modules` (school-owned, `unique(school_id, module)`,
+override-only). No other schema changes.
 
-## Routes (application, additions in M6)
+## Routes (application, additions in M7)
 
 Tenant-scoped (`auth · verified · active · tenant`):
 
 | Method | URI | Name | Permission |
 |--------|-----|------|------------|
-| GET | `/settings/school` | `settings.school.edit` | `school.settings.view` |
-| PATCH | `/settings/school` | `settings.school.update` | `school.settings.update` |
-| GET | `/settings/school/branding` | `settings.school.branding.edit` | `school.settings.view` |
-| PATCH | `/settings/school/branding` | `settings.school.branding.update` | `school.settings.update` |
-| DELETE | `/settings/school/branding/logo` | `settings.school.branding.logo.destroy` | `school.settings.update` |
-| GET | `/settings/school/branding/logo` | `settings.school.branding.logo.show` | `school.settings.view` |
-| GET | `/settings/school/regional` | `settings.school.regional.edit` | `school.settings.view` |
-| PATCH | `/settings/school/regional` | `settings.school.regional.update` | `school.settings.update` |
+| GET | `/settings/school/modules` | `settings.school.modules.edit` | `school.settings.view` |
+| PATCH | `/settings/school/modules/{module}` | `settings.school.modules.update` | `school.settings.update` |
 
-(The M5 `settings.school.edit` / `.update` names are retained; the single
-`PATCH /settings/school` now handles the Profile section only.)
+New middleware alias: `module:<name>` (`EnsureModuleEnabled`) — not yet used by
+any route; the seam for domain milestones.
 
 ## Tests
 
-231 passing (was 211 at M5; +20 in M6, M1–M5 intact). New / changed:
-`Feature/Settings/SchoolSettingsTest` (retargeted to the Profile section + shared
-auth/isolation/protected-field coverage), new
-`Feature/Settings/SchoolBrandingTest`, `Feature/Settings/SchoolRegionalTest`,
-`Unit/Enums/DateFormatTest`, `Unit/Enums/WeekdayTest`.
-`Feature/Onboarding/OnboardingChecklistTest` updated for the new profile payload.
+264 passing (was 231 at M6; +33 in M7, M1–M6 intact). New:
+`tests/Unit/Enums/ModuleTest` (catalogue integrity, acyclic dependency graph,
+default/dependency consistency), `tests/Feature/Modules/SchoolModulesTest`
+(resolver: defaults, overrides, isolation, fail-safe, one-query-per-request),
+`tests/Feature/Modules/ModuleActivationMiddlewareTest` (the `module:` gate),
+`tests/Feature/Settings/SchoolModulesTest` (page + toggle: auth, view-only,
+enable/disable, validation, dependencies, unknown id, cross-school isolation,
+platform-admin context, activation grants no permission).
 
 ## Known follow-ups / recommendations
 
 - Production env: `SESSION_SECURE_COOKIE=true`, real `MAIL_MAILER`, `APP_DEBUG=false`.
-- Apply the stored `timezone` / `locale` / `date_format` at render time
-  (incremental; values are already stored & validated).
-- Next milestone (Domain Modules): each new school-owned table follows the
-  `BelongsToSchool` convention; `academics.*` / `student.*` / … permissions move
-  from dormant to enforced in their own modules.
+- Next milestone (Domain Modules): each module's routes carry both
+  `module:<name>` and their `->can('…')`; each module flips its
+  `App\Enums\Module::isAvailable()` to `true` when it ships something usable.
+- Apply the stored `timezone` / `locale` / `date_format` at render time.
 - Invitations & brand-new-account onboarding; school suspension.
 - Add a CI workflow (Pint + PHPUnit + `npm run build`).
-- Audit logging of settings / membership / role / provisioning changes.
+- Audit logging of settings / module / membership / role / provisioning changes.
 - Logo: virus scanning, object-storage (`s3`) delivery in production.

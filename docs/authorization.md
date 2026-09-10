@@ -67,6 +67,22 @@ They exist now so the role bundles are meaningful and testable. A domain
 milestone that needs finer control adds a case and slots it into the relevant
 `Role::permissions()` bundles — nothing else changes.
 
+### Permissions vs. module activation (M7)
+
+`App\Enums\Module` / the `module:` middleware (`docs/module-activation.md`)
+answer a **different** question: "is this feature switched on for this school?"
+They are **orthogonal to authorization** and grant nothing. A domain route
+carries both, independently:
+
+```php
+Route::middleware(['tenant', 'module:attendance'])   // feature on for the school?
+    ->get('attendance', …)->can('attendance.view');  // may THIS user? (authoritative)
+```
+
+Turning a module on never gives a user a permission; turning it off never
+removes one. Module activation itself is gated by the existing
+`school.settings.*` permissions — no new permission was added.
+
 ## 4. Roles (`App\Enums\Role`)
 
 Seven per-school roles, each a static bundle of permissions plus a `tier`:
@@ -169,6 +185,7 @@ school, so a cross-school membership can never reach the policy.
 | Tier-based escalation guard (`target.tier ≤ granter.tier`) | models org hierarchy; the hard invariant "never grant a role above your own" is simple and testable |
 | Platform admin = all permissions *within an entered school* | "retain platform-wide administration" without weakening row-level isolation (`SchoolScope` still applies) |
 | `member.*` permissions enforced; the rest declared but dormant | the vocabulary the role bundles need, without starting domain modules |
+| Module activation (M7) reuses `school.settings.*`, stays orthogonal to permissions | it is configuration ("is the feature on for this school?"), not "may this user…"; a domain route checks both |
 
 ## 11. Deferred
 

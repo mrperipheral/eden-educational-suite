@@ -126,6 +126,23 @@ Full detail in `docs/school-settings.md`. Summary of controls:
 | Input normalisation | `country` / `currency` upper-cased, `brand_color` lower-cased, `week_starts_on` cast to int in `prepareForValidation` |
 | CSRF | on every form; `@method('PATCH'|'DELETE')` spoofing |
 
+## Implemented in Milestone 7 (Feature / Module Activation)
+
+Full detail in `docs/module-activation.md`. Summary of controls:
+
+| Control | State |
+|---------|-------|
+| Activation authz | `/settings/school/modules` route carries `->can('school.settings.view'|'.update')` **and** `UpdateSchoolModuleRequest::authorize()` re-checks `school.settings.update`; view-only roles get the page without toggle controls, others 403 |
+| Activation ≠ authorization | enabling a module grants **no** permission and disabling removes none — M4 is the sole authority; the `module:` middleware and `->can()` are orthogonal and a domain route needs both (tested) |
+| Tenant isolation | `SchoolModule` is `BelongsToSchool`; `SchoolModules` reads/writes only the active school's rows and fails closed with no context; School A cannot read or change School B's module state (tested at the resolver and HTTP layers) |
+| `school_id` protection | never in `$fillable`, never read from input, stamped from `TenantContext` on create, immutable after; a `school_id` in the PATCH body is ignored (tested) |
+| Unknown module id | `Module::tryFrom()` in the controller → **404**; the `module:` middleware throws on an unknown name (route misconfiguration, not user input) |
+| Invalid state | `enabled` is `required|boolean` (Form Request); dependency rules rejected with a `module` validation error, no row written |
+| Safe defaults | absence of a row ⇒ `Module::enabledByDefault()`; a stale/retired `module` string in the table is ignored by the resolver, never fatal (tested) |
+| Platform admin | no active school → school-picker redirect; in-context → scoped to that one school (tested) |
+| Efficient lookup | one memoised read of `school_modules` per request (`SchoolModules`, request-scoped), verified by a query-count test |
+| CSRF | on every toggle form; `@method('PATCH')` spoofing |
+
 ## Deferred (with the milestone that owns them)
 
 - **Auth follow-ups:** 2FA, "log out other devices" on password change, session

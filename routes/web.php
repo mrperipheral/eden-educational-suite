@@ -6,6 +6,7 @@ use App\Http\Controllers\HealthController;
 use App\Http\Controllers\MemberController;
 use App\Http\Controllers\Platform\SchoolController as PlatformSchoolController;
 use App\Http\Controllers\SchoolContextController;
+use App\Http\Controllers\SchoolModuleController;
 use App\Http\Controllers\SchoolSettingsController;
 use App\Http\Controllers\Settings\PasswordController;
 use App\Http\Controllers\Settings\ProfileController;
@@ -94,6 +95,12 @@ Route::middleware(['auth', 'verified', 'active'])->group(function () {
                 ->can('school.settings.view')->name('regional.edit');
             Route::patch('regional', [SchoolSettingsController::class, 'updateRegional'])
                 ->can('school.settings.update')->name('regional.update');
+
+            // Feature / module activation (see docs/module-activation.md).
+            Route::get('modules', [SchoolModuleController::class, 'edit'])
+                ->can('school.settings.view')->name('modules.edit');
+            Route::patch('modules/{module}', [SchoolModuleController::class, 'update'])
+                ->can('school.settings.update')->name('modules.update');
         });
 
         Route::get('settings/academic-sessions', [AcademicSessionController::class, 'index'])

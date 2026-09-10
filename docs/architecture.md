@@ -1,6 +1,6 @@
 # Architecture
 
-Status: Milestone 6 (School Settings & Configuration) complete. This describes
+Status: Milestone 7 (Feature / Module Activation) complete. This describes
 the intended shape of the system and what exists today.
 
 ## 1. High-level model
@@ -124,13 +124,39 @@ Reuses the existing seams unchanged: `school.settings.view` / `.update`,
 get the read-only view; Platform Admin operates only through a selected context.
 Reference lists live in `config/school-settings.php`.
 
+## 2e. Feature / module activation (implemented — Milestone 7)
+
+Full reference: **`docs/module-activation.md`**. Each school turns the
+application's feature modules on or off independently. M7 ships the activation
+*system*; the modules themselves are later milestones.
+
+- **`App\Enums\Module`** — the code-defined catalogue (14 cases: Academics,
+  Students, Guardians, Staff, Timetable, Attendance, Assessments, Results, Fees,
+  Learning Materials, CBT, Notifications, Parent/Student Portal). Each case
+  carries a label, description, group, dependency list, default, and
+  `isAvailable()` (all `false` until each domain milestone flips its own).
+- **`school_modules`** (`App\Models\SchoolModule`, `BelongsToSchool`) —
+  override-only: a row exists only where a school departs from the catalogue
+  default, so a new school writes nothing.
+- **`App\Support\Modules\SchoolModules`** — request-scoped resolver: reads the
+  override rows once (keyed by active school id), memoised; `enabled(Module)` /
+  `states()` / `set()`.
+- **Admin screen** — `GET/PATCH /settings/school/modules`, gated
+  `school.settings.view` / `.update` (no new permission). Single-level
+  dependency validation on toggle. Not-yet-built modules are badged **Planned**.
+- **Reuse seam for future modules** — `module:` route middleware
+  (`EnsureModuleEnabled`, 404s when off) and the `@module('…')` Blade directive.
+  Activation is **configuration, not authorization** — it grants nothing; a
+  domain route checks both `module:` *and* `->can('…')`.
+
 ### Deferred
 
 - Queue jobs capture/restore the tenant id (no jobs exist yet — see
   `docs/tenancy.md` §7).
 - Invitations / brand-new-account onboarding, school suspension / subscription,
-  the Academic Management milestone, notification & payment config, feature
-  activation, admin UI for `status` / `is_platform_admin`, subdomain routing.
+  the Academic Management milestone, notification & payment config, the domain
+  modules behind the M7 catalogue, admin UI for `status` / `is_platform_admin`,
+  subdomain routing.
 
 ## 3. Application layers & conventions
 
@@ -209,3 +235,6 @@ pre-auth screens.
 | 2026-09-13 | Provisioning is platform-level; school-owned onboarding data is configured in-context | "operate through controlled school context when modifying school-owned data" — `/admin` only creates the shell |
 | 2026-09-13 | Add-existing-user reuses `member.assign-role` + `canGrantRole`; academic sessions gated by `school.settings.*` | smallest permission surface; the year container is configuration, `academics.*` stays dormant for its milestone |
 | 2026-09-13 | Tenant-owned route params resolved by id in-controller, not route-model-bound | binding runs before the `tenant` middleware, so a `BelongsToSchool` bind would hit `SchoolScope` with no context |
+| 2026-09-14 | School settings expanded as typed columns on `SchoolSetting`, three sectioned pages; logo on the private disk behind a gated no-path route | validated/queryable, no JSON blob or second settings system; prevents logo traversal / cross-tenant access (see `docs/school-settings.md`) |
+| 2026-09-10 | Module catalogue is `App\Enums\Module`; `school_modules` is override-only; reuse `school.settings.*` | modules are behaviour reviewed as code; a new school writes nothing; activation is configuration, not a new permission (see `docs/module-activation.md`) |
+| 2026-09-10 | Module activation is orthogonal to authorization — `module:` middleware + `->can()` are both required on a domain route | turning a feature on must never grant a permission; M4 stays the sole authority on "may this user…" |

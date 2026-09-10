@@ -1,10 +1,10 @@
 # Database Design
 
-Status: Milestone 6. Tenant + roles + onboarding + school settings. The first
-real school-owned tables (`school_settings`, `academic_sessions`) exist;
-`school_settings` is now the full configuration record (M6). No other domain
-tables (students, staff, classes …) yet. This document records the conventions
-every future migration follows.
+Status: Milestone 7. Tenant + roles + onboarding + school settings + module
+activation. School-owned tables so far: `school_settings` (full config record —
+M6), `academic_sessions`, `school_modules` (per-school feature toggles — M7). No
+domain tables (students, staff, classes …) yet. This document records the
+conventions every future migration follows.
 
 ## Current schema
 
@@ -15,6 +15,7 @@ every future migration follows.
 | `school_user` | User↔School membership + per-school `role`. PK `(school_id, user_id)`, index `(school_id, role)`, cascade both ways |
 | `school_settings` | per-school config (1:1). `school_id` unique. School-owned. Profile (contact + address), branding (`logo_path`, `brand_color`), regional (`timezone, locale, currency, date_format, week_starts_on, academic_year_start_month`). |
 | `academic_sessions` | a school's academic years. School-owned. `unique(school_id, name)`, `index(school_id, starts_on)` |
+| `school_modules` | per-school feature-module on/off overrides. School-owned. `unique(school_id, module)`. Override-only — a row exists only where a school departs from the `App\Enums\Module` default. |
 | `password_reset_tokens`, `sessions` | auth/session plumbing |
 | `cache`, `cache_locks` | `CACHE_STORE=database` |
 | `jobs`, `job_batches`, `failed_jobs` | `QUEUE_CONNECTION=database` |
@@ -67,6 +68,15 @@ tinyint` default `9`. Column defaults, the model `$attributes`, and
 (bool, at most one per school — enforced in `AcademicSession::makeCurrent()`).
 `index(school_id, starts_on)` for the list. School-owned. **Structure-agnostic**:
 no terms / calendar — that is the Academic Management milestone.
+
+### `2026_09_15_100000_create_school_modules_table`
+Milestone 7 — per-school feature/module activation. `module` (`string(40)`, an
+`App\Enums\Module` value, **not** cast so an unknown id can't break a page),
+`enabled` (bool). `unique(['school_id','module'])` is both the 1-per-module
+constraint and the lookup index (`school_id` leads). **Override-only**: absence
+of a row means "use `Module::enabledByDefault()`", so a freshly onboarded school
+writes nothing. School-owned (`App\Models\SchoolModule` uses `BelongsToSchool`);
+written only via `App\Support\Modules\SchoolModules`. See `docs/module-activation.md`.
 
 ## Multi-tenant conventions (ACTIVE — enforced by `BelongsToSchool` from M3 on)
 
