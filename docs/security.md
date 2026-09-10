@@ -92,13 +92,31 @@ Full detail in `docs/authorization.md`. Summary of controls:
 | Role tampering | `school_user.role` is set only via `User::assignRoleInSchool()` / `joinSchool()`; not part of any `$fillable`; validated against the `Role` enum |
 | Role storage | static enums (no `permissions` table to keep in sync, no cache to poison) |
 
+## Implemented in Milestone 5 (School Onboarding)
+
+Full detail in `docs/onboarding.md`. Summary of controls:
+
+| Control | State |
+|---------|-------|
+| School provisioning authz | `/admin/schools*` — platform-admin only (`SchoolPolicy` + `can:viewAny,School` group middleware + per-action `authorize()`); school users get 403 |
+| Provisioning ≠ context change | provisioning never writes the school session key or sets `TenantContext` |
+| Initial admin escalation | `canGrantRole(SchoolAdmin, $school)` asserted before seating; account must be existing + active |
+| Add-member escalation | `member.assign-role` gate + `canGrantRole($role)` — a Principal cannot add a School Admin |
+| Add-member isolation | controller only `joinSchool($tenant->schoolOrFail(), …)`; never a cross-school membership; never a context switch |
+| Add-member rate limit | `throttle:10,1` on `POST /members` |
+| School-owned data | `SchoolSetting`, `AcademicSession` use `BelongsToSchool` — `SchoolScope` + unspoofable/immutable `school_id`; `$fillable` excludes `school_id`/`completed_at`/`is_current` |
+| Tenant-owned route binding | `{session}` resolved by id **after** the `tenant` middleware, so `SchoolScope` scopes it and another school's id 404s |
+| Settings / session validation | Form Requests; `timezone` against the identifier list; `ends_on` after `starts_on`; session name unique per (tenant) school |
+| Enumeration | add-member / initial-admin email uses `exists:users` (admin tool, gated + throttled); documented trade-off |
+
 ## Deferred (with the milestone that owns them)
 
 - **Auth follow-ups:** 2FA, "log out other devices" on password change, session
   listing, auth-event audit logging, templated transactional emails.
-- **Authz follow-ups:** multi-role per school, custom/runtime roles, invitations,
-  admin UI for `status` / `is_platform_admin`, audit logging of role changes,
-  enforcing the currently-dormant domain permissions (each in its module).
+- **Authz follow-ups:** multi-role per school, custom/runtime roles, invitations
+  / brand-new-account onboarding, admin UI for `status` / `is_platform_admin`,
+  audit logging of role & membership changes, enforcing the currently-dormant
+  domain permissions (each in its module).
 - **Tenancy follow-ups:** queue-job tenant propagation, per-tenant rate limiting,
   per-tenant cache keys, audit logging of context switches.
 - **Later:** audit logging (who did what, per school), secure file upload

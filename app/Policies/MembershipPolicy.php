@@ -28,6 +28,16 @@ class MembershipPolicy
         return $user->hasPermission(Permission::MemberView);
     }
 
+    /**
+     * Coarse gate for adding an existing user to the current school. The
+     * specific role is checked against the actor's tier in the controller
+     * ({@see User::canGrantRole()}).
+     */
+    public function add(User $user): bool
+    {
+        return $user->hasPermission(Permission::MemberAssignRole);
+    }
+
     public function assignRole(User $user, SchoolUser $membership, Role $target): bool
     {
         if ($membership->user_id === $user->id) {

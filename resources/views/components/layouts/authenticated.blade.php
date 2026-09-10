@@ -4,10 +4,12 @@
 
 @php
     $navLinks = collect([
-        ['route' => 'dashboard', 'label' => __('Dashboard'), 'can' => null],
-        ['route' => 'members.index', 'label' => __('Members'), 'can' => 'member.view'],
-        ['route' => 'settings.profile.edit', 'label' => __('Account settings'), 'can' => null],
-    ])->filter(fn ($link) => $link['can'] === null || auth()->user()->can($link['can']));
+        ['route' => 'dashboard', 'label' => __('Dashboard'), 'active' => 'dashboard', 'allowed' => true],
+        ['route' => 'members.index', 'label' => __('Members'), 'active' => 'members.*', 'allowed' => auth()->user()->can('member.view')],
+        ['route' => 'settings.school.edit', 'label' => __('School settings'), 'active' => ['settings.school.*', 'academic-sessions.*'], 'allowed' => auth()->user()->can('school.settings.view')],
+        ['route' => 'admin.schools.index', 'label' => __('Schools'), 'active' => 'admin.schools.*', 'allowed' => auth()->user()->can('viewAny', \App\Models\School::class)],
+        ['route' => 'settings.profile.edit', 'label' => __('Account settings'), 'active' => 'settings.profile.*', 'allowed' => true],
+    ])->filter(fn ($link) => $link['allowed']);
 
     $currentSchool = app(\App\Support\Tenancy\TenantContext::class)->school();
     $canSwitchSchool = $currentSchool !== null
@@ -17,14 +19,15 @@
 <x-layouts.app :title="$title">
     <x-slot:navigation>
         @foreach ($navLinks as $link)
+            @php($isActive = request()->routeIs($link['active']))
             <a
                 href="{{ route($link['route']) }}"
                 @class([
                     'rounded-md px-3 py-2 text-sm font-medium',
-                    'bg-brand-50 text-brand-700' => request()->routeIs($link['route']),
-                    'text-gray-700 hover:bg-gray-100' => ! request()->routeIs($link['route']),
+                    'bg-brand-50 text-brand-700' => $isActive,
+                    'text-gray-700 hover:bg-gray-100' => ! $isActive,
                 ])
-                @if (request()->routeIs($link['route'])) aria-current="page" @endif
+                @if ($isActive) aria-current="page" @endif
             >
                 {{ $link['label'] }}
             </a>

@@ -3,18 +3,19 @@
 namespace Database\Seeders;
 
 use App\Enums\Role;
+use App\Models\AcademicSession;
 use App\Models\School;
 use App\Models\User;
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
+use App\Support\Tenancy\TenantContext;
 use Illuminate\Database\Seeder;
 
 class DatabaseSeeder extends Seeder
 {
-    use WithoutModelEvents;
-
     /**
-     * Local development data: two schools, a platform admin, and a spread of
-     * per-school roles so every authorization path can be exercised by hand.
+     * Local development data:
+     *   - Alpha Academy: fully onboarded (admin, settings, current session).
+     *   - Beta School: freshly provisioned (no admin, no settings, no session).
+     *   - a platform admin, and a spread of per-school roles.
      */
     public function run(): void
     {
@@ -26,7 +27,6 @@ class DatabaseSeeder extends Seeder
             'email' => 'owner@example.com',
         ]);
 
-        // A school admin at Alpha (also the "Test User" other milestones referenced).
         User::factory()->create(['name' => 'Test User', 'email' => 'test@example.com'])
             ->joinSchool($alpha, Role::SchoolAdmin);
 
@@ -39,10 +39,22 @@ class DatabaseSeeder extends Seeder
         User::factory()->create(['name' => 'Bola Bursar', 'email' => 'bursar@example.com'])
             ->joinSchool($alpha, Role::Bursar);
 
-        // Someone who is a Teacher at Alpha and a Parent at Beta — the
-        // cross-school role case.
+        // Teacher at Alpha, Parent at Beta — the cross-school role case.
         $dual = User::factory()->create(['name' => 'Dele Dual', 'email' => 'dual@example.com']);
         $dual->joinSchool($alpha, Role::Staff);
         $dual->joinSchool($beta, Role::Parent);
+
+        // Alpha's school-owned onboarding data (created inside its tenant context).
+        $tenant = app(TenantContext::class);
+        $tenant->set($alpha);
+
+        $alpha->settings()->firstOrCreate([], ['contact_email' => 'office@alpha.example'])->markReviewed();
+        AcademicSession::create([
+            'name' => '2025/2026',
+            'starts_on' => '2025-09-01',
+            'ends_on' => '2026-07-31',
+        ])->makeCurrent();
+
+        $tenant->forget();
     }
 }

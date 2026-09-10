@@ -51,10 +51,17 @@ detail in `docs/authorization.md`.
 Deferred: multi-role per school, custom/runtime roles, invitations, admin UI for
 `status` / `is_platform_admin`.
 
-## Milestone 5 — School Onboarding
+## ✅ Milestone 5 — School Onboarding (complete, 2026-09-13)
 
-School registration/provisioning flow, initial admin user, adding existing users
-to a school, school settings, academic session / term setup.
+Platform-admin school provisioning (`/admin/schools`, `SchoolProvisioner`,
+unique-slug generation), optional initial School Admin assignment, adding
+existing users to a school (`/members/create`, `member.assign-role` + tier
+guard), basic school settings (`school_settings`, 1:1, `BelongsToSchool`), the
+initial academic session (`academic_sessions`, structure-agnostic), and a
+derived dashboard onboarding checklist. Full detail in `docs/onboarding.md`.
+
+Deferred: invitations / brand-new-account onboarding, school suspension /
+subscription, the full School Settings and Academic Management milestones.
 
 ## Milestone 6+ — Domain Modules
 

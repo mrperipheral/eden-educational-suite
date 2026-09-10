@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Enums\Permission;
 use App\Enums\Role;
+use App\Http\Requests\AddMemberRequest;
 use App\Http\Requests\AssignMemberRoleRequest;
 use App\Models\SchoolUser;
 use App\Models\User;
@@ -42,6 +43,34 @@ class MemberController extends Controller
             'canAssign' => $request->user()->hasPermission(Permission::MemberAssignRole),
             'canRemove' => $request->user()->hasPermission(Permission::MemberRemove),
         ]);
+    }
+
+    public function create(Request $request): View
+    {
+        $this->authorize('add', SchoolUser::class);
+
+        return view('members.create', [
+            'assignableRoles' => $this->assignableRoles($request->user()),
+        ]);
+    }
+
+    public function store(AddMemberRequest $request): RedirectResponse
+    {
+        $this->authorize('add', SchoolUser::class);
+
+        $target = $request->targetUser();
+        $role = $request->role();
+
+        // No privilege escalation: the same tier check the Members list uses.
+        abort_unless($request->user()->canGrantRole($role), 403);
+
+        $target->joinSchool($this->tenant->schoolOrFail(), $role);
+
+        return to_route('members.index')
+            ->with('status', __(':name has been added as :role.', [
+                'name' => $target->name,
+                'role' => $role->label(),
+            ]));
     }
 
     public function updateRole(AssignMemberRoleRequest $request, User $user): RedirectResponse

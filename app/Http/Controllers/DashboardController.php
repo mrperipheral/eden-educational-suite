@@ -2,7 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\Permission;
+use App\Models\School;
 use App\Support\Tenancy\TenantContext;
+use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class DashboardController extends Controller
@@ -12,10 +15,48 @@ class DashboardController extends Controller
      * once EnforceTenant has resolved the active school. The real, role-aware
      * dashboard is a later milestone.
      */
-    public function __invoke(TenantContext $tenant): View
+    public function __invoke(Request $request, TenantContext $tenant): View
     {
+        $school = $tenant->schoolOrFail();
+
         return view('dashboard', [
-            'school' => $tenant->schoolOrFail(),
+            'school' => $school,
+            'onboarding' => $this->onboarding($request, $school),
         ]);
+    }
+
+    /**
+     * Onboarding checklist — only for administrators who can act on it.
+     *
+     * @return array{steps: list<array{label: string, done: bool, route: string}>, complete: bool}|null
+     */
+    private function onboarding(Request $request, School $school): ?array
+    {
+        if (! $request->user()->hasPermission(Permission::SchoolSettingsUpdate)) {
+            return null;
+        }
+
+        $steps = [
+            [
+                'label' => __('Assign a School Admin'),
+                'done' => $school->hasSchoolAdmin(),
+                'route' => route('members.create'),
+            ],
+            [
+                'label' => __('Create the first academic session'),
+                'done' => $school->academicSessions()->exists(),
+                'route' => route('academic-sessions.index'),
+            ],
+            [
+                'label' => __('Review school settings'),
+                'done' => $school->settings()->whereNotNull('completed_at')->exists(),
+                'route' => route('settings.school.edit'),
+            ],
+        ];
+
+        return [
+            'steps' => $steps,
+            'complete' => collect($steps)->every(fn ($s) => $s['done']),
+        ];
     }
 }

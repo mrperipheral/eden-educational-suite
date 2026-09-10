@@ -93,4 +93,12 @@ trait InteractsWithTenancy
 
         return $user;
     }
+
+    /**
+     * A user who is NOT a member of $school (for cross-school / stranger cases).
+     */
+    protected function stranger(array $attributes = []): User
+    {
+        return User::factory()->create($attributes);
+    }
 }

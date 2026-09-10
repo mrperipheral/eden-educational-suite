@@ -1,8 +1,9 @@
 # Database Design
 
-Status: Milestone 4. The tenant + roles foundation exists; no school-*domain*
-tables (students, staff, classes …) yet. This document records the conventions
-every future migration follows.
+Status: Milestone 5. Tenant + roles + onboarding foundation. The first real
+school-owned tables (`school_settings`, `academic_sessions`) exist; no other
+domain tables (students, staff, classes …) yet. This document records the
+conventions every future migration follows.
 
 ## Current schema
 
@@ -11,6 +12,8 @@ every future migration follows.
 | `users` | auth identities. `id, name, email (unique), email_verified_at, password, status, is_platform_admin, remember_token, timestamps` |
 | `schools` | tenant root. `id, name, slug (unique), status, timestamps` |
 | `school_user` | User↔School membership + per-school `role`. PK `(school_id, user_id)`, index `(school_id, role)`, cascade both ways |
+| `school_settings` | per-school config (1:1). `school_id` unique. School-owned. |
+| `academic_sessions` | a school's academic years. School-owned. `unique(school_id, name)`, `index(school_id, starts_on)` |
 | `password_reset_tokens`, `sessions` | auth/session plumbing |
 | `cache`, `cache_locks` | `CACHE_STORE=database` |
 | `jobs`, `job_batches`, `failed_jobs` | `QUEUE_CONNECTION=database` |
@@ -40,6 +43,19 @@ not mass-assignable. The platform-owner primitive — see `docs/tenancy.md` §2.
 per (user, school); `null` = member with no permissions. Index `(school_id, role)`
 for the "members with role X" query. Not mass-assignable — written only via
 `User::joinSchool()` / `assignRoleInSchool()`. See `docs/authorization.md`.
+
+### `2026_09_13_100000_create_school_settings_table`
+1:1 with `schools` (`school_id` **unique** — both the tenant key and the
+constraint). `timezone` (default `Africa/Lagos`), `locale` (default `en`),
+`contact_email` / `contact_phone` (nullable), `completed_at` (nullable — set on
+first save, drives the onboarding checklist). School-owned (`BelongsToSchool`).
+See `docs/onboarding.md`.
+
+### `2026_09_13_100010_create_academic_sessions_table`
+`name` (`unique(school_id, name)`), `starts_on` / `ends_on` (dates), `is_current`
+(bool, at most one per school — enforced in `AcademicSession::makeCurrent()`).
+`index(school_id, starts_on)` for the list. School-owned. **Structure-agnostic**:
+no terms / calendar — that is the Academic Management milestone.
 
 ## Multi-tenant conventions (ACTIVE — enforced by `BelongsToSchool` from M3 on)
 
@@ -85,8 +101,8 @@ for the "members with role X" query. Not mass-assignable — written only via
 
 ## Not yet designed (later milestones, will be added here)
 
-`school_user.is_default`, students, guardians, staff, classes/sections,
-subjects, enrolment, attendance, assessments/results, fees/invoices/payments,
-CBT, audit log. Each gets an entry here when built.
+`school_user.is_default`, academic terms / calendar, students, guardians, staff,
+classes/sections, subjects, enrolment, attendance, assessments/results,
+fees/invoices/payments, CBT, audit log. Each gets an entry here when built.
 
 Permissions and roles are **not** in the database — they are code (`App\Enums`).

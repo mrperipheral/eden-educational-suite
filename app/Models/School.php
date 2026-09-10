@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\Role;
 use App\Enums\SchoolStatus;
 use Database\Factories\SchoolFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -9,6 +10,8 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 /**
  * A school — the tenant root. School-owned models point here via `school_id`
@@ -16,6 +19,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
  * tenant-scoped.
  *
  * `status` is never mass-assignable; changing it is a platform-admin action.
+ * A new school is provisioned by App\Services\SchoolProvisioner.
  */
 #[Fillable(['name', 'slug'])]
 class School extends Model
@@ -53,9 +57,31 @@ class School extends Model
             ->withTimestamps();
     }
 
+    /**
+     * @return HasOne<SchoolSetting, $this>
+     */
+    public function settings(): HasOne
+    {
+        return $this->hasOne(SchoolSetting::class);
+    }
+
+    /**
+     * @return HasMany<AcademicSession, $this>
+     */
+    public function academicSessions(): HasMany
+    {
+        return $this->hasMany(AcademicSession::class);
+    }
+
     public function isActive(): bool
     {
         return $this->status === SchoolStatus::Active;
+    }
+
+    /** Whether at least one member holds the School Admin role. */
+    public function hasSchoolAdmin(): bool
+    {
+        return $this->users()->wherePivot('role', Role::SchoolAdmin->value)->exists();
     }
 
     /**

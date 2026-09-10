@@ -1,6 +1,12 @@
 @php use App\Enums\Role; @endphp
 
 <x-layouts.authenticated :title="__('Members')">
+    @if ($canAssign)
+        <x-slot:actions>
+            <x-button :href="route('members.create')" size="sm">{{ __('Add member') }}</x-button>
+        </x-slot:actions>
+    @endif
+
     <div class="space-y-6">
         @if (session('status'))
             <x-alert variant="success">{{ session('status') }}</x-alert>

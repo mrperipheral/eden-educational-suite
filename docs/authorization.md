@@ -14,7 +14,7 @@ role set, composed with the strict `TenantContext` from Milestone 3.
 | Runtime check | `User::hasPermission()` / `roleIn()` / `permissionsIn()` / `canGrantRole()` |
 | Gate wiring | `App\Providers\AuthServiceProvider` — one `Gate::define()` per permission |
 | Fine-grained rules | `App\Policies\MembershipPolicy` (self / escalation guards) |
-| The one feature that uses it | Members management — `App\Http\Controllers\MemberController`, `GET/PATCH/DELETE /members` |
+| Features that use it | Members management (`/members*`), school settings + academic sessions (`school.settings.*`), school provisioning (`SchoolPolicy`) |
 
 ```
 Request → auth · verified · active · tenant  (TenantContext::set(School))
@@ -50,8 +50,11 @@ and `hasPermission()` are the only things that would change.
 
 24 coarse permissions, dotted strings, grouped in the enum:
 
-- **School config:** `school.settings.view`, `school.settings.update`
-- **People & access (enforced now):** `member.view`, `member.assign-role`, `member.remove`
+- **School config (enforced — M5):** `school.settings.view`,
+  `school.settings.update` — gate school settings *and* the initial academic
+  session.
+- **People & access (enforced):** `member.view`, `member.assign-role`
+  (also gates *adding* an existing user — M5), `member.remove`
 - **Declared for later domain milestones** (not yet enforced — the modules that
   check them don't exist): `student.*`, `guardian.*`, `staff.*`, `academics.*`,
   `attendance.*`, `result.*`, `finance.*`, `portal.parent`, `portal.student`
@@ -122,6 +125,7 @@ Coarse "can touch the Members area" is the `member.*` Gate abilities. The policy
 | Ability | Rule |
 |---------|------|
 | `viewAny` | `member.view` |
+| `add` | `member.assign-role` (coarse gate for adding an existing user — M5; the target role is checked in the controller via `canGrantRole()`) |
 | `assignRole($membership, $target)` | not your own membership; `canGrantRole($target)` — **no privilege escalation** (target tier ≤ your role's tier); platform admins may grant any role |
 | `remove($membership)` | not your own membership; `member.remove` |
 
@@ -165,9 +169,7 @@ school, so a cross-school membership can never reach the policy.
 ## 11. Deferred
 
 - Multi-role per school; custom/per-school roles; runtime-editable permissions.
-- `school_user` `is_default` / invitation / "add existing user to school" flow
-  (this milestone changes and removes roles; it does not add brand-new members —
-  that arrives with School Onboarding).
+- Invitation / brand-new-account flow (M5 adds *existing* users only).
 - Admin UI for `users.status` and `users.is_platform_admin`.
 - Enforcing the dormant permissions — happens in each domain module's milestone.
 - Audit logging of role changes.

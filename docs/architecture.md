@@ -1,6 +1,6 @@
 # Architecture
 
-Status: Milestone 4 (Roles & Permissions) complete. This describes the intended
+Status: Milestone 5 (School Onboarding) complete. This describes the intended
 shape of the system and what exists today.
 
 ## 1. High-level model
@@ -82,22 +82,43 @@ Full reference: **`docs/authorization.md`**. Summary:
   second ambient tenant id competing with `TenantContext`). See
   `docs/authorization.md` §2.
 
+## 2c. School onboarding (implemented — Milestone 5)
+
+Full reference: **`docs/onboarding.md`**. The controlled path from provisioning
+to a usable school, built on the M1–M4 seams:
+
+- **Provisioning** (`Platform\SchoolController` + `SchoolProvisioner`,
+  `/admin/schools*`) is **platform-level** — a school shell (`schools` row,
+  status `active`, unique slug) is created outside any tenant context;
+  `SchoolPolicy` is the authority. Optionally seats an existing active account as
+  the initial `Role::SchoolAdmin` (guarded by `canGrantRole`).
+- **School-owned onboarding data** — `App\Models\SchoolSetting` (1:1) and
+  `App\Models\AcademicSession`, the first real `BelongsToSchool` models — is
+  created by the school's own administrators **inside** the tenant context,
+  gated by `school.settings.*`.
+- **Adding an existing user** (`/members/create`) reuses `member.assign-role` +
+  `canGrantRole` (tier); it never crosses a school boundary or changes anyone's
+  context.
+- The dashboard derives an **onboarding checklist** (admin seated, first session
+  created, settings reviewed) for administrators.
+
 ### Deferred
 
 - Queue jobs capture/restore the tenant id (no jobs exist yet — see
   `docs/tenancy.md` §7).
-- Multi-role per school, custom/runtime-editable roles, invitations / add-member
-  flow, admin UI for `status` / `is_platform_admin`, subdomain routing.
+- Invitations / brand-new-account onboarding, school suspension / subscription,
+  the full School Settings and Academic Management milestones, admin UI for
+  `status` / `is_platform_admin`, subdomain routing.
 
 ## 3. Application layers & conventions
 
 | Layer | Directory | Responsibility |
 |-------|-----------|----------------|
 | Routing | `routes/web.php`, `routes/auth.php` | thin; names every route; auth flow split into its own file |
-| Controllers | `app/Http/Controllers` (`Auth/`, `Settings/`) | HTTP orchestration only; resourceful naming |
-| Form Requests | `app/Http/Requests` (`Auth/`, `Settings/`) | validation + request-scoped authorization |
+| Controllers | `app/Http/Controllers` (`Auth/`, `Settings/`, `Platform/`) | HTTP orchestration only; resourceful naming |
+| Form Requests | `app/Http/Requests` (`Auth/`, `Settings/`, `Platform/`) | validation + request-scoped authorization |
 | Policies | `app/Policies` | model authorization, invoked server-side |
-| Services | `app/Services` | multi-step / cross-model business operations |
+| Services | `app/Services` | multi-step business operations (`SchoolProvisioner`) |
 | Models | `app/Models` | persistence, casts, mass-assignment guards, scopes |
 | Enums | `app/Enums` | closed value sets (`UserStatus`, `SchoolStatus`, `Role`, `Permission`), backed by string columns / static bundles |
 | Middleware | `app/Http/Middleware` | cross-cutting request guards (`EnsureAccountIsActive`, `EnforceTenant`) |
@@ -163,3 +184,6 @@ pre-auth screens.
 | 2026-09-12 | Roles/permissions in-house (enums), not Spatie laravel-permission | Spatie's Teams adds a second ambient tenant id competing with `TenantContext`; our permission set is static/code-defined (see `docs/authorization.md` §2) |
 | 2026-09-12 | Each permission is a Gate ability; still **no `Gate::before`** | `$user->can()` / `@can` / route `->can()` all work and stay tenant-composed; platform admins get school-admin reach *inside* an entered school only |
 | 2026-09-12 | One role per (user, school), tier-based escalation guard | matches "roles = bundles"; invariant "never grant a role above your own" is simple and testable |
+| 2026-09-13 | Provisioning is platform-level; school-owned onboarding data is configured in-context | "operate through controlled school context when modifying school-owned data" — `/admin` only creates the shell |
+| 2026-09-13 | Add-existing-user reuses `member.assign-role` + `canGrantRole`; academic sessions gated by `school.settings.*` | smallest permission surface; the year container is configuration, `academics.*` stays dormant for its milestone |
+| 2026-09-13 | Tenant-owned route params resolved by id in-controller, not route-model-bound | binding runs before the `tenant` middleware, so a `BelongsToSchool` bind would hit `SchoolScope` with no context |

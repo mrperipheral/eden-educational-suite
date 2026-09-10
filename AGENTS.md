@@ -21,9 +21,13 @@ The full development guide is **[CLAUDE.md](CLAUDE.md)** and the documents under
   (`$user->can('x')`, `@can`, `->can()`), never role names. `App\Enums\Permission`
   + `App\Enums\Role` (bundles), assigned per school on `school_user.role`, every
   check composed with `TenantContext`. No `Gate::before`.
+- **Onboarding / platform admin:** `docs/onboarding.md`. `/admin/*`
+  (`app/Http/Controllers/Platform/`) is platform-admin only and not
+  tenant-scoped; school-owned data is created/edited only inside a tenant context.
 - **Scope discipline:** work the current milestone only. `PROJECT_STATUS.md` and
-  `docs/roadmap.md` say where we are. Milestones 1–4 (Platform Foundation,
-  Authentication, Multi-School Tenant Isolation, Roles & Permissions) are done.
+  `docs/roadmap.md` say where we are. Milestones 1–5 (Platform Foundation,
+  Authentication, Multi-School Tenant Isolation, Roles & Permissions, School
+  Onboarding) are done.
 - **Before finishing:** `php artisan test`, `vendor/bin/pint`, `npm run build`.
 - This file and `docs/` are development-only and must never become a runtime
   dependency of the application.

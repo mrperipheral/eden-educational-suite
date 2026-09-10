@@ -95,10 +95,16 @@ The session holds only an id; access is re-checked from the database every
 request, so tampering with the stored value achieves nothing (proven by
 `EnforceTenantTest` / `CrossSchoolIsolationTest`).
 
-Applied in `routes/web.php` to the tenant-scoped group (currently just
-`/dashboard`). Account-level routes (`/settings/*`, `/school`) do **not** use it.
+Applied in `routes/web.php` to the tenant-scoped group: `/dashboard`,
+`/members*`, `/settings/school`, `/settings/academic-sessions*`. Account-level
+routes (`/settings/profile`, `/settings/password`, `/school`) and platform
+routes (`/admin/schools*`) do **not** use it.
 
 ## 5. `BelongsToSchool` — writing a tenant-owned model
+
+The first real school-owned models ship with Milestone 5:
+`App\Models\SchoolSetting` (1:1 with a school) and `App\Models\AcademicSession`.
+Both follow the pattern:
 
 ```php
 use App\Support\Tenancy\Concerns\BelongsToSchool;
@@ -205,8 +211,8 @@ intentional (fail closed). So:
 
 ## 11. Deferred
 
-- `school_user` `is_default` column, invitations / add-existing-user flow.
-- School onboarding / provisioning / settings / subscription.
+- `school_user` `is_default` column, invitations / brand-new-account flow.
+- School suspension / lifecycle, subscription / billing.
 - Queue-job tenant propagation (no jobs yet).
 - Subdomain / path-based tenant routing (slug is ready for it).
 - Per-tenant rate limiting, per-tenant caching keys, audit logging of context

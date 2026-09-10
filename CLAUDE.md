@@ -86,6 +86,12 @@ See `docs/architecture.md` for the full rationale. In short:
   `App\Enums\Permission`; roles (`App\Enums\Role`) are static bundles assigned per
   school on `school_user.role`. Every permission check is composed with
   `TenantContext` (applies only inside the school in context). No `Gate::before`.
+  Role assignment / adding members goes through `User::canGrantRole()` (tier
+  guard — no escalation).
+- **Platform screens** (`app/Http/Controllers/Platform/`, `/admin/*`) are
+  **not** tenant-scoped — platform-admin only via `SchoolPolicy`. School-owned
+  data is only ever created/edited inside a tenant context. Onboarding:
+  `docs/onboarding.md`.
 - **Tests** — feature tests for every route and each authorization boundary; unit
   tests for services, enums and value objects. Tenant isolation gets explicit
   cross-tenant "cannot see / cannot touch" tests once schools exist. Tests that
@@ -102,7 +108,8 @@ See `docs/architecture.md` for the full rationale. In short:
 
 ## Milestones
 
-Tracked in `PROJECT_STATUS.md` and `docs/roadmap.md`. **Milestones 1–4 (Platform
-Foundation, Authentication, Multi-School Tenant Isolation, Roles & Permissions)
-are complete.** Do not start School Onboarding or any domain module (students,
-staff, academics, fees, …) without picking up the next milestone explicitly.
+Tracked in `PROJECT_STATUS.md` and `docs/roadmap.md`. **Milestones 1–5 (Platform
+Foundation, Authentication, Multi-School Tenant Isolation, Roles & Permissions,
+School Onboarding) are complete.** Do not start any domain module (students,
+staff, academics, attendance, fees, results, CBT, notifications, …) without
+picking up the next milestone explicitly.
