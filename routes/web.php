@@ -73,13 +73,28 @@ Route::middleware(['auth', 'verified', 'active'])->group(function () {
         Route::patch('members/{user}', [MemberController::class, 'updateRole'])->name('members.update-role');
         Route::delete('members/{user}', [MemberController::class, 'destroy'])->name('members.destroy');
 
-        // Basic school settings + the initial academic session (onboarding).
-        Route::get('settings/school', [SchoolSettingsController::class, 'edit'])
-            ->can('school.settings.view')
-            ->name('settings.school.edit');
-        Route::patch('settings/school', [SchoolSettingsController::class, 'update'])
-            ->can('school.settings.update')
-            ->name('settings.school.update');
+        // School configuration — sectioned (see docs/school-settings.md).
+        // `school.settings.view` reads; `school.settings.update` writes.
+        Route::prefix('settings/school')->name('settings.school.')->group(function () {
+            Route::get('/', [SchoolSettingsController::class, 'edit'])
+                ->can('school.settings.view')->name('edit');
+            Route::patch('/', [SchoolSettingsController::class, 'update'])
+                ->can('school.settings.update')->name('update');
+
+            Route::get('branding', [SchoolSettingsController::class, 'branding'])
+                ->can('school.settings.view')->name('branding.edit');
+            Route::patch('branding', [SchoolSettingsController::class, 'updateBranding'])
+                ->can('school.settings.update')->name('branding.update');
+            Route::delete('branding/logo', [SchoolSettingsController::class, 'destroyLogo'])
+                ->can('school.settings.update')->name('branding.logo.destroy');
+            Route::get('branding/logo', [SchoolSettingsController::class, 'showLogo'])
+                ->can('school.settings.view')->name('branding.logo.show');
+
+            Route::get('regional', [SchoolSettingsController::class, 'regional'])
+                ->can('school.settings.view')->name('regional.edit');
+            Route::patch('regional', [SchoolSettingsController::class, 'updateRegional'])
+                ->can('school.settings.update')->name('regional.update');
+        });
 
         Route::get('settings/academic-sessions', [AcademicSessionController::class, 'index'])
             ->can('school.settings.view')

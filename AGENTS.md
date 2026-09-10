@@ -25,9 +25,10 @@ The full development guide is **[CLAUDE.md](CLAUDE.md)** and the documents under
   (`app/Http/Controllers/Platform/`) is platform-admin only and not
   tenant-scoped; school-owned data is created/edited only inside a tenant context.
 - **Scope discipline:** work the current milestone only. `PROJECT_STATUS.md` and
-  `docs/roadmap.md` say where we are. Milestones 1–5 (Platform Foundation,
+  `docs/roadmap.md` say where we are. Milestones 1–6 (Platform Foundation,
   Authentication, Multi-School Tenant Isolation, Roles & Permissions, School
-  Onboarding) are done.
+  Onboarding, School Settings & Configuration — `docs/school-settings.md`) are
+  done.
 - **Before finishing:** `php artisan test`, `vendor/bin/pint`, `npm run build`.
 - This file and `docs/` are development-only and must never become a runtime
   dependency of the application.

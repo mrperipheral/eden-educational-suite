@@ -109,6 +109,23 @@ Full detail in `docs/onboarding.md`. Summary of controls:
 | Settings / session validation | Form Requests; `timezone` against the identifier list; `ends_on` after `starts_on`; session name unique per (tenant) school |
 | Enumeration | add-member / initial-admin email uses `exists:users` (admin tool, gated + throttled); documented trade-off |
 
+## Implemented in Milestone 6 (School Settings & Configuration)
+
+Full detail in `docs/school-settings.md`. Summary of controls:
+
+| Control | State |
+|---------|-------|
+| Settings authz | every section route carries `->can('school.settings.view'|'.update')` **and** each Form Request `authorize()` re-checks `school.settings.update`; view-only roles (Principal/Bursar) get the read-only page, others 403 |
+| Tenant isolation | `SchoolSetting` is `BelongsToSchool`; the row is always resolved via `TenantContext->schoolOrFail()->settings()`; `school_id` never read from input, immutable on update |
+| Protected columns | `$fillable` excludes `school_id`, `completed_at`, `logo_path`; written only via `markReviewed()` / `putLogo()` / `clearLogo()` (mass-assignment attempt tested) |
+| Logo upload validation | `mimetypes` content sniff (jpeg/png/webp, not extension), `max:2048` KB, `dimensions` 48–1600px; invalid type / tiny image rejected (tested) |
+| Logo storage | private `local` disk (`storage/app/private/school-logos/{tenant_id}/…`), never the public disk / `/storage` symlink |
+| Logo serving | only `GET /settings/school/branding/logo`, gated `school.settings.view`, **no path parameter** → no traversal; serves only the current tenant's `logo_path`; a School B user cannot fetch School A's logo (tested) |
+| Logo lifecycle | replace/remove delete the previous file through the model, not mass assignment |
+| Platform admin | no active school → school picker redirect; in-context → scoped to that one school (tested) |
+| Input normalisation | `country` / `currency` upper-cased, `brand_color` lower-cased, `week_starts_on` cast to int in `prepareForValidation` |
+| CSRF | on every form; `@method('PATCH'|'DELETE')` spoofing |
+
 ## Deferred (with the milestone that owns them)
 
 - **Auth follow-ups:** 2FA, "log out other devices" on password change, session
@@ -119,10 +136,11 @@ Full detail in `docs/onboarding.md`. Summary of controls:
   domain permissions (each in its module).
 - **Tenancy follow-ups:** queue-job tenant propagation, per-tenant rate limiting,
   per-tenant cache keys, audit logging of context switches.
-- **Later:** audit logging (who did what, per school), secure file upload
-  (type/size validation, out-of-webroot or object storage, virus posture),
-  encryption of sensitive PII at rest, data export/erasure handling, 2FA for
-  admins, security headers (CSP) review, dependency scanning in CI.
+- **Later:** audit logging (who did what, per school), virus scanning of
+  uploads (type/size/dimension validation and out-of-webroot storage are done
+  in M6 — see `docs/school-settings.md` §4), encryption of sensitive PII at
+  rest, data export/erasure handling, 2FA for admins, security headers (CSP)
+  review, dependency scanning in CI.
 
 ## Review checklist for every PR
 

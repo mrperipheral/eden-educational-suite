@@ -38,7 +38,7 @@ class OnboardingChecklistTest extends TestCase
         $this->get('/dashboard')->assertOk()->assertDontSee('School onboarding is complete');
 
         // Complete settings + a session.
-        $this->patch('/settings/school', ['timezone' => 'Africa/Lagos', 'locale' => 'en']);
+        $this->patch('/settings/school', ['contact_email' => 'office@school.example']);
         $this->post('/settings/academic-sessions', [
             'name' => '2025/2026', 'starts_on' => '2025-09-01', 'ends_on' => '2026-07-31',
         ]);

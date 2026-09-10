@@ -1,9 +1,10 @@
 # Database Design
 
-Status: Milestone 5. Tenant + roles + onboarding foundation. The first real
-school-owned tables (`school_settings`, `academic_sessions`) exist; no other
-domain tables (students, staff, classes …) yet. This document records the
-conventions every future migration follows.
+Status: Milestone 6. Tenant + roles + onboarding + school settings. The first
+real school-owned tables (`school_settings`, `academic_sessions`) exist;
+`school_settings` is now the full configuration record (M6). No other domain
+tables (students, staff, classes …) yet. This document records the conventions
+every future migration follows.
 
 ## Current schema
 
@@ -12,7 +13,7 @@ conventions every future migration follows.
 | `users` | auth identities. `id, name, email (unique), email_verified_at, password, status, is_platform_admin, remember_token, timestamps` |
 | `schools` | tenant root. `id, name, slug (unique), status, timestamps` |
 | `school_user` | User↔School membership + per-school `role`. PK `(school_id, user_id)`, index `(school_id, role)`, cascade both ways |
-| `school_settings` | per-school config (1:1). `school_id` unique. School-owned. |
+| `school_settings` | per-school config (1:1). `school_id` unique. School-owned. Profile (contact + address), branding (`logo_path`, `brand_color`), regional (`timezone, locale, currency, date_format, week_starts_on, academic_year_start_month`). |
 | `academic_sessions` | a school's academic years. School-owned. `unique(school_id, name)`, `index(school_id, starts_on)` |
 | `password_reset_tokens`, `sessions` | auth/session plumbing |
 | `cache`, `cache_locks` | `CACHE_STORE=database` |
@@ -50,6 +51,16 @@ constraint). `timezone` (default `Africa/Lagos`), `locale` (default `en`),
 `contact_email` / `contact_phone` (nullable), `completed_at` (nullable — set on
 first save, drives the onboarding checklist). School-owned (`BelongsToSchool`).
 See `docs/onboarding.md`.
+
+### `2026_09_14_100000_add_configuration_to_school_settings_table`
+Milestone 6 — expands `school_settings` (still 1:1, no new index needed). Typed
+columns, not a JSON blob. Adds: `address_line1/2`, `city(120)`, `state(120)`,
+`postal_code(20)`, `country char(2)` default `NG`, `website_url`, `logo_path`
+(**guarded** — written only by `SchoolSetting::putLogo()`), `brand_color char(7)`,
+`currency char(3)` default `NGN`, `date_format(20)` default `d/m/Y`,
+`week_starts_on tinyint` default `1` (0=Sun…6=Sat), `academic_year_start_month
+tinyint` default `9`. Column defaults, the model `$attributes`, and
+`config('school-settings.defaults')` are kept in sync. See `docs/school-settings.md`.
 
 ### `2026_09_13_100010_create_academic_sessions_table`
 `name` (`unique(school_id, name)`), `starts_on` / `ends_on` (dates), `is_current`

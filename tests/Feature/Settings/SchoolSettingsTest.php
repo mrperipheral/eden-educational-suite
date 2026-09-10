@@ -8,6 +8,10 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Concerns\InteractsWithTenancy;
 use Tests\TestCase;
 
+/**
+ * School settings — profile section plus the authorization / tenant-isolation
+ * rules shared by every section (branding and regional have their own files).
+ */
 class SchoolSettingsTest extends TestCase
 {
     use InteractsWithTenancy, RefreshDatabase;
@@ -18,24 +22,35 @@ class SchoolSettingsTest extends TestCase
         $this->withoutVite();
     }
 
-    public function test_school_admin_can_view_and_update_settings(): void
+    private function stored(int $schoolId): SchoolSetting
+    {
+        return SchoolSetting::query()->withoutGlobalScopes()->where('school_id', $schoolId)->firstOrFail();
+    }
+
+    public function test_school_admin_can_view_and_update_the_profile(): void
     {
         $school = $this->newSchool();
         $this->actingAsMemberOf($school, Role::SchoolAdmin);
 
-        $this->get('/settings/school')->assertOk()->assertSee('Africa/Lagos');
+        $this->get('/settings/school')->assertOk()->assertSee($school->name);
 
         $this->patch('/settings/school', [
-            'timezone' => 'Africa/Accra',
-            'locale' => 'en-GB',
             'contact_email' => 'office@school.example',
-            'contact_phone' => '+233200000000',
+            'contact_phone' => '+234 801 000 0000',
+            'website_url' => 'https://school.example',
+            'address_line1' => '1 Broad Street',
+            'city' => 'Lagos',
+            'state' => 'Lagos',
+            'postal_code' => '100001',
+            'country' => 'ng',
         ])->assertRedirect(route('settings.school.edit'));
 
-        $settings = SchoolSetting::query()->withoutGlobalScopes()->where('school_id', $school->id)->firstOrFail();
-        $this->assertSame('Africa/Accra', $settings->timezone);
+        $settings = $this->stored($school->id);
         $this->assertSame('office@school.example', $settings->contact_email);
-        $this->assertNotNull($settings->completed_at, 'completed_at is stamped on first save');
+        $this->assertSame('https://school.example', $settings->website_url);
+        $this->assertSame('Lagos', $settings->city);
+        $this->assertSame('NG', $settings->country, 'country is normalised to upper case');
+        $this->assertNotNull($settings->completed_at, 'saving stamps the onboarding-review flag');
     }
 
     public function test_settings_row_is_created_on_first_visit(): void
@@ -45,7 +60,11 @@ class SchoolSettingsTest extends TestCase
 
         $this->assertDatabaseCount('school_settings', 0);
         $this->get('/settings/school')->assertOk();
-        $this->assertDatabaseHas('school_settings', ['school_id' => $school->id, 'timezone' => 'Africa/Lagos']);
+        $this->assertDatabaseHas('school_settings', [
+            'school_id' => $school->id,
+            'timezone' => 'Africa/Lagos',
+            'currency' => 'NGN',
+        ]);
     }
 
     public function test_view_only_roles_can_see_but_not_change_settings(): void
@@ -54,11 +73,13 @@ class SchoolSettingsTest extends TestCase
 
         foreach ([Role::Principal, Role::Bursar] as $role) {
             $this->actingAsMemberOf($school, $role);
-            $this->get('/settings/school')->assertOk()->assertDontSee('name="timezone"', false);
+            $this->get('/settings/school')->assertOk()->assertDontSee('name="contact_email"', false);
             $this->from('/settings/school')->patch('/settings/school', [
-                'timezone' => 'UTC', 'locale' => 'en',
+                'contact_email' => 'sneaky@school.example',
             ])->assertForbidden();
         }
+
+        $this->assertNull($this->stored($school->id)->contact_email);
     }
 
     public function test_roles_without_settings_view_are_denied(): void
@@ -68,18 +89,40 @@ class SchoolSettingsTest extends TestCase
         foreach ([Role::Teacher, Role::Staff, Role::Parent, Role::Student, null] as $role) {
             $this->actingAsMemberOf($school, $role);
             $this->get('/settings/school')->assertForbidden();
+            $this->get('/settings/school/branding')->assertForbidden();
+            $this->get('/settings/school/regional')->assertForbidden();
         }
     }
 
-    public function test_invalid_timezone_is_rejected(): void
+    public function test_invalid_profile_input_is_rejected(): void
     {
         $school = $this->newSchool();
         $this->actingAsMemberOf($school, Role::SchoolAdmin);
 
         $this->from('/settings/school')->patch('/settings/school', [
-            'timezone' => 'Mars/Olympus_Mons',
-            'locale' => 'en',
-        ])->assertSessionHasErrors('timezone');
+            'contact_email' => 'not-an-email',
+            'website_url' => 'ftp://school.example',
+            'country' => 'ZZ',
+        ])->assertSessionHasErrors(['contact_email', 'website_url', 'country']);
+    }
+
+    public function test_protected_columns_cannot_be_mass_assigned(): void
+    {
+        $school = $this->newSchool();
+        $this->actingAsMemberOf($school, Role::SchoolAdmin);
+        $this->get('/settings/school')->assertOk();
+
+        $this->patch('/settings/school', [
+            'contact_email' => 'office@school.example',
+            'school_id' => 999999,
+            'logo_path' => 'school-logos/evil.png',
+            'completed_at' => null,
+        ])->assertRedirect();
+
+        $settings = $this->stored($school->id);
+        $this->assertSame($school->id, $settings->school_id);
+        $this->assertNull($settings->logo_path);
+        $this->assertNotNull($settings->completed_at);
     }
 
     public function test_settings_are_isolated_between_schools(): void
@@ -87,37 +130,33 @@ class SchoolSettingsTest extends TestCase
         $schoolA = $this->newSchool();
         $schoolB = $this->newSchool();
 
-        // B's admin sets B's timezone.
         $this->actingAsMemberOf($schoolB, Role::SchoolAdmin);
-        $this->patch('/settings/school', ['timezone' => 'Europe/London', 'locale' => 'en']);
+        $this->patch('/settings/school', ['contact_email' => 'b@school.example', 'city' => 'Kano']);
 
         $this->flushSession();
 
-        // A's admin edits A — B must be untouched, and A starts from the default.
         $this->actingAsMemberOf($schoolA, Role::SchoolAdmin);
-        $this->get('/settings/school')
-            ->assertOk()
-            ->assertSee('value="Africa/Lagos" selected', false)
-            ->assertDontSee('value="Europe/London" selected', false);
+        $this->get('/settings/school')->assertOk()->assertDontSee('b@school.example');
+        $this->patch('/settings/school', ['contact_email' => 'a@school.example', 'city' => 'Lagos']);
 
-        $this->patch('/settings/school', ['timezone' => 'Africa/Accra', 'locale' => 'en']);
-
-        $this->assertSame('Africa/Accra', SchoolSetting::query()->withoutGlobalScopes()
-            ->where('school_id', $schoolA->id)->value('timezone'));
-        $this->assertSame('Europe/London', SchoolSetting::query()->withoutGlobalScopes()
-            ->where('school_id', $schoolB->id)->value('timezone'), 'B untouched');
+        $this->assertSame('a@school.example', $this->stored($schoolA->id)->contact_email);
+        $this->assertSame('b@school.example', $this->stored($schoolB->id)->contact_email, 'B untouched');
         $this->assertSame(2, SchoolSetting::query()->withoutGlobalScopes()->count());
     }
 
-    public function test_platform_admin_in_context_can_update_settings(): void
+    public function test_platform_admin_operates_only_through_tenant_context(): void
     {
         $school = $this->newSchool();
+
+        // No active school selected — denied.
+        $this->actingAsPlatformAdmin();
+        $this->get('/settings/school')->assertRedirect(route('school-context.create'));
+
+        // Inside the school's context — allowed, and scoped to that school.
+        $this->flushSession();
         $this->actingAsPlatformAdmin($school);
+        $this->patch('/settings/school', ['contact_email' => 'platform@school.example'])->assertRedirect();
 
-        $this->patch('/settings/school', ['timezone' => 'UTC', 'locale' => 'en'])
-            ->assertRedirect();
-
-        $this->assertSame('UTC', SchoolSetting::query()->withoutGlobalScopes()
-            ->where('school_id', $school->id)->value('timezone'));
+        $this->assertSame('platform@school.example', $this->stored($school->id)->contact_email);
     }
 }

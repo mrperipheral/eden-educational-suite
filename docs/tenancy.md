@@ -103,7 +103,9 @@ routes (`/admin/schools*`) do **not** use it.
 ## 5. `BelongsToSchool` — writing a tenant-owned model
 
 The first real school-owned models ship with Milestone 5:
-`App\Models\SchoolSetting` (1:1 with a school) and `App\Models\AcademicSession`.
+`App\Models\SchoolSetting` (1:1 with a school — Milestone 6 expanded its columns
+and added a private-disk `logo_path` written only through the model, never
+`$fillable`; see `docs/school-settings.md`) and `App\Models\AcademicSession`.
 Both follow the pattern:
 
 ```php

@@ -48,7 +48,24 @@ class DatabaseSeeder extends Seeder
         $tenant = app(TenantContext::class);
         $tenant->set($alpha);
 
-        $alpha->settings()->firstOrCreate([], ['contact_email' => 'office@alpha.example'])->markReviewed();
+        $settings = $alpha->settings()->firstOrCreate([]);
+        $settings->fill([
+            'contact_email' => 'office@alpha.example',
+            'contact_phone' => '+234 801 234 5678',
+            'website_url' => 'https://alpha-academy.example',
+            'address_line1' => '12 Bourdillon Road',
+            'city' => 'Lagos',
+            'state' => 'Lagos',
+            'country' => 'NG',
+            'timezone' => 'Africa/Lagos',
+            'locale' => 'en-NG',
+            'currency' => 'NGN',
+            'date_format' => 'd/m/Y',
+            'week_starts_on' => 1,
+            'academic_year_start_month' => 9,
+            'brand_color' => '#1d4ed8',
+        ])->save();
+        $settings->markReviewed();
         AcademicSession::create([
             'name' => '2025/2026',
             'starts_on' => '2025-09-01',

@@ -85,26 +85,26 @@ school) can add an existing account:
   the route is rate-limited. "Already a member" is a distinct validation error.
 - Invitations / creating brand-new accounts are **out of scope** — deferred.
 
-## 5. Basic school settings
+## 5. School settings
 
 `school_settings` — one row per school (1:1), `App\Models\SchoolSetting` uses
-`BelongsToSchool`:
+`BelongsToSchool`. **Milestone 6** expanded this into the full configuration
+record (profile, branding, regional) — see `docs/school-settings.md`. Onboarding
+only cares that the row exists and has been reviewed:
 
 | Column | Notes |
 |--------|-------|
-| `timezone` | default `Africa/Lagos` (target market; fully overridable), validated against `timezone_identifiers_list()` |
-| `locale` | default `en` |
-| `contact_email`, `contact_phone` | nullable |
-| `completed_at` | stamped on first save — drives the onboarding checklist; **not** mass-assignable (`markReviewed()`) |
+| `completed_at` | stamped the first time any settings section is saved — drives the onboarding checklist; **not** mass-assignable (`markReviewed()`) |
+| everything else | typed, defaulted, validated per section (`docs/school-settings.md` §3) |
 
 - `GET /settings/school` (`school.settings.view`) — the row is `firstOrCreate`d
   via the school relation; `school_id` is stamped from the context.
-- `PATCH /settings/school` (`school.settings.update`).
+- `PATCH /settings/school` · `/settings/school/branding` · `/settings/school/regional`
+  (`school.settings.update`). Any of them stamps `completed_at`.
 - `Principal` / `Bursar` see a read-only view (they hold `school.settings.view`,
   not `update`). `Teacher` / `Staff` / `Parent` / `Student` get 403.
-- Fully tenant-isolated by `SchoolScope`; another school's settings are
-  unreachable (tested).
-- This is **not** the full School Settings milestone — that adds columns here.
+- Fully tenant-isolated by `SchoolScope`; another school's settings (and logo)
+  are unreachable (tested).
 
 ## 6. Initial academic session
 
@@ -162,7 +162,7 @@ cost). When all three are done the checklist collapses to "onboarding complete".
 | Initial admin assigned in the controller (not the service), guarded by `canGrantRole` | keeps the escalation rule visible and meaningful; the service stays a pure "create the row" step |
 | Add-member reuses `member.assign-role` (+ `canGrantRole`), no new permission | it *is* "give this person a role in my school"; smaller permission surface |
 | Academic sessions gated by `school.settings.*`, not `academics.*` | the year container is configuration; `academics.*` stays dormant for its own milestone |
-| `SchoolSetting` typed columns, not a JSON blob or key/value table | validated, indexable; the full Settings milestone adds columns |
+| `SchoolSetting` typed columns, not a JSON blob or key/value table | validated, indexable; M6 (`docs/school-settings.md`) added the remaining columns |
 | `{session}` resolved by id, not route-model-bound | binding runs before `tenant`, so a `BelongsToSchool` bind would hit `SchoolScope` with no context |
 | `timezone` default `Africa/Lagos` | sensible default for the initial market; a settable field, not a code assumption |
 
@@ -170,7 +170,7 @@ cost). When all three are done the checklist collapses to "onboarding complete".
 
 - Invitations / email workflows; creating brand-new accounts during onboarding.
 - School suspension / lifecycle, subscriptions / billing.
-- The full School Settings milestone (branding, grading scheme, address, …).
+- Grading scheme / term structure / holiday calendar (Academic Management).
 - The full Academic Management milestone (terms, calendar, holidays, promotion).
 - Bulk import of members; membership removal audit; onboarding-complete
   notifications.

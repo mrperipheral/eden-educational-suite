@@ -50,9 +50,13 @@ and `hasPermission()` are the only things that would change.
 
 24 coarse permissions, dotted strings, grouped in the enum:
 
-- **School config (enforced — M5):** `school.settings.view`,
-  `school.settings.update` — gate school settings *and* the initial academic
-  session.
+- **School config (enforced — M5/M6):** `school.settings.view`,
+  `school.settings.update` — gate all school settings sections (profile,
+  branding, regional — M6) *and* the academic sessions. School Admin holds
+  `.update`; Principal and Bursar hold only `.view` (read-only settings). No
+  finer-grained settings permission was added in M6 — editing school-wide
+  configuration is a School Admin function; revisit if a school needs a
+  Principal who can edit (see `docs/school-settings.md` §5).
 - **People & access (enforced):** `member.view`, `member.assign-role`
   (also gates *adding* an existing user — M5), `member.remove`
 - **Declared for later domain milestones** (not yet enforced — the modules that

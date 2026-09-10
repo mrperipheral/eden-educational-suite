@@ -61,9 +61,25 @@ initial academic session (`academic_sessions`, structure-agnostic), and a
 derived dashboard onboarding checklist. Full detail in `docs/onboarding.md`.
 
 Deferred: invitations / brand-new-account onboarding, school suspension /
-subscription, the full School Settings and Academic Management milestones.
+subscription, the Academic Management milestone.
 
-## Milestone 6+ — Domain Modules
+## ✅ Milestone 6 — School Settings & Configuration (complete, 2026-09-10)
+
+Expanded `school_settings` (typed columns, no JSON blob) into the full
+per-school configuration record, split into three sections — **Profile**
+(contact + address), **Branding** (private-disk logo upload served through a
+gated no-path route, `brand_color`), **Regional** (`timezone`, `locale`,
+`currency`, `date_format`, `week_starts_on`, `academic_year_start_month`) — plus
+`config/school-settings.php` reference data and the `DateFormat` / `Weekday`
+enums. Built on the existing M3/M4 tenant + permission architecture
+(`school.settings.view` / `.update`); Principal & Bursar read-only. Full detail
+in `docs/school-settings.md`.
+
+Deferred: grading scheme / term structure / holiday calendar (Academic
+Management), notification & payment-gateway config (their own modules), feature
+activation, app-wide render-time application of the formatting preferences.
+
+## Milestone 7+ — Domain Modules
 
 Staff · Students & Guardians · Classes/Sections/Subjects · Enrolment ·
 Attendance · Assessments & Results · Fees / Invoices / Payments (Paystack) ·

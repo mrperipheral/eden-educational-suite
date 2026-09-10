@@ -1,7 +1,7 @@
 # Architecture
 
-Status: Milestone 5 (School Onboarding) complete. This describes the intended
-shape of the system and what exists today.
+Status: Milestone 6 (School Settings & Configuration) complete. This describes
+the intended shape of the system and what exists today.
 
 ## 1. High-level model
 
@@ -102,13 +102,35 @@ to a usable school, built on the M1–M4 seams:
 - The dashboard derives an **onboarding checklist** (admin seated, first session
   created, settings reviewed) for administrators.
 
+## 2d. School settings & configuration (implemented — Milestone 6)
+
+Full reference: **`docs/school-settings.md`**. Expands the single M5
+`SchoolSetting` row into the full per-school configuration record — typed
+columns, no JSON blob — split into three focused sections behind a shared
+sub-nav:
+
+- **Profile** (`PATCH /settings/school`) — contact details + address; the
+  school's `name`/`slug`/`status` stay platform-controlled and read-only.
+- **Branding** (`/settings/school/branding`) — an optional logo stored on the
+  **private `local` disk** and served only through a `school.settings.view`-gated
+  route with **no path parameter** (no traversal, tenant-scoped), plus
+  `brand_color`.
+- **Regional** (`/settings/school/regional`) — `timezone`, `locale`, `currency`,
+  `date_format` (`App\Enums\DateFormat`), `week_starts_on` (`App\Enums\Weekday`),
+  `academic_year_start_month` (read later by Academic Management).
+
+Reuses the existing seams unchanged: `school.settings.view` / `.update`,
+`TenantContext` + `SchoolScope`, the M3 storage abstraction. Principal & Bursar
+get the read-only view; Platform Admin operates only through a selected context.
+Reference lists live in `config/school-settings.php`.
+
 ### Deferred
 
 - Queue jobs capture/restore the tenant id (no jobs exist yet — see
   `docs/tenancy.md` §7).
 - Invitations / brand-new-account onboarding, school suspension / subscription,
-  the full School Settings and Academic Management milestones, admin UI for
-  `status` / `is_platform_admin`, subdomain routing.
+  the Academic Management milestone, notification & payment config, feature
+  activation, admin UI for `status` / `is_platform_admin`, subdomain routing.
 
 ## 3. Application layers & conventions
 

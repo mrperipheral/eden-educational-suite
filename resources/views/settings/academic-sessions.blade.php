@@ -4,10 +4,7 @@
             <x-alert variant="success">{{ session('status') }}</x-alert>
         @endif
 
-        <nav class="flex gap-4 border-b border-gray-200 pb-2 text-sm">
-            <a href="{{ route('settings.school.edit') }}" class="text-gray-500 hover:text-gray-800">{{ __('General') }}</a>
-            <span class="font-medium text-brand-700">{{ __('Academic sessions') }}</span>
-        </nav>
+        @include('settings.school._nav')
 
         @can('school.settings.update')
             <x-card :title="__('Add a session')">

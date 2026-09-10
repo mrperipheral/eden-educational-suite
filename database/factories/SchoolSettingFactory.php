@@ -21,8 +21,15 @@ class SchoolSettingFactory extends Factory
         return [
             'timezone' => 'Africa/Lagos',
             'locale' => 'en',
+            'country' => 'NG',
+            'currency' => 'NGN',
+            'date_format' => 'd/m/Y',
+            'week_starts_on' => 1,
+            'academic_year_start_month' => 9,
             'contact_email' => fake()->companyEmail(),
             'contact_phone' => fake()->numerify('+234#########'),
+            'city' => fake()->city(),
+            'state' => fake()->randomElement(['Lagos', 'Oyo', 'Abuja', 'Rivers', 'Kano']),
         ];
     }
 
