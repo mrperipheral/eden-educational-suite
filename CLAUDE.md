@@ -79,8 +79,13 @@ See `docs/architecture.md` for the full rationale. In short:
   components in `resources/views/components/`. Signed-in pages use
   `<x-layouts.authenticated>`; pre-auth pages use `<x-layouts.guest>`.
 - **Auth** — native Laravel, no starter package. Flow routes in `routes/auth.php`;
-  see `docs/authentication.md`. Passwords via `Password::defaults()`. Check
-  **permissions**, never role names (roles/permissions not built yet).
+  see `docs/authentication.md`. Passwords via `Password::defaults()`.
+- **Authorization** (see `docs/authorization.md`) — check **permissions** through
+  the Gate (`$user->can('member.view')`, `@can`, `->can()` route middleware,
+  `$this->authorize(...)`), **never role names**. Permissions are
+  `App\Enums\Permission`; roles (`App\Enums\Role`) are static bundles assigned per
+  school on `school_user.role`. Every permission check is composed with
+  `TenantContext` (applies only inside the school in context). No `Gate::before`.
 - **Tests** — feature tests for every route and each authorization boundary; unit
   tests for services, enums and value objects. Tenant isolation gets explicit
   cross-tenant "cannot see / cannot touch" tests once schools exist. Tests that
@@ -97,8 +102,7 @@ See `docs/architecture.md` for the full rationale. In short:
 
 ## Milestones
 
-Tracked in `PROJECT_STATUS.md` and `docs/roadmap.md`. **Milestones 1 (Platform
-Foundation), 2 (Authentication & User Foundation) and 3 (Multi-School / Strict
-Tenant Isolation) are complete.** Do not start Roles & Permissions, School
-Onboarding or any domain module (students, staff, academics, fees, …) without
-picking up the next milestone explicitly.
+Tracked in `PROJECT_STATUS.md` and `docs/roadmap.md`. **Milestones 1–4 (Platform
+Foundation, Authentication, Multi-School Tenant Isolation, Roles & Permissions)
+are complete.** Do not start School Onboarding or any domain module (students,
+staff, academics, fees, …) without picking up the next milestone explicitly.

@@ -3,10 +3,11 @@
 ])
 
 @php
-    $navLinks = [
-        ['route' => 'dashboard', 'label' => 'Dashboard'],
-        ['route' => 'settings.profile.edit', 'label' => 'Account settings'],
-    ];
+    $navLinks = collect([
+        ['route' => 'dashboard', 'label' => __('Dashboard'), 'can' => null],
+        ['route' => 'members.index', 'label' => __('Members'), 'can' => 'member.view'],
+        ['route' => 'settings.profile.edit', 'label' => __('Account settings'), 'can' => null],
+    ])->filter(fn ($link) => $link['can'] === null || auth()->user()->can($link['can']));
 
     $currentSchool = app(\App\Support\Tenancy\TenantContext::class)->school();
     $canSwitchSchool = $currentSchool !== null

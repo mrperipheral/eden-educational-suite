@@ -2,6 +2,7 @@
 
 namespace Tests\Concerns;
 
+use App\Enums\Role;
 use App\Http\Middleware\EnforceTenant;
 use App\Models\School;
 use App\Models\User;
@@ -45,25 +46,40 @@ trait InteractsWithTenancy
         return $school;
     }
 
-    protected function memberOf(School $school, array $userAttributes = []): User
+    protected function memberOf(School $school, ?Role $role = null, array $userAttributes = []): User
     {
         $user = User::factory()->create($userAttributes);
-        $user->schools()->attach($school);
+        $user->joinSchool($school, $role);
 
         return $user;
     }
 
     /**
-     * Authenticate as a member of $school and pin that school as the session's
-     * active context — the state a normal request reaches after EnforceTenant.
+     * Authenticate as a member of $school (optionally with a role) and pin that
+     * school as the session's active context — the state a normal request
+     * reaches after EnforceTenant.
      */
-    protected function actingAsMemberOf(School $school, array $userAttributes = []): User
+    protected function actingAsMemberOf(School $school, ?Role $role = null, array $userAttributes = []): User
     {
-        $user = $this->memberOf($school, $userAttributes);
+        $user = $this->memberOf($school, $role, $userAttributes);
         $this->actingAs($user);
         $this->withSession([EnforceTenant::SESSION_KEY => $school->getKey()]);
 
         return $user;
+    }
+
+    /**
+     * Read the stored role for (user, school) straight from the pivot table,
+     * bypassing any in-memory memo on the User model.
+     */
+    protected function storedRole(User $user, School $school): ?Role
+    {
+        $value = \DB::table('school_user')
+            ->where('user_id', $user->getKey())
+            ->where('school_id', $school->getKey())
+            ->value('role');
+
+        return $value !== null ? Role::from($value) : null;
     }
 
     protected function actingAsPlatformAdmin(?School $activeSchool = null): User

@@ -1,7 +1,7 @@
 # Architecture
 
-Status: Milestone 3 (Multi-School / Strict Tenant Isolation) complete. This
-describes the intended shape of the system and what exists today.
+Status: Milestone 4 (Roles & Permissions) complete. This describes the intended
+shape of the system and what exists today.
 
 ## 1. High-level model
 
@@ -61,11 +61,33 @@ Full reference: **`docs/tenancy.md`**. Summary:
 `TenantContext`. Isolation is a property of the framework wiring, not of every
 developer remembering a `where()` clause.
 
+## 2b. Roles & permissions (implemented — Milestone 4)
+
+Full reference: **`docs/authorization.md`**. Summary:
+
+- **`App\Enums\Permission`** — the fixed, code-defined authorization vocabulary
+  (no DB table). **`App\Enums\Role`** — seven per-school roles, each a static
+  bundle of permissions + a `tier`.
+- Assignment is one nullable column: **`school_user.role`** (`App\Models\SchoolUser`
+  pivot). One role per (user, school).
+- **`App\Providers\AuthServiceProvider`** registers every permission as a Gate
+  ability delegating to **`User::hasPermission()`**, which is composed with the
+  active `TenantContext` — a permission only applies inside the school in
+  context, and there is **no `Gate::before()`** blanket bypass.
+- Platform admins hold every permission *within a school they have entered*;
+  `SchoolScope` still constrains which rows they touch.
+- **`App\Policies\MembershipPolicy`** adds per-row rules (no self-edit, no
+  privilege escalation).
+- Evaluated Spatie laravel-permission; not adopted (its Teams feature is a
+  second ambient tenant id competing with `TenantContext`). See
+  `docs/authorization.md` §2.
+
 ### Deferred
 
 - Queue jobs capture/restore the tenant id (no jobs exist yet — see
   `docs/tenancy.md` §7).
-- `school_user` roles, membership management UI, onboarding, subdomain routing.
+- Multi-role per school, custom/runtime-editable roles, invitations / add-member
+  flow, admin UI for `status` / `is_platform_admin`, subdomain routing.
 
 ## 3. Application layers & conventions
 
@@ -77,8 +99,9 @@ developer remembering a `where()` clause.
 | Policies | `app/Policies` | model authorization, invoked server-side |
 | Services | `app/Services` | multi-step / cross-model business operations |
 | Models | `app/Models` | persistence, casts, mass-assignment guards, scopes |
-| Enums | `app/Enums` | closed value sets (`UserStatus`, `SchoolStatus`), backed by string columns |
+| Enums | `app/Enums` | closed value sets (`UserStatus`, `SchoolStatus`, `Role`, `Permission`), backed by string columns / static bundles |
 | Middleware | `app/Http/Middleware` | cross-cutting request guards (`EnsureAccountIsActive`, `EnforceTenant`) |
+| Providers | `app/Providers` | `AppServiceProvider` (tenant seam, model strictness), `AuthServiceProvider` (Gate abilities per permission, policy map) |
 | Support | `app/Support` | framework-agnostic helpers; `Support\Tenancy` = tenant context, `BelongsToSchool` trait, `SchoolScope`, exceptions |
 | Views | `resources/views/<area>` | pages |
 | UI components | `resources/views/components` | layouts + design-system primitives |
@@ -137,3 +160,6 @@ pre-auth screens.
 | 2026-09-11 | `creating` hook forces `school_id` from context; `school_id` immutable on update | `school_id` cannot be spoofed via mass assignment or explicit set |
 | 2026-09-11 | Many-to-many `User`↔`School`; `is_platform_admin` boolean, no `Gate::before` | multi-campus staff are real; platform admins still act within a chosen tenant, not around it |
 | 2026-09-11 | School context in the session, re-validated every request | stateless-friendly; tampering with the stored id is inert |
+| 2026-09-12 | Roles/permissions in-house (enums), not Spatie laravel-permission | Spatie's Teams adds a second ambient tenant id competing with `TenantContext`; our permission set is static/code-defined (see `docs/authorization.md` §2) |
+| 2026-09-12 | Each permission is a Gate ability; still **no `Gate::before`** | `$user->can()` / `@can` / route `->can()` all work and stay tenant-composed; platform admins get school-admin reach *inside* an entered school only |
+| 2026-09-12 | One role per (user, school), tier-based escalation guard | matches "roles = bundles"; invariant "never grant a role above your own" is simple and testable |

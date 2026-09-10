@@ -14,13 +14,16 @@ The full development guide is **[CLAUDE.md](CLAUDE.md)** and the documents under
   in `$fillable`, never `where('school_id')` by hand, never read `school_id` from
   the request. Active school = `App\Support\Tenancy\TenantContext`; tenant routes
   get the `tenant` middleware.
-- **Security:** server-side authorization (Policies), Form Request validation,
-  CSRF on every write. Frontend hiding is not authorization.
+- **Security:** server-side authorization, Form Request validation, CSRF on every
+  write. Frontend hiding is not authorization.
 - **Auth:** native Laravel, no starter package. See `docs/authentication.md`.
-  Check permissions, never role names.
+- **Authorization** (`docs/authorization.md`): check **permissions** via the Gate
+  (`$user->can('x')`, `@can`, `->can()`), never role names. `App\Enums\Permission`
+  + `App\Enums\Role` (bundles), assigned per school on `school_user.role`, every
+  check composed with `TenantContext`. No `Gate::before`.
 - **Scope discipline:** work the current milestone only. `PROJECT_STATUS.md` and
-  `docs/roadmap.md` say where we are. Milestones 1–3 (Platform Foundation,
-  Authentication, Multi-School Tenant Isolation) are done.
+  `docs/roadmap.md` say where we are. Milestones 1–4 (Platform Foundation,
+  Authentication, Multi-School Tenant Isolation, Roles & Permissions) are done.
 - **Before finishing:** `php artisan test`, `vendor/bin/pint`, `npm run build`.
 - This file and `docs/` are development-only and must never become a runtime
   dependency of the application.

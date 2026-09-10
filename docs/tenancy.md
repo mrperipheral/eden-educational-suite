@@ -43,8 +43,11 @@ be entered. Route key is `slug`. Not itself tenant-scoped. `status` and `slug`
 changes are platform-admin actions; `status` is not mass-assignable.
 
 ### `school_user`
-`school_id, user_id, timestamps`, composite PK `(school_id, user_id)`. No role
-column — roles/permissions are a later milestone. `ON DELETE CASCADE` both ways.
+`school_id, user_id, role (nullable), timestamps`, composite PK
+`(school_id, user_id)`, extra index `(school_id, role)`. `role` is the
+per-school `App\Enums\Role` (Milestone 4). `ON DELETE CASCADE` both ways.
+Modelled by `App\Models\SchoolUser` (the `->using()` pivot for
+`User::schools()` / `School::users()`).
 
 ### `users.is_platform_admin`
 Boolean, default false, **not mass-assignable**, set via seeder / future admin
@@ -148,10 +151,12 @@ Escape hatches (platform tooling / jobs only):
 Auto-discovered (Laravel maps `App\Policies\SchoolPolicy` to `App\Models\School`).
 Controllers call `$this->authorize('enter', $school)` etc.
 
-**Convention going forward:** authorize with *permissions/policies*, never role
-names. Roles (School Admin, Teacher, Bursar, …) arrive in their own milestone and
-will compose with `TenantContext` so a permission only applies inside the acting
-school.
+**Per-school roles & permissions** (Milestone 4, `docs/authorization.md`) are
+built directly on this seam: `User::hasPermission()` reads `TenantContext::id()`,
+so a permission only applies inside the school in context. The `school_user`
+pivot now carries a `role` column; permission checks go through the Gate
+(`$user->can('member.view')`, `@can`, `->can()` route middleware), never role
+names.
 
 ## 7. Console & queue guidance
 
@@ -200,8 +205,7 @@ intentional (fail closed). So:
 
 ## 11. Deferred
 
-- Roles & permissions (own milestone) — will compose with `TenantContext`.
-- `school_user` role/`is_default` columns, invitations, membership management UI.
+- `school_user` `is_default` column, invitations / add-existing-user flow.
 - School onboarding / provisioning / settings / subscription.
 - Queue-job tenant propagation (no jobs yet).
 - Subdomain / path-based tenant routing (slug is ready for it).

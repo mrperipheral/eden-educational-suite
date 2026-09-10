@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\HealthController;
+use App\Http\Controllers\MemberController;
 use App\Http\Controllers\SchoolContextController;
 use App\Http\Controllers\Settings\PasswordController;
 use App\Http\Controllers\Settings\ProfileController;
@@ -40,6 +41,14 @@ Route::middleware(['auth', 'verified', 'active'])->group(function () {
     */
     Route::middleware('tenant')->group(function () {
         Route::get('dashboard', DashboardController::class)->name('dashboard');
+
+        // Membership & roles for the current school. Permission checks are
+        // composed with the active tenant (see docs/authorization.md).
+        Route::get('members', [MemberController::class, 'index'])
+            ->can('member.view')
+            ->name('members.index');
+        Route::patch('members/{user}', [MemberController::class, 'updateRole'])->name('members.update-role');
+        Route::delete('members/{user}', [MemberController::class, 'destroy'])->name('members.destroy');
     });
 });
 

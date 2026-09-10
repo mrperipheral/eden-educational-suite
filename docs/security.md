@@ -17,9 +17,10 @@ column.
    global scope (`SchoolScope`, which *throws* rather than run unscoped) + the
    `creating`/`updating` hooks that make `school_id` unspoofable and immutable,
    and proven by the cross-tenant test suite. Full reference: `docs/tenancy.md`.
-4. **Least privilege.** Roles/permissions (a later milestone) grant the minimum;
-   platform-admin capability is separate from any school role. Code checks
-   permissions, never role names.
+4. **Least privilege.** Roles are bundles of permissions granted per school
+   (`school_user.role`); code checks **permissions** via the Gate, never role
+   names. Platform-admin capability is separate from any school role and confers
+   nothing without an active school context. Full reference: `docs/authorization.md`.
 5. **Fail safe.** Missing tenant context throws (`idOrFail`), it does not fall
    back to "all schools".
 
@@ -76,14 +77,30 @@ Full detail in `docs/tenancy.md`. Summary of controls:
 | Suspended school | cannot be entered (`SchoolPolicy::enter`, `EnforceTenant`) |
 | Tenant-aware indexes | `school_id`-leading composite indexes are a documented requirement (`docs/database-design.md`) |
 
+## Implemented in Milestone 4 (Roles & Permissions)
+
+Full detail in `docs/authorization.md`. Summary of controls:
+
+| Control | State |
+|---------|-------|
+| Permission enforcement | every `App\Enums\Permission` is a Gate ability delegating to `User::hasPermission()` |
+| Tenant composition | `hasPermission()` reads `TenantContext::id()`; a permission applies only inside the school in context, and returns `false` with no context |
+| No platform-wide bypass | **no `Gate::before()`**; a platform admin holds permissions only inside a school they have entered, and `SchoolScope` still limits the rows |
+| Privilege escalation | `MembershipPolicy` + `User::canGrantRole()` — you can never grant a role of a higher tier than your own |
+| Self-modification | you cannot change or remove your own membership |
+| Cross-school role management | Members controller only loads `school_user` rows for `TenantContext::idOrFail()`; another school's member 404s |
+| Role tampering | `school_user.role` is set only via `User::assignRoleInSchool()` / `joinSchool()`; not part of any `$fillable`; validated against the `Role` enum |
+| Role storage | static enums (no `permissions` table to keep in sync, no cache to poison) |
+
 ## Deferred (with the milestone that owns them)
 
-- **Auth follow-ups:** role/permission enforcement, 2FA, "log out other devices"
-  on password change, session listing, auth-event audit logging, templated
-  transactional emails.
+- **Auth follow-ups:** 2FA, "log out other devices" on password change, session
+  listing, auth-event audit logging, templated transactional emails.
+- **Authz follow-ups:** multi-role per school, custom/runtime roles, invitations,
+  admin UI for `status` / `is_platform_admin`, audit logging of role changes,
+  enforcing the currently-dormant domain permissions (each in its module).
 - **Tenancy follow-ups:** queue-job tenant propagation, per-tenant rate limiting,
-  per-tenant cache keys, audit logging of context switches, membership
-  management / onboarding.
+  per-tenant cache keys, audit logging of context switches.
 - **Later:** audit logging (who did what, per school), secure file upload
   (type/size validation, out-of-webroot or object storage, virus posture),
   encryption of sensitive PII at rest, data export/erasure handling, 2FA for

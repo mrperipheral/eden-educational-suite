@@ -1,8 +1,8 @@
 # Database Design
 
-Status: Milestone 3. The tenant foundation (`schools`, `school_user`) exists; no
-school-*domain* tables (students, staff, classes …) yet. This document records
-the conventions every future migration follows.
+Status: Milestone 4. The tenant + roles foundation exists; no school-*domain*
+tables (students, staff, classes …) yet. This document records the conventions
+every future migration follows.
 
 ## Current schema
 
@@ -10,7 +10,7 @@ the conventions every future migration follows.
 |-------|---------|
 | `users` | auth identities. `id, name, email (unique), email_verified_at, password, status, is_platform_admin, remember_token, timestamps` |
 | `schools` | tenant root. `id, name, slug (unique), status, timestamps` |
-| `school_user` | User↔School membership. PK `(school_id, user_id)`, cascade both ways |
+| `school_user` | User↔School membership + per-school `role`. PK `(school_id, user_id)`, index `(school_id, role)`, cascade both ways |
 | `password_reset_tokens`, `sessions` | auth/session plumbing |
 | `cache`, `cache_locks` | `CACHE_STORE=database` |
 | `jobs`, `job_batches`, `failed_jobs` | `QUEUE_CONNECTION=database` |
@@ -33,6 +33,13 @@ the `user_id` FK index covers "schools for user". No role column (later mileston
 ### `2026_09_11_100020_add_is_platform_admin_to_users_table`
 `users.is_platform_admin` boolean default false. Not indexed (tiny cardinality),
 not mass-assignable. The platform-owner primitive — see `docs/tenancy.md` §2.
+
+### `2026_09_12_100000_add_role_to_school_user_table`
+`school_user.role` — `string(30)` **nullable** (`App\Enums\Role`: `school_admin`
+/ `principal` / `bursar` / `teacher` / `staff` / `parent` / `student`). One role
+per (user, school); `null` = member with no permissions. Index `(school_id, role)`
+for the "members with role X" query. Not mass-assignable — written only via
+`User::joinSchool()` / `assignRoleInSchool()`. See `docs/authorization.md`.
 
 ## Multi-tenant conventions (ACTIVE — enforced by `BelongsToSchool` from M3 on)
 
@@ -78,6 +85,8 @@ not mass-assignable. The platform-owner primitive — see `docs/tenancy.md` §2.
 
 ## Not yet designed (later milestones, will be added here)
 
-Roles/permissions, `school_user` role/default columns, students, guardians,
-staff, classes/sections, subjects, enrolment, attendance, assessments/results,
-fees/invoices/payments, CBT, audit log. Each gets an entry here when built.
+`school_user.is_default`, students, guardians, staff, classes/sections,
+subjects, enrolment, attendance, assessments/results, fees/invoices/payments,
+CBT, audit log. Each gets an entry here when built.
+
+Permissions and roles are **not** in the database — they are code (`App\Enums`).

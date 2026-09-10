@@ -38,21 +38,25 @@ suite. Full detail in `docs/tenancy.md`.
 Deferred: `school_user` roles, membership management UI, queue-job tenant
 propagation, subdomain routing.
 
-## Milestone 3.x — Roles & Permissions
+## ✅ Milestone 4 — Roles & Permissions (complete, 2026-09-12)
 
-Permission-based authorization (roles = permission bundles), the planned role
-set (Super Admin · School Admin · Principal · Teacher · Accountant/Bursar ·
-Staff · Parent · Student), Policy/Gate wiring, admin UI for `users.status`.
-Evaluate Spatie Permission vs. a small in-house model at that point. Composed
-with the tenant context so a permission only applies within the acting school.
-Sequenced with Milestone 3 since most permissions are per-school.
+`App\Enums\Permission` (24 code-defined permissions) + `App\Enums\Role` (7
+per-school roles as static permission bundles + tiers), `school_user.role`
+column + `App\Models\SchoolUser` pivot, `AuthServiceProvider` registering every
+permission as a tenant-composed Gate ability (no `Gate::before`),
+`MembershipPolicy` (self / escalation guards), and the Members-management
+feature (`/members`). Spatie laravel-permission evaluated and not adopted. Full
+detail in `docs/authorization.md`.
 
-## Milestone 4 — School Onboarding
+Deferred: multi-role per school, custom/runtime roles, invitations, admin UI for
+`status` / `is_platform_admin`.
 
-School registration/provisioning flow, initial admin user, school settings,
-academic session / term setup.
+## Milestone 5 — School Onboarding
 
-## Milestone 5+ — Domain Modules
+School registration/provisioning flow, initial admin user, adding existing users
+to a school, school settings, academic session / term setup.
+
+## Milestone 6+ — Domain Modules
 
 Staff · Students & Guardians · Classes/Sections/Subjects · Enrolment ·
 Attendance · Assessments & Results · Fees / Invoices / Payments (Paystack) ·
