@@ -24,6 +24,13 @@ below, not a rewrite.
   resource, and the publish guard is a single self-join — timetable entries are
   never loaded into PHP to find clashes. The same pattern applies to any future
   "does a conflicting row exist" rule.
+- **Bulk writes are one statement.** Attendance (M13) snapshots a class roster
+  with a single `AttendanceRecord::insert()` (never one insert per student), and
+  bulk mark-saving loads the register's records once (`keyBy` student id) then
+  writes only the changed rows — no per-student `SELECT`. Register summary
+  counts come from `withCount` sub-queries on the list and from the already
+  loaded collection on the detail screen. Regression tests assert bounded query
+  counts for a full-class taking screen, the register list and a bulk save.
 
 ### Caching
 - Cache expensive, read-mostly, tenant-scoped computations with a

@@ -108,18 +108,19 @@ See `docs/architecture.md` for the full rationale. In short:
 
 ## Milestones
 
-Tracked in `PROJECT_STATUS.md` and `docs/roadmap.md`. **Milestones 1–12 (Platform
+Tracked in `PROJECT_STATUS.md` and `docs/roadmap.md`. **Milestones 1–13 (Platform
 Foundation, Authentication, Multi-School Tenant Isolation, Roles & Permissions,
 School Onboarding, School Settings & Configuration, Feature / Module Activation,
 Academic Foundation, Student Management, Guardian / Parent Management, Teacher
-Management, Timetable Management) are complete.** School settings:
-`docs/school-settings.md`; module activation: `docs/module-activation.md`;
-academic structure: `docs/academic-foundation.md`; students + enrollment:
-`docs/student-management.md`; guardians + student ↔ guardian links:
-`docs/guardian-management.md`; teachers + teaching assignments:
+Management, Timetable Management, Attendance Management) are complete.** School
+settings: `docs/school-settings.md`; module activation:
+`docs/module-activation.md`; academic structure: `docs/academic-foundation.md`;
+students + enrollment: `docs/student-management.md`; guardians + student ↔
+guardian links: `docs/guardian-management.md`; teachers + teaching assignments:
 `docs/teacher-management.md`; timetables + lessons + conflict rules:
-`docs/timetable-management.md`. Do not start any further domain module
-(attendance, fees, results, CBT, notifications, promotion, portals, …) without
+`docs/timetable-management.md`; attendance registers + records + eligibility:
+`docs/attendance-management.md`. Do not start any further domain module
+(fees, results, CBT, notifications, promotion, portals, …) without
 picking up the next milestone explicitly.
 
 Module activation is **configuration, not authorization**: a domain route checks

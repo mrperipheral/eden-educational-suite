@@ -1,14 +1,15 @@
 # Database Design
 
-Status: Milestone 12. Tenant + roles + onboarding + school settings + module
+Status: Milestone 13. Tenant + roles + onboarding + school settings + module
 activation + academic foundation + student management + guardian management +
-teacher management + timetable management. School-owned tables:
-`school_settings` (M6), `school_modules` (M7), the academic structure —
+teacher management + timetable management + attendance management. School-owned
+tables: `school_settings` (M6), `school_modules` (M7), the academic structure —
 `academic_sessions`, `academic_periods`, `academic_levels`, `level_arms`,
 `subjects`, `level_subject` (M8) — `students` + `enrollments` (M9), `guardians` +
-`guardian_student` (M10), `teachers` + `teacher_assignments` (M11), and
-`timetables` + `timetable_entries` (M12). No attendance / results / fees tables
-yet. This document records the conventions every future migration follows.
+`guardian_student` (M10), `teachers` + `teacher_assignments` (M11),
+`timetables` + `timetable_entries` (M12), and `attendance_registers` +
+`attendance_records` (M13). No results / fees tables yet. This document records
+the conventions every future migration follows.
 
 ## Current schema
 
@@ -32,6 +33,8 @@ yet. This document records the conventions every future migration follows.
 | `teacher_assignments` | a teacher's teaching assignment over time. School-owned **+** `teacher_id`. FKs to session (req) / period (opt) / level (req) / arm (opt) / subject (req). `index(school_id, teacher_id, status)`, class-roster index `(school_id, session, level, arm)`, `index(school_id, subject_id)`. `status` (`active` / `ended`); history preserved. |
 | `timetables` | a weekly schedule. School-owned. `academic_session_id` (req, fixed) + optional `academic_period_id`. `status` (`draft`/`published`, not mass-assignable), `published_at`. `index(school_id, session, period)`, `index(school_id, status)`. |
 | `timetable_entries` | one scheduled lesson. School-owned **+** `timetable_id`. FKs level / arm / subject / teacher (all required — scheduled per class). `weekday`, `start_time`/`end_time` (`HH:MM` strings, half-open), optional text `room`. Overlap indexes on `(school_id, timetable_id, {weekday|teacher|arm|room}, …)`. |
+| `attendance_registers` | one class's attendance for one day. School-owned. FKs session (req) / period (opt) / level (req) / arm (req); `attendance_date`; `status` (`draft`/`submitted`, not mass-assignable), `submitted_at`, `submitted_by`. `unique(school_id, level_arm_id, attendance_date)`, `index(school_id, attendance_date)`, `index(school_id, session, period)`, `index(school_id, status)`. Not tied to the timetable. |
+| `attendance_records` | one student's mark on a register. School-owned **+** `attendance_register_id`. `student_id` FK; `status` (nullable — null = unmarked; `present`/`absent`/`late`/`excused`), text `note`, `recorded_at`, `recorded_by`. `unique(attendance_register_id, student_id)`, `index(school_id, student_id)`, `index(school_id, attendance_register_id, status)`. Never hard-deleted for historical reasons. |
 | `school_modules` | per-school feature-module on/off overrides. School-owned. `unique(school_id, module)`. Override-only — a row exists only where a school departs from the `App\Enums\Module` default. |
 | `password_reset_tokens`, `sessions` | auth/session plumbing |
 | `cache`, `cache_locks` | `CACHE_STORE=database` |
@@ -189,6 +192,34 @@ Two migrations, both school-owned (`BelongsToSchool`). See `docs/timetable-manag
   `[start, end)` overlap, subject↔level, an active teacher assignment) are
   enforced in `TimetableEntryRequest`; the publish guard runs one self-join scan.
 
+### `2026_09_21_100000_*` — Attendance Management (Milestone 13)
+Two migrations, both school-owned (`BelongsToSchool`). See `docs/attendance-management.md`.
+
+- **`attendance_registers`** — one class's attendance for one day.
+  `academic_session_id` FK (cascade, required), `academic_period_id` FK
+  (`nullOnDelete`, optional), `academic_level_id` FK (cascade, required),
+  `level_arm_id` FK (cascade, **required** — a register is one class/arm),
+  `attendance_date` (`date`), `status` (`App\Enums\AttendanceRegisterStatus`
+  `draft` / `submitted`, default `draft`, **not** mass-assignable), `notes`
+  (`string(255)`, nullable), `submitted_at` (nullable, **not** mass-assignable),
+  `submitted_by` FK to `users` (`nullOnDelete`, **not** mass-assignable).
+  `unique(school_id, level_arm_id, attendance_date)` (one register per class per
+  day), `index(school_id, attendance_date)`,
+  `index(school_id, academic_session_id, academic_period_id)`,
+  `index(school_id, status)`. No `timetable_id` — attendance is independent of
+  the timetable.
+- **`attendance_records`** — one student's mark. `attendance_register_id` FK
+  (cascade), `student_id` FK (cascade), `status` (`string(15)`, **nullable** —
+  null = unmarked; `App\Enums\AttendanceStatus` otherwise), `note` (`string(255)`,
+  nullable), `recorded_at` (nullable), `recorded_by` FK to `users`
+  (`nullOnDelete`). `unique(attendance_register_id, student_id)` (no duplicate
+  student on a register), `index(school_id, student_id)` (a student's history),
+  `index(school_id, attendance_register_id, status)` (summary counts). Eligibility
+  (an active `enrollments` row for the register's exact session/level/arm whose
+  date range contains `attendance_date`) is enforced in the Form Requests and
+  `AttendanceRegister::eligibleStudents()`, not by a DB constraint. Records are
+  never hard-deleted — historical attendance survives a student leaving.
+
 ### `2026_09_15_100000_create_school_modules_table`
 Milestone 7 — per-school feature/module activation. `module` (`string(40)`, an
 `App\Enums\Module` value, **not** cast so an unknown id can't break a page),
@@ -248,7 +279,7 @@ written only via `App\Support\Modules\SchoolModules`. See `docs/module-activatio
 ## Not yet designed (later milestones, will be added here)
 
 `school_user.is_default`, holiday / calendar events, non-teaching staff, class
-rosters, attendance, assessments/results, fees/invoices/payments, CBT,
-rooms/facilities, audit log. Each gets an entry here when built.
+rosters, assessments/results, fees/invoices/payments, CBT, rooms/facilities,
+audit log. Each gets an entry here when built.
 
 Permissions and roles are **not** in the database — they are code (`App\Enums`).

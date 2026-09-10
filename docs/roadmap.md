@@ -192,9 +192,32 @@ Deferred: student/parent timetable views (portals), publish notifications, a
 rooms/facilities module, timetable templates / term cloning, named period grids,
 teacher workload limits, recurring exceptions / cover, auto-generation.
 
-## Milestone 13+ — Domain Modules
+## ✅ Milestone 13 — Attendance Management (complete, 2026-09-21)
 
-Attendance · Assessments & Results · Fees / Invoices / Payments (Paystack) ·
+Tenant-scoped daily student-attendance registers with a draft → submitted
+(locked) lifecycle, **independent of the Timetable module**.
+`App\Models\AttendanceRegister` (one class's attendance for one day — session /
+optional period / level / arm / date; `status` + `submitted_*` not
+mass-assignable; `submit()` / `reopen()`) + `App\Models\AttendanceRecord` (one
+student's mark — nullable `status` = unmarked; `present` / `absent` / `late` /
+`excused`; optional note; `recorded_at` / `recorded_by`). Eligibility is the M9
+enrollment date range; the roster is snapshotted at creation. A register can't be
+submitted while any student is unmarked; a locked register is corrected only via
+an `attendance.manage` `reopen()`. `AttendanceAuthorizer` scopes a teacher to
+classes they hold an active M11 assignment for. New `attendance.manage`
+permission (Principal); `attendance.view` / `attendance.record` kept on Teacher /
+Staff. `Module::Attendance->isAvailable()` is `true` and **on by default**;
+depends on `module:academics` + `module:students` — **not** `module:timetable`.
+Full detail in `docs/attendance-management.md`.
+
+Deferred: attendance rate / percentage analytics, term & monthly reports,
+per-lesson (timetable-driven) registers, portal attendance views, absence
+notifications, an attendance-reason taxonomy, half-day records, a full
+audit-trail / retention workflow.
+
+## Milestone 14+ — Domain Modules
+
+Assessments & Results · Fees / Invoices / Payments (Paystack) ·
 CBT · Role-specific portals & dashboards · Notifications · Reporting · Promotion.
 
 Each domain module checks its `App\Enums\Module` flag (`module:` middleware /

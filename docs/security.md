@@ -240,6 +240,26 @@ Full detail in `docs/timetable-management.md`. Summary of controls:
 | Data integrity | published timetables cannot be deleted (draft first); FK deletes cascade for the required parents (never hard-deleted in practice), `academic_period_id` is `nullOnDelete` |
 | CSRF | every form; `@method('PATCH'|'DELETE')` spoofing |
 
+## Implemented in Milestone 13 (Attendance Management)
+
+Full detail in `docs/attendance-management.md`. Summary of controls:
+
+| Control | How |
+|---------|-----|
+| Two gates on every attendance route | `module:attendance` (feature on? else 404) **and** `->can('attendance.view'|'.record'|'.manage')`; write Form Requests re-check via `AttendanceModuleRequest` + `AttendanceAuthorizer` |
+| Enforced permissions | `attendance.view` (School Admin, Principal, Teacher, Staff) / `attendance.record` (School Admin, Principal, Teacher — class-scoped for teachers) / `attendance.manage` (School Admin, Principal); **Bursar / Parent / Student / role-less → 403** (tested) |
+| Activation ≠ authorization | Attendance module on does not give a Bursar `attendance.view` (tested) |
+| Timetable independence | `Module::Attendance` depends on Academics + Students only; the full workflow is exercised with the Timetable module **off** (tested); no `timetable_id` column, no lesson picker |
+| Tenant isolation | `AttendanceRegister` and `AttendanceRecord` are `BelongsToSchool`; the record also carries `attendance_register_id`. School A cannot view / record / submit / reopen / delete School B's register, cannot create one with School B's class, and cannot POST School B's student ids (explicit HTTP + model tests) |
+| `status` / `submitted_*` protection | **not mass-assignable** — locking goes through `submit()` (only when every student is marked); unlocking through `reopen()` (`attendance.manage` only) |
+| Route-model binding | `{register}` resolved by tenant-scoped `findOrFail`; the write Form Requests `abort(404)` on a cross-school route parent before validation |
+| Cross-school id leakage | every session / period / level / arm id validated with `Rule::exists(...)->where('school_id', <tenant>)` → plain "invalid"; a mark for a student not on the snapshotted roster is rejected, which also blocks cross-school / wrong-class student ids |
+| Roster bulk insert | `AttendanceRecord::insert()` bypasses the `creating` hook, so `school_id` is set explicitly from `TenantContext::idOrFail()` |
+| Accidental false attendance | records start `null` (unmarked); a register can't be submitted while any is unmarked; "Save & submit" only locks a fully-marked class |
+| PII minimisation | no personal data on attendance — student references only, plus a short optional free-text `note` |
+| Historical correctness | records are never hard-deleted; eligibility is the enrollment date range, not current status, so a later withdrawal doesn't alter past registers; correction after locking is an explicit authorized `reopen()`, not a silent edit |
+| CSRF | every form; `@method('PATCH'|'DELETE')` spoofing |
+
 ## Deferred (with the milestone that owns them)
 
 - **Auth follow-ups:** 2FA, "log out other devices" on password change, session
@@ -248,7 +268,8 @@ Full detail in `docs/timetable-management.md`. Summary of controls:
   / brand-new-account onboarding, admin UI for `status` / `is_platform_admin`,
   audit logging of role & membership changes, enforcing the remaining dormant
   domain permissions (each in its module — `academics.*` in M8, `student.*` in
-  M9, `guardian.*` in M10, `staff.*` in M11, `timetable.*` in M12).
+  M9, `guardian.*` in M10, `staff.*` in M11, `timetable.*` in M12,
+  `attendance.*` in M13).
 - **Tenancy follow-ups:** queue-job tenant propagation, per-tenant rate limiting,
   per-tenant cache keys, audit logging of context switches.
 - **Later:** audit logging (who did what, per school — incl. student record /

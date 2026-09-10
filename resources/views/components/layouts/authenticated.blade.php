@@ -14,6 +14,7 @@
         ['route' => 'guardians.index', 'label' => __('Guardians'), 'active' => 'guardians.*', 'allowed' => $moduleOn(\App\Enums\Module::Guardians) && auth()->user()->can('guardian.view')],
         ['route' => 'teachers.index', 'label' => __('Teachers'), 'active' => 'teachers.*', 'allowed' => $moduleOn(\App\Enums\Module::Staff) && auth()->user()->can('staff.view')],
         ['route' => 'timetables.index', 'label' => __('Timetable'), 'active' => 'timetables.*', 'allowed' => $moduleOn(\App\Enums\Module::Timetable) && auth()->user()->can('timetable.view')],
+        ['route' => 'attendance.index', 'label' => __('Attendance'), 'active' => 'attendance.*', 'allowed' => $moduleOn(\App\Enums\Module::Attendance) && auth()->user()->can('attendance.view')],
         ['route' => 'academic.sessions.index', 'label' => __('Academic'), 'active' => 'academic.*', 'allowed' => $moduleOn(\App\Enums\Module::Academics) && auth()->user()->can('academics.view')],
         ['route' => 'settings.school.edit', 'label' => __('School settings'), 'active' => 'settings.school.*', 'allowed' => auth()->user()->can('school.settings.view')],
         ['route' => 'admin.schools.index', 'label' => __('Schools'), 'active' => 'admin.schools.*', 'allowed' => auth()->user()->can('viewAny', \App\Models\School::class)],

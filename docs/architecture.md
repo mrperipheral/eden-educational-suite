@@ -1,6 +1,6 @@
 # Architecture
 
-Status: Milestone 12 (Timetable Management) complete. This describes the intended
+Status: Milestone 13 (Attendance Management) complete. This describes the intended
 shape of the system and what exists today.
 
 ## 1. High-level model
@@ -282,13 +282,56 @@ rooms module, workload/payroll, auto-optimisation or student/parent views.
 - Desktop **day × time grid**, mobile **stacked day list**; a **teacher
   timetable** view; filters by class / arm / teacher / weekday.
 
+## 2k. Attendance management (implemented — Milestone 13)
+
+Full reference: **`docs/attendance-management.md`**. A tenant-scoped daily
+student-attendance foundation with a draft → submitted (locked) lifecycle,
+**independent of the Timetable module**. No attendance analytics, term/monthly
+reports, portal views, notifications, per-lesson registers or a full audit
+trail.
+
+- **`App\Models\AttendanceRegister`** — school-owned. One class's attendance for
+  one day: `(academic_session, optional academic_period, academic_level,
+  level_arm, attendance_date)`. `status` (`draft` / `submitted`) and
+  `submitted_at` / `submitted_by` are **not** mass-assignable — `submit()` /
+  `reopen()` only. `eligibleStudents()` is the enrollment-based eligibility rule;
+  `summary()` gives register-level totals.
+- **`App\Models\AttendanceRecord`** — school-owned *and* register-scoped. One
+  student's mark: nullable `status` (null = unmarked; `present` / `absent` /
+  `late` / `excused` — one controlled enum, no `is_present` booleans, no
+  minutes-late field), optional `note`, `recorded_at` / `recorded_by` stamped
+  when a mark changes. Never deleted (historical correctness).
+- **Eligibility** — a student is on a register iff they hold an M9 `Enrollment`
+  for the register's exact session/level/arm whose `[started_on, ended_on]`
+  range contains the date. Current status is *not* a filter, so a later
+  withdrawal doesn't rewrite history. The roster is **snapshotted** at creation
+  (one bulk `insert`).
+- **Workflow** — marks start `null`; a register can't be submitted while any
+  record is unmarked (an unmarked student is never counted present). A submitted
+  register is locked; only an `attendance.manage` holder can `reopen()` it.
+- **`App\Support\Attendance\AttendanceAuthorizer`** — `attendance.manage` →
+  any class; `attendance.record` only → a class the teacher holds an active M11
+  `TeacherAssignment` for. Assignments *scope* teachers; they are not a
+  dependency (a Staff-off school records through `attendance.manage` holders).
+- **`App\Http\Controllers\Attendance\AttendanceRegisterController`**,
+  `/attendance/*` routes behind `['tenant', 'module:attendance']`, gated
+  `attendance.view` / `attendance.record` / `attendance.manage`.
+  `Module::Attendance->isAvailable()` is now `true` (**on by default**); it
+  **depends on `Module::Academics` and `Module::Students` — not
+  `Module::Timetable`**. `attendance.manage` added to Principal.
+- List (date / session / level / arm / status filters + pagination), an
+  Alpine-cascade create form, a mobile-first taking screen (per-student status
+  buttons, bulk "mark all present" / "clear all", per-student note, save draft /
+  save & submit), and a register detail with summary counts and a
+  reopen-for-correction control.
+
 ### Deferred
 
 - Queue jobs capture/restore the tenant id (no jobs exist yet — see
   `docs/tenancy.md` §7).
 - Invitations / brand-new-account onboarding, school suspension / subscription,
   notification & payment config, the remaining domain modules behind the M7
-  catalogue (attendance, results, fees, CBT, portals, promotion workflow, bulk
+  catalogue (results, fees, CBT, portals, promotion workflow, bulk
   import), a rooms/facilities module + timetable templates, the Parent Portal
   (guardian sign-in) and Teacher Portal (teacher sign-in), non-teaching staff
   records, admin UI for `status` / `is_platform_admin`, subdomain routing.
@@ -387,3 +430,7 @@ pre-auth screens.
 | 2026-09-20 | Timetable = a `Timetable` (session-scoped) + `TimetableEntry` (lesson) pair; session/period on the parent only | lessons structurally can't cross sessions; the entry stays lean for the Attendance module to extend (see `docs/timetable-management.md`) |
 | 2026-09-20 | Lesson times are `HH:MM` strings + half-open `[start, end)`; overlap checks are DB existence queries / one self-join, never loaded into PHP | portable string comparison across SQLite/MySQL; back-to-back lessons don't clash; conflict detection stays index-bound on a busy board |
 | 2026-09-20 | `room` is plain text, not a FK / facilities module; `Module::Timetable` depends on Academics + Staff and stays off by default | M12 is scheduling, not facilities management; a timetable needs the academic structure *and* teachers-with-assignments; timetable is a specialised opt-in (unchanged M7 intent) |
+| 2026-09-21 | Attendance = an `AttendanceRegister` (one class, one day) + `AttendanceRecord` (one student's mark) pair; a **daily** register, not per-lesson; `Module::Attendance` depends on Academics + Students, **never Timetable** | every school needs a daily register and must record attendance with the timetable off; a per-lesson register can be layered on later as an optional enhancement without schema change |
+| 2026-09-21 | One `AttendanceStatus` enum (`present`/`absent`/`late`/`excused`); a record's `status` is **nullable** (unmarked) and a register can't be submitted while any is unmarked | a single status column beats a spread of `is_present` booleans; the unmarked state + submit guard is the safe operational default — an absent child is never silently recorded present |
+| 2026-09-21 | Eligibility is the enrollment date-range (`[started_on, ended_on]` contains the register date), not current status; the roster is snapshotted at creation | historical registers stay correct when a student later withdraws / changes arm / graduates; the register records who was in the class *that day* |
+| 2026-09-21 | Locked registers are corrected by an `attendance.manage` `reopen()`, not an approval workflow or an audit-log system | the spec forbids a full audit trail here; `recorded_by`/`submitted_by` timestamps preserve the structure a later audit feature needs without building it now |

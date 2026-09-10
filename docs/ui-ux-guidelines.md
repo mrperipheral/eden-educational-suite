@@ -142,6 +142,24 @@ in `mode="teacher"`) lists one teacher's lessons across all timetables, grouped
 by day. Read-only roles (`timetable.view`) see the grid and teacher view with no
 add / edit / publish controls.
 
+The **Attendance** area (`resources/views/attendance/`,
+`docs/attendance-management.md`, gated `attendance.*` + `module:attendance`) is a
+top-level nav item and does **not** depend on the Timetable module. **List** —
+registers filterable by date / session / level / arm / status, paginated, each
+badged **Draft** / **Submitted** and showing `present / total`. **Create** — an
+Alpine session→period and level→arm cascade plus a `type="date"` (`:max` today)
+and optional notes; an empty state when the school has no sessions/levels yet.
+The **taking screen** is the core view, built for daily phone use: a scrollable
+student list (name · admission number · status badge), four single-tap status
+buttons per student with `aria-pressed`, an optional per-student note, an
+Alpine-driven **"Mark all present" / "Clear all"** bar, and a **sticky footer**
+with **Save draft** and **Save & submit** (the latter disabled by Alpine while
+any student is unmarked). The **register detail** shows summary count chips
+(`attendance/_summary.blade.php`), the submitted-by/at indicator when locked, and
+— for `attendance.manage` holders — a **"Reopen for correction"** control; a
+locked register renders a read-only roster. Read-only roles (`attendance.view`)
+see the list and detail with no create / record / submit controls.
+
 Flash messages (`session('success' | 'error' | 'status')`) are rendered
 automatically by `<x-layouts.app>` as alerts.
 
@@ -173,5 +191,5 @@ automatically by `<x-layouts.app>` as alerts.
 Dark mode, dense/table layouts, data-grid, charts, iconography system,
 notification/toast system. The primary nav is permission- and
 module-filtered (Dashboard · Members · Students · Guardians · Teachers ·
-Timetable · Academic · School settings · Schools · Account) but not yet
-role-specific / collapsible. Add here when built.
+Timetable · Attendance · Academic · School settings · Schools · Account) but not
+yet role-specific / collapsible. Add here when built.

@@ -1,14 +1,14 @@
 # Project Status
 
-_Last updated: 2026-09-20_
+_Last updated: 2026-09-21_
 
 ## Current milestone
 
-**Milestone 12 — Timetable Management: COMPLETE.**
+**Milestone 13 — Attendance Management: COMPLETE.**
 
-Next up: **Domain Modules** (Milestone 13+) — Attendance, Assessments & Results,
-Fees, CBT, Notifications, Portals, Promotion. Not started — do not begin without
-picking it up explicitly. See `docs/roadmap.md`.
+Next up: **Domain Modules** (Milestone 14+) — Assessments & Results, Fees, CBT,
+Notifications, Portals, Promotion. Not started — do not begin without picking it
+up explicitly. See `docs/roadmap.md`.
 
 ## What the application is
 
@@ -16,7 +16,7 @@ Multi-school School Management SaaS (management + portals only — no website
 features). PHP 8.3 · Laravel 13.31 · MySQL 8 · Blade + Tailwind v4 · Alpine.js ·
 Vite · PHPUnit · Pint.
 
-## Environment (verified 2026-09-20)
+## Environment (verified 2026-09-21)
 
 | Item | Value |
 |------|-------|
@@ -25,7 +25,7 @@ Vite · PHPUnit · Pint.
 | Node / npm | 22.x |
 | Database | MySQL 8 (app) · SQLite `:memory:` (tests) |
 | Local mail | Mailpit (`127.0.0.1:1025`, UI `:8025`) — `.env` only, not committed |
-| Tests | `php artisan test` — 472 passing |
+| Tests | `php artisan test` — 526 passing |
 | Build | `npm run build` — passing |
 | Formatting | `vendor/bin/pint --test` — passing |
 
@@ -42,8 +42,65 @@ Vite · PHPUnit · Pint.
 - **M9 — Student Management** (`student-management-complete`) — `docs/student-management.md`.
 - **M10 — Guardian / Parent Management** (`guardian-management-complete`) — `docs/guardian-management.md`.
 - **M11 — Teacher Management** (`teacher-management-complete`) — `docs/teacher-management.md`.
-- **M12 — Timetable Management** (this milestone, `timetable-management-complete`) —
-  `docs/timetable-management.md`; see below.
+- **M12 — Timetable Management** (`timetable-management-complete`) — `docs/timetable-management.md`.
+- **M13 — Attendance Management** (this milestone, `attendance-management-complete`) —
+  `docs/attendance-management.md`; see below.
+
+## Delivered in Milestone 13
+
+A tenant-scoped daily student-attendance foundation with a draft → submitted
+(locked) lifecycle, **independent of the Timetable module**. Built on the
+existing `TenantContext` + `BelongsToSchool` + `Permission` + `module:attendance`
+seams, the M9 `Enrollment` history and the M11 `TeacherAssignment` — no new
+mechanism, no new packages, no Redis/queues.
+
+- **Enums** — `App\Enums\AttendanceStatus` (`present` / `absent` / `late` /
+  `excused` — one controlled column, no `is_present` booleans, no minutes-late
+  field) and `App\Enums\AttendanceRegisterStatus` (`draft` / `submitted`).
+- **`App\Models\AttendanceRegister`** — school-owned. One class's attendance for
+  one day: `(academic_session, optional academic_period, academic_level,
+  level_arm, attendance_date)`. `status` / `submitted_*` **not** mass-assignable
+  — `submit()` / `reopen()` only. `eligibleStudents()` is the enrollment-based
+  eligibility rule; `summary()` gives register-level totals from loaded records.
+- **`App\Models\AttendanceRecord`** — school-owned **and** register-scoped. One
+  student's mark: nullable `status` (null = unmarked), optional `note`,
+  `recorded_at` / `recorded_by` stamped when a mark changes. Never deleted for
+  historical reasons.
+- **Migrations** `2026_09_21_100000` (`attendance_registers`), `…100010`
+  (`attendance_records`) — both `BelongsToSchool`, `school_id`-leading indexes,
+  `unique(school_id, level_arm_id, attendance_date)` and
+  `unique(attendance_register_id, student_id)`.
+- **`App\Support\Attendance\AttendanceAuthorizer`** — the class-scoping rule M4
+  permissions can't express: `attendance.manage` → any class; `attendance.record`
+  only → a class the teacher holds an **active** M11 assignment for. Tenant
+  scoped; degrades safely with the Staff module off.
+- **`App\Http\Controllers\Attendance\AttendanceRegisterController`** +
+  `App\Http\Requests\Attendance\*` (`AttendanceModuleRequest`, `RegisterRequest`,
+  `RecordAttendanceRequest`, `SubmitRegisterRequest`) +
+  `resources/views/attendance/*` — list (date/session/level/arm/status filter +
+  pagination), create (session→period / level→arm Alpine cascade), the
+  taking screen (per-student status buttons, bulk "mark all present" / "clear
+  all", per-student note, save draft / save & submit, sticky footer, mobile
+  first), and the register detail (summary counts, submitted-by indicator,
+  read-only roster when locked, reopen control for managers).
+- **Eligibility & workflow** — the roster is **snapshotted** at creation (one
+  bulk `insert`, one record per then-eligible student). Marks start **unmarked**
+  (the safe default — an unmarked student is never counted present); a register
+  cannot be submitted while any record is unmarked. A submitted register is
+  locked; only an `attendance.manage` holder can `reopen()` it for correction.
+- **`Module::Attendance->isAvailable()`** flipped to `true` (on by default);
+  **`Module::Attendance` depends on `Module::Academics` + `Module::Students`**
+  — **not** `Timetable`. "Attendance" is a top-level nav item.
+- **Permissions** — new `attendance.manage` (added to **Principal**;
+  School Admin auto). `attendance.view` / `attendance.record` already existed
+  from M7 and were left on Teacher / Staff as declared.
+- **Seeder** — Alpha gets 10 extra enrolled students, one **submitted** register
+  (Primary 1 Gold, mixed marks) and one **draft** register (Primary 2 Gold,
+  unmarked).
+- **Docs** — new `docs/attendance-management.md`; updated `architecture.md`,
+  `authorization.md`, `database-design.md`, `security.md`, `scalability.md`,
+  `tenancy.md`, `module-activation.md`, `roadmap.md`, `ui-ux-guidelines.md`,
+  `CLAUDE.md`, `AGENTS.md`.
 
 ## Delivered in Milestone 12
 
@@ -103,62 +160,74 @@ auto-optimisation or student/parent views. Built on the existing `TenantContext`
   `tenancy.md`, `module-activation.md`, `roadmap.md`, `ui-ux-guidelines.md`,
   `CLAUDE.md`, `AGENTS.md`.
 
-## Authorization & tenant controls
+## Authorization & tenant controls (M13)
 
-- **Two gates on every timetable route:** `module:timetable` (404 when off)
-  **and** `->can('timetable.view'|'.manage')`; write Form Requests re-check
-  `timetable.manage`. Module gate ≠ permission (a Bursar with the module on still
-  can't see timetables — tested).
-- `Timetable` / `TimetableEntry` are `BelongsToSchool`; the entry also carries
-  `timetable_id`. `school_id` never from input, immutable
+- **Two gates on every `/attendance/*` route:** `module:attendance` (404 when
+  off) **and** `->can('attendance.view'|'.record'|'.manage')`; write Form
+  Requests re-check via `AttendanceModuleRequest` + `AttendanceAuthorizer`.
+  Module gate ≠ permission (a Bursar with the module on still can't see
+  attendance — tested).
+- `AttendanceRegister` / `AttendanceRecord` are `BelongsToSchool`; the record
+  also carries `attendance_register_id`. `school_id` never from input, immutable
   (`TenantMismatchException`); a `school_id` in a payload is ignored (tested).
-- `{timetable}` / `{entry}` resolved by tenant-scoped `findOrFail`; the Form
-  Requests `abort(404)` on a cross-school route parent before validation. Every
-  session / period / level / arm / subject / teacher id in a payload uses
+  The roster bulk `insert` sets `school_id` from `TenantContext` explicitly.
+- `{register}` resolved by tenant-scoped `findOrFail`; the write Form Requests
+  `abort(404)` on a cross-school route parent before validation. Every session /
+  period / level / arm id in the create payload uses
   `Rule::exists(...)->where('school_id', <tenant>)` → generic "invalid", no leak.
-  The conflict self-join is filtered by `timetable_id` **and** `school_id`.
-  Explicit HTTP + model cross-school isolation tests (view / edit / delete /
-  publish / create-with-foreign-entities).
+  A mark for a student not on the register's snapshotted roster is rejected —
+  this blocks cross-school and wrong-class student ids. Explicit HTTP + model
+  cross-school isolation tests (view / records / submit / reopen / delete /
+  create-with-foreign-class / post-foreign-student).
 
 ## Database
 
-M12 adds `timetables` and `timetable_entries`. No other schema changes.
+M13 adds `attendance_registers` and `attendance_records`. No other schema
+changes.
 
-## Routes (application, additions in M12)
+## Routes (application, additions in M13)
 
-Tenant-scoped + `module:timetable`, gated `timetable.view` / `timetable.manage`.
-14 routes under `/timetables/` (`timetables.*`, `timetables.entries.*`,
-`timetables.teacher`).
+Tenant-scoped + `module:attendance`, gated `attendance.view` /
+`attendance.record` / `attendance.manage`. 8 routes under `/attendance/`
+(`attendance.index|create|store|show|records|submit|reopen|destroy`).
 
 ## Tests
 
-472 passing (was 427 at M11; +45 in M12, M1–M11 intact). New
-`tests/Feature/Timetable/*` (+ `TimetableTestCase` base) — `TimetableTest`,
-`TimetableEntryTest`, `TimetablePublishTest`, `TimetableStructureTest`:
-create / edit / delete / validation / list filters + pagination; the session is
-immutable after creation; a draft can be deleted but a published one can't;
-scheduling — valid lesson, end-after-start, teacher / class / room overlap,
-back-to-back lessons allowed, different-day lessons don't clash, subject↔level,
-active teacher assignment required (ended doesn't count), arm↔level, cross-school
-ids rejected without leak; publishing — valid draft publishes, empty can't,
-conflicting can't, unpublish clears `published_at`, published state visible;
-tenant isolation of timetables + entries, ownership immutability, `school_id`
-spoof ignored, tenant-safe route resolution; authorization per role, module
-disabled → 404, module enabled without permission → 403; half-open `clashingWith`
-scope; N+1 guards on the grid, the teacher view and the add-lesson path; bounded
-overlap-query count against a busy board. New
-`tests/Unit/Enums/TimetableEnumsTest`. `Unit/Enums/ModuleTest` updated (available
-list).
+526 passing (was 472 at M12; +54 in M13, M1–M12 intact). New
+`tests/Feature/Attendance/*` (+ `AttendanceTestCase` base) — `AttendanceRegisterTest`,
+`AttendanceEligibilityTest`, `AttendanceRecordTest`, `AttendanceLifecycleTest`,
+`AttendanceAuthorizationTest`, `AttendanceStructureTest`, `AttendanceTimetableTest`:
+register create / validation / date-vs-session-period / arm-vs-level / duplicate
+prevention / list filters + pagination; eligibility — only students enrolled in
+the exact class on the date, not-yet-enrolled excluded, enrollment-ended-before
+excluded but ended-after included, cross-school student can never be added;
+records — present/absent/late/excused, notes + length limit, correction before
+lock, invalid status rejected, student-not-on-register rejected, DB duplicate
+prevention, full-class one request; lifecycle — submit locks, unmarked blocks
+submit, save+submit still needs all marked, locked rejects edits, only a manager
+reopens, draft deletable; authorization — all 7 roles + role-less, module off →
+404, module on without permission → 403, teacher only for assigned class,
+teacher with no Teacher record can't, teacher assigned in another school can't;
+timetable — full workflow with Timetable module off, dependency graph excludes
+Timetable; tenant isolation of registers + records, ownership immutability,
+`school_id` spoof ignored, tenant-safe route resolution; historical correctness —
+record survives a later withdrawal, deleting a student cascades records but keeps
+the register; N+1 guards on the taking screen, the list and bulk save. New
+`tests/Unit/Enums/AttendanceEnumsTest`. `Unit/Enums/ModuleTest` updated
+(available list).
 
 ## Known follow-ups / recommendations
 
 - Production env: `SESSION_SECURE_COOKIE=true`, real `MAIL_MAILER`, `APP_DEBUG=false`.
-- Next milestone: Attendance (per-lesson registers, building on the timetable).
+- Next milestone: Assessments & Results.
+- **Attendance follow-ups** — attendance rate / percentage analytics, term &
+  monthly reports, per-lesson (timetable-driven) registers, portal attendance
+  views, absence notifications, an attendance-reason taxonomy, half-day records.
 - **Timetable follow-ups** — student/parent timetable views (portals), publish
   notifications, a rooms/facilities module, timetable templates / term cloning,
   named period grids, teacher workload limits.
 - **Teacher portal** / **Parent portal** — sign-in + invitations.
 - Promotion / graduation workflow; bulk import; documents / photo.
-- Audit trail + data-erasure handling for student / guardian / teacher / timetable records.
+- Audit trail + data-erasure handling for student / guardian / teacher / timetable / attendance records.
 - Apply the stored `timezone` / `locale` / `date_format` at render time.
 - Add a CI workflow (Pint + PHPUnit + `npm run build`).

@@ -48,9 +48,12 @@ enum Permission: string
     case TimetableView = 'timetable.view';
     case TimetableManage = 'timetable.manage';
 
-    // ---- Declared for later domain milestones (coarse; not yet enforced) -----
+    // ---- Attendance (enforced: Attendance Management M13) ----------------
     case AttendanceView = 'attendance.view';
     case AttendanceRecord = 'attendance.record';
+    case AttendanceManage = 'attendance.manage';
+
+    // ---- Declared for later domain milestones (coarse; not yet enforced) -----
     case ResultView = 'result.view';
     case ResultEnter = 'result.enter';
     case ResultPublish = 'result.publish';

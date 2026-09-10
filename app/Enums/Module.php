@@ -64,7 +64,7 @@ enum Module: string
             self::Guardians => __('Parent and guardian records linked to their children.'),
             self::Staff => __('Teacher and non-teaching staff records and assignments.'),
             self::Timetable => __('Weekly period timetables for classes and teachers.'),
-            self::Attendance => __('Daily and per-lesson student attendance registers.'),
+            self::Attendance => __('Daily class attendance registers, independent of the timetable.'),
             self::Assessments => __('Continuous assessment and examination score entry.'),
             self::Results => __('Termly report cards compiled from assessment scores.'),
             self::Fees => __('Fee structures, invoices and payment tracking.'),
@@ -105,7 +105,7 @@ enum Module: string
             self::Guardians => [self::Students],
             self::Staff => [self::Academics],
             self::Timetable => [self::Academics, self::Staff],
-            self::Attendance => [self::Students],
+            self::Attendance => [self::Academics, self::Students],
             self::Assessments => [self::Academics, self::Students],
             self::Results => [self::Assessments],
             self::Fees => [self::Students],
@@ -134,11 +134,14 @@ enum Module: string
      *   - `timetable` — Timetable Management (M12): weekly class/teacher
      *     schedules with conflict detection (`docs/timetable-management.md`).
      *     Still **off** by default — a specialised tool a school opts into.
+     *   - `attendance` — Attendance Management (M13): daily class registers with
+     *     a draft → submitted lifecycle (`docs/attendance-management.md`).
+     *     Independent of the Timetable module.
      */
     public function isAvailable(): bool
     {
         return match ($this) {
-            self::Academics, self::Students, self::Guardians, self::Staff, self::Timetable => true,
+            self::Academics, self::Students, self::Guardians, self::Staff, self::Timetable, self::Attendance => true,
             default => false,
         };
     }

@@ -114,6 +114,14 @@ class School extends Model
     }
 
     /**
+     * @return HasMany<AttendanceRegister, $this>
+     */
+    public function attendanceRegisters(): HasMany
+    {
+        return $this->hasMany(AttendanceRegister::class);
+    }
+
+    /**
      * @return HasMany<Timetable, $this>
      */
     public function timetables(): HasMany

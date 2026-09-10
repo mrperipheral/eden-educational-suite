@@ -79,6 +79,7 @@ enum Role: string
                 Permission::TimetableManage,
                 Permission::AttendanceView,
                 Permission::AttendanceRecord,
+                Permission::AttendanceManage,
                 Permission::ResultView,
                 Permission::ResultEnter,
                 Permission::ResultPublish,

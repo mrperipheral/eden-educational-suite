@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Enums\AttendanceStatus;
 use App\Enums\EnrollmentStatus;
 use App\Enums\GuardianRelationship;
 use App\Enums\Module;
@@ -10,6 +11,7 @@ use App\Enums\StudentStatus;
 use App\Enums\TeacherStatus;
 use App\Models\AcademicLevel;
 use App\Models\AcademicSession;
+use App\Models\AttendanceRegister;
 use App\Models\Guardian;
 use App\Models\School;
 use App\Models\SchoolModule;
@@ -39,8 +41,8 @@ class DatabaseSeeder extends Seeder
             'email' => 'owner@example.com',
         ]);
 
-        User::factory()->create(['name' => 'Test User', 'email' => 'test@example.com'])
-            ->joinSchool($alpha, Role::SchoolAdmin);
+        $admin = User::factory()->create(['name' => 'Test User', 'email' => 'test@example.com']);
+        $admin->joinSchool($alpha, Role::SchoolAdmin);
 
         User::factory()->create(['name' => 'Priya Principal', 'email' => 'principal@example.com'])
             ->joinSchool($alpha, Role::Principal);
@@ -256,6 +258,58 @@ class DatabaseSeeder extends Seeder
         }
 
         $timetable->publish();
+
+        // Attendance — a bigger Primary 1 Gold cohort, one submitted register
+        // (mixed statuses) and one open draft. Works independently of the
+        // timetable module.
+        $p1 = $levels[0];
+        $p1Gold = $p1->arms->firstWhere('name', 'Gold');
+        $p2 = $levels[1];
+        $p2Gold = $p2->arms->firstWhere('name', 'Gold');
+
+        Student::factory()->count(6)->create()->each(fn (Student $s) => $s->enrollments()->create([
+            'academic_session_id' => $session->id,
+            'academic_level_id' => $p1->id,
+            'level_arm_id' => $p1Gold->id,
+            'status' => EnrollmentStatus::Active->value,
+            'started_on' => '2025-09-15',
+        ]));
+        Student::factory()->count(4)->create()->each(fn (Student $s) => $s->enrollments()->create([
+            'academic_session_id' => $session->id,
+            'academic_level_id' => $p2->id,
+            'level_arm_id' => $p2Gold->id,
+            'status' => EnrollmentStatus::Active->value,
+            'started_on' => '2025-09-15',
+        ]));
+
+        $submitted = AttendanceRegister::create([
+            'academic_session_id' => $session->id,
+            'academic_period_id' => $firstTerm?->id,
+            'academic_level_id' => $p1->id,
+            'level_arm_id' => $p1Gold->id,
+            'attendance_date' => '2025-09-16',
+        ]);
+        $statuses = [AttendanceStatus::Present, AttendanceStatus::Present, AttendanceStatus::Absent, AttendanceStatus::Late, AttendanceStatus::Excused];
+        $submitted->eligibleStudents()->get()->each(function (Student $student, int $i) use ($submitted, $statuses) {
+            $status = $statuses[$i % count($statuses)];
+            $submitted->records()->create([
+                'student_id' => $student->id,
+                'status' => $status->value,
+                'note' => $status === AttendanceStatus::Excused ? 'Medical appointment' : null,
+            ]);
+        });
+        $submitted->submit($admin);
+
+        $draft = AttendanceRegister::create([
+            'academic_session_id' => $session->id,
+            'academic_period_id' => $firstTerm?->id,
+            'academic_level_id' => $p2->id,
+            'level_arm_id' => $p2Gold->id,
+            'attendance_date' => '2025-09-17',
+        ]);
+        $draft->eligibleStudents()->get()->each(fn (Student $student) => $draft->records()->create([
+            'student_id' => $student->id,
+        ]));
 
         // One graduated student with a completed placement — history is kept.
         $alumnus = Student::factory()->status(StudentStatus::Graduated)->create(['first_name' => 'Ada', 'last_name' => 'Obi']);

@@ -5,6 +5,7 @@ use App\Http\Controllers\Academic\LevelController;
 use App\Http\Controllers\Academic\PeriodController;
 use App\Http\Controllers\Academic\SessionController as AcademicSessionController;
 use App\Http\Controllers\Academic\SubjectController;
+use App\Http\Controllers\Attendance\AttendanceRegisterController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Guardian\GuardianController;
 use App\Http\Controllers\Guardian\GuardianLinkController;
@@ -332,6 +333,36 @@ Route::middleware(['auth', 'verified', 'active'])->group(function () {
                 ->whereNumber('timetable')->can('timetable.manage')->name('status');
             Route::delete('{timetable}', [TimetableController::class, 'destroy'])
                 ->whereNumber('timetable')->can('timetable.manage')->name('destroy');
+        });
+
+        /*
+        | Attendance management (see docs/attendance-management.md). Two gates:
+        |   module:attendance  — is the feature on? (depends on academics + students,
+        |     NOT timetable — attendance works with the timetable module off)
+        |   ->can('attendance.view' | '.record' | '.manage')  — may this user?
+        | The finer "may this user record for *this* class" rule (a teacher only
+        | for an assigned class) is in App\Support\Attendance\AttendanceAuthorizer,
+        | checked in the Form Requests / controller. `{register}` is resolved by
+        | tenant-scoped `findOrFail` (after `tenant`), so another school's id 404s.
+        */
+        Route::middleware('module:attendance')->prefix('attendance')->name('attendance.')->group(function () {
+            Route::get('/', [AttendanceRegisterController::class, 'index'])
+                ->can('attendance.view')->name('index');
+            Route::get('create', [AttendanceRegisterController::class, 'create'])
+                ->can('attendance.record')->name('create');
+            Route::post('/', [AttendanceRegisterController::class, 'store'])
+                ->can('attendance.record')->name('store');
+
+            Route::get('{register}', [AttendanceRegisterController::class, 'show'])
+                ->whereNumber('register')->can('attendance.view')->name('show');
+            Route::patch('{register}/records', [AttendanceRegisterController::class, 'updateRecords'])
+                ->whereNumber('register')->can('attendance.record')->name('records');
+            Route::post('{register}/submit', [AttendanceRegisterController::class, 'submit'])
+                ->whereNumber('register')->can('attendance.record')->name('submit');
+            Route::post('{register}/reopen', [AttendanceRegisterController::class, 'reopen'])
+                ->whereNumber('register')->can('attendance.manage')->name('reopen');
+            Route::delete('{register}', [AttendanceRegisterController::class, 'destroy'])
+                ->whereNumber('register')->can('attendance.record')->name('destroy');
         });
     });
 });
