@@ -199,6 +199,27 @@ Full detail in `docs/guardian-management.md`. Summary of controls:
 | No hard delete | guardians are never deleted by the UI; removing a link keeps both records; FKs cascade for a future data-erasure tool |
 | CSRF | every form; `@method('PATCH'|'DELETE')` spoofing |
 
+## Implemented in Milestone 11 (Teacher Management)
+
+Full detail in `docs/teacher-management.md`. Summary of controls:
+
+| Control | State |
+|---------|-------|
+| Two gates on every teacher route | `module:staff` (feature on? else 404) **and** `->can('staff.view'|'.manage')`; write Form Requests re-check `staff.manage` |
+| Enforced permissions | `staff.view` (School Admin, Principal, Bursar, Teacher, Staff) / `staff.manage` (School Admin, Principal); Parent / Student / role-less → 403 (tested). A **Teacher** role holder can view but **cannot manage other teachers** |
+| Activation ≠ authorization | Staff module on does not give a Parent `staff.view` (tested) |
+| Tenant isolation | `Teacher` and `TeacherAssignment` are `BelongsToSchool`; the assignment also carries `teacher_id`. School A's teachers / assignments cannot be read, created, edited or deleted from School B (explicit HTTP + model tests) |
+| `school_id` protection | never in `$fillable`, never from input, stamped from `TenantContext`, immutable (`updating` hook → `TenantMismatchException`, tested); a `school_id` in the create payload is ignored (tested) |
+| `status` / `user_id` protection | **not mass-assignable** — a `status` in the edit payload is ignored (tested); each changes only via its dedicated `PATCH` endpoint |
+| Teacher ↔ User linkage | linked only to an **existing member of the active school** (`Rule::exists('school_user', 'user_id')->where('school_id', <tenant>)`); a stranger / another school's member is rejected; `unique(school_id, user_id)` blocks a second teacher per account; `nullOnDelete` keeps the professional record when the account is deleted (all tested) |
+| Route-model binding | tenant-owned ids (`{teacher}`, `{assignment}`) resolved by tenant-scoped `findOrFail`; another school's id 404s |
+| Cross-school id leakage | `TeacherAssignmentRequest` `abort(404)`s on a cross-school `{teacher}` / `{assignment}` before validation; academic ids and `user_id` use `Rule::exists(...)->where('school_id' | school_user, <tenant>)`, so a cross-school id fails with a plain "invalid" — never a 500 or an oracle |
+| Invalid combinations | period↔session and arm↔level consistency checked (tenant-scoped) with generic "not part of the selected …" messages |
+| Duplicate assignments | a duplicate **active** `(teacher, session, period, level, arm, subject)` is rejected in the Form Request; an `ended` duplicate is allowed (history) |
+| PII minimisation | name / employee number / email / phone / start date / address / notes only — no NIN / BVN / ID, no financial / bank / pension, no medical, **no credentials** |
+| No hard delete | teachers are never deleted (a leaver is `resigned`); assignments are `ended`, not dropped — `DELETE` stays only for a mis-entered row |
+| CSRF | every form; `@method('PATCH'|'DELETE')` spoofing |
+
 ## Deferred (with the milestone that owns them)
 
 - **Auth follow-ups:** 2FA, "log out other devices" on password change, session
@@ -207,15 +228,15 @@ Full detail in `docs/guardian-management.md`. Summary of controls:
   / brand-new-account onboarding, admin UI for `status` / `is_platform_admin`,
   audit logging of role & membership changes, enforcing the remaining dormant
   domain permissions (each in its module — `academics.*` in M8, `student.*` in
-  M9, `guardian.*` in M10).
+  M9, `guardian.*` in M10, `staff.*` in M11).
 - **Tenancy follow-ups:** queue-job tenant propagation, per-tenant rate limiting,
   per-tenant cache keys, audit logging of context switches.
 - **Later:** audit logging (who did what, per school — incl. student record /
   status changes), virus scanning of uploads (type/size/dimension validation and
   out-of-webroot storage are done in M6 — see `docs/school-settings.md` §4),
   encryption of sensitive PII at rest, data export / erasure (GDPR-style)
-  handling for student and guardian records, 2FA for admins, security headers
-  (CSP) review, dependency scanning in CI.
+  handling for student / guardian / teacher records, 2FA for admins, security
+  headers (CSP) review, dependency scanning in CI.
 
 ## Review checklist for every PR
 

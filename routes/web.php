@@ -18,6 +18,8 @@ use App\Http\Controllers\Settings\PasswordController;
 use App\Http\Controllers\Settings\ProfileController;
 use App\Http\Controllers\Student\EnrollmentController;
 use App\Http\Controllers\Student\StudentController;
+use App\Http\Controllers\Teacher\TeacherAssignmentController;
+use App\Http\Controllers\Teacher\TeacherController;
 use App\Models\School;
 use Illuminate\Support\Facades\Route;
 
@@ -245,6 +247,46 @@ Route::middleware(['auth', 'verified', 'active'])->group(function () {
                 ->whereNumber('guardian')->can('guardian.manage')->name('edit');
             Route::patch('{guardian}', [GuardianController::class, 'update'])
                 ->whereNumber('guardian')->can('guardian.manage')->name('update');
+        });
+
+        /*
+        | Teacher management (see docs/teacher-management.md). Two gates:
+        |   module:staff  — is the feature on for this school? (depends on academics)
+        |   ->can('staff.view' | 'staff.manage')  — may this user?
+        | Tenant-owned ids ({teacher}, {assignment}) are resolved by tenant-scoped
+        | `findOrFail` in the controller (after `tenant`), so another school's id
+        | 404s. A teacher record is separate from a login — `user_id` is optional.
+        */
+        Route::middleware('module:staff')->prefix('teachers')->name('teachers.')->group(function () {
+            Route::get('/', [TeacherController::class, 'index'])
+                ->can('staff.view')->name('index');
+            Route::get('create', [TeacherController::class, 'create'])
+                ->can('staff.manage')->name('create');
+            Route::post('/', [TeacherController::class, 'store'])
+                ->can('staff.manage')->name('store');
+
+            // Assignments — literal prefix so it never collides with {teacher}.
+            Route::get('{teacher}/assignments/create', [TeacherAssignmentController::class, 'create'])
+                ->whereNumber('teacher')->can('staff.manage')->name('assignments.create');
+            Route::post('{teacher}/assignments', [TeacherAssignmentController::class, 'store'])
+                ->whereNumber('teacher')->can('staff.manage')->name('assignments.store');
+            Route::get('assignments/{assignment}/edit', [TeacherAssignmentController::class, 'edit'])
+                ->whereNumber('assignment')->can('staff.manage')->name('assignments.edit');
+            Route::patch('assignments/{assignment}', [TeacherAssignmentController::class, 'update'])
+                ->whereNumber('assignment')->can('staff.manage')->name('assignments.update');
+            Route::delete('assignments/{assignment}', [TeacherAssignmentController::class, 'destroy'])
+                ->whereNumber('assignment')->can('staff.manage')->name('assignments.destroy');
+
+            Route::get('{teacher}', [TeacherController::class, 'show'])
+                ->whereNumber('teacher')->can('staff.view')->name('show');
+            Route::get('{teacher}/edit', [TeacherController::class, 'edit'])
+                ->whereNumber('teacher')->can('staff.manage')->name('edit');
+            Route::patch('{teacher}', [TeacherController::class, 'update'])
+                ->whereNumber('teacher')->can('staff.manage')->name('update');
+            Route::patch('{teacher}/status', [TeacherController::class, 'updateStatus'])
+                ->whereNumber('teacher')->can('staff.manage')->name('status');
+            Route::patch('{teacher}/user', [TeacherController::class, 'updateUser'])
+                ->whereNumber('teacher')->can('staff.manage')->name('user');
         });
     });
 });

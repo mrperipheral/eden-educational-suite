@@ -7,6 +7,7 @@ use App\Enums\GuardianRelationship;
 use App\Enums\Module;
 use App\Enums\Role;
 use App\Enums\StudentStatus;
+use App\Enums\TeacherStatus;
 use App\Models\AcademicLevel;
 use App\Models\AcademicSession;
 use App\Models\Guardian;
@@ -14,6 +15,7 @@ use App\Models\School;
 use App\Models\SchoolModule;
 use App\Models\Student;
 use App\Models\Subject;
+use App\Models\Teacher;
 use App\Models\User;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Database\Seeder;
@@ -42,8 +44,8 @@ class DatabaseSeeder extends Seeder
         User::factory()->create(['name' => 'Priya Principal', 'email' => 'principal@example.com'])
             ->joinSchool($alpha, Role::Principal);
 
-        User::factory()->create(['name' => 'Tomiwa Teacher', 'email' => 'teacher@example.com'])
-            ->joinSchool($alpha, Role::Teacher);
+        $tomiwa = User::factory()->create(['name' => 'Tomiwa Teacher', 'email' => 'teacher@example.com']);
+        $tomiwa->joinSchool($alpha, Role::Teacher);
 
         User::factory()->create(['name' => 'Bola Bursar', 'email' => 'bursar@example.com'])
             ->joinSchool($alpha, Role::Bursar);
@@ -175,6 +177,46 @@ class DatabaseSeeder extends Seeder
                 'is_primary' => true,
             ]);
         }
+
+        // Teaching staff for Alpha. One is linked to the Tomiwa Teacher account
+        // (a teacher record is a professional record first — the link is optional
+        // and does not itself create a login), one has resigned (history kept).
+        $subjectList = $subjects->values();
+
+        $tomiwaTeacher = Teacher::factory()->create([
+            'first_name' => 'Tomiwa', 'last_name' => 'Adeyemi', 'employee_number' => 'EMP-1001',
+            'email' => 'teacher@example.com',
+        ]);
+        $tomiwaTeacher->user_id = $tomiwa->id;
+        $tomiwaTeacher->save();
+
+        $others = Teacher::factory()->count(4)->create();
+        $resigned = $others->last();
+        $resigned->status = TeacherStatus::Resigned;
+        $resigned->save();
+
+        $staff = collect([$tomiwaTeacher])->concat($others->take(3));
+        $staff->each(function (Teacher $teacher, int $i) use ($levels, $session, $subjectList) {
+            $level = $levels[$i % $levels->count()];
+
+            $teacher->assignments()->create([
+                'academic_session_id' => $session->id,
+                'academic_level_id' => $level->id,
+                'level_arm_id' => $level->arms->first()->id,
+                'subject_id' => $subjectList[$i % $subjectList->count()]->id,
+                'started_on' => '2025-09-15',
+            ]);
+
+            // A prior-year assignment kept as history.
+            $teacher->assignments()->create([
+                'academic_session_id' => $session->id,
+                'academic_level_id' => $levels[($i + 1) % $levels->count()]->id,
+                'subject_id' => $subjectList[($i + 1) % $subjectList->count()]->id,
+                'status' => 'ended',
+                'started_on' => '2024-09-15',
+                'ended_on' => '2025-07-24',
+            ]);
+        });
 
         // One graduated student with a completed placement — history is kept.
         $alumnus = Student::factory()->status(StudentStatus::Graduated)->create(['first_name' => 'Ada', 'last_name' => 'Obi']);

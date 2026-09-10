@@ -72,6 +72,7 @@ enum Role: string
                 Permission::GuardianView,
                 Permission::GuardianManage,
                 Permission::StaffView,
+                Permission::StaffManage,
                 Permission::AcademicsView,
                 Permission::AcademicsManage,
                 Permission::AttendanceView,
@@ -86,6 +87,7 @@ enum Role: string
                 Permission::SchoolSettingsView,
                 Permission::StudentView,
                 Permission::GuardianView,
+                Permission::StaffView,
                 Permission::FinanceView,
                 Permission::FinanceManage,
             ],
@@ -93,6 +95,7 @@ enum Role: string
             self::Teacher => [
                 Permission::StudentView,
                 Permission::GuardianView,
+                Permission::StaffView,
                 Permission::AcademicsView,
                 Permission::AttendanceView,
                 Permission::AttendanceRecord,
@@ -103,6 +106,7 @@ enum Role: string
             self::Staff => [
                 Permission::StudentView,
                 Permission::GuardianView,
+                Permission::StaffView,
                 Permission::AcademicsView,
                 Permission::AttendanceView,
             ],

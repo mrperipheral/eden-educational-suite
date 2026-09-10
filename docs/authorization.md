@@ -14,7 +14,7 @@ role set, composed with the strict `TenantContext` from Milestone 3.
 | Runtime check | `User::hasPermission()` / `roleIn()` / `permissionsIn()` / `canGrantRole()` |
 | Gate wiring | `App\Providers\AuthServiceProvider` — one `Gate::define()` per permission |
 | Fine-grained rules | `App\Policies\MembershipPolicy` (self / escalation guards) |
-| Features that use it | Members (`/members*`), school settings + module activation (`school.settings.*`), academic structure (`/academic/*`, `academics.*` — M8), students (`/students/*`, `student.*` — M9), guardians (`/guardians/*`, `guardian.*` — M10), school provisioning (`SchoolPolicy`) |
+| Features that use it | Members (`/members*`), school settings + module activation (`school.settings.*`), academic structure (`/academic/*`, `academics.*` — M8), students (`/students/*`, `student.*` — M9), guardians (`/guardians/*`, `guardian.*` — M10), teachers (`/teachers/*`, `staff.*` — M11), school provisioning (`SchoolPolicy`) |
 
 ```
 Request → auth · verified · active · tenant  (TenantContext::set(School))
@@ -48,7 +48,8 @@ and `hasPermission()` are the only things that would change.
 
 ## 3. Permissions (`App\Enums\Permission`)
 
-24 coarse permissions, dotted strings, grouped in the enum:
+24 coarse permissions, dotted strings, grouped in the enum (order is
+presentational only — nothing depends on it):
 
 - **School config (enforced — M5/M6):** `school.settings.view`,
   `school.settings.update` — gate all school settings sections (profile,
@@ -67,11 +68,18 @@ and `hasPermission()` are the only things that would change.
   Principal manage; Bursar + Teacher + Staff read; Parent / Student get 403.
   `guardian.view` was added to the Staff bundle in M10 (the third read-only role
   that already holds `student.view`). See `docs/guardian-management.md`.
+- **Teachers (enforced — M11):** `staff.view`, `staff.manage` — gate
+  `/teachers/*` (teacher records, optional account link, teaching-assignment
+  foundation). School Admin + Principal manage; Bursar + Teacher + Staff read;
+  Parent / Student get 403. `staff.manage` was added to Principal, `staff.view`
+  to Bursar / Teacher / Staff in M11 (Principal already held `staff.view`). A
+  Teacher role holder can *see* the staff area but cannot manage other teachers.
+  See `docs/teacher-management.md`.
 - **People & access (enforced):** `member.view`, `member.assign-role`
   (also gates *adding* an existing user — M5), `member.remove`
 - **Declared for later domain milestones** (not yet enforced — the modules that
-  check them don't exist): `staff.*`,
-  `attendance.*`, `result.*`, `finance.*`, `portal.parent`, `portal.student`
+  check them don't exist): `attendance.*`, `result.*`, `finance.*`,
+  `portal.parent`, `portal.student`
 
 They exist now so the role bundles are meaningful and testable. A domain
 milestone that needs finer control adds a case and slots it into the relevant
@@ -100,10 +108,10 @@ Seven per-school roles, each a static bundle of permissions plus a `tier`:
 | Role | tier | Holds |
 |------|-----:|-------|
 | `school_admin` | 100 | **every** permission |
-| `principal` | 80 | school settings (view), member view + assign-role, all student/guardian/academics/attendance/result permissions, finance (view) |
-| `bursar` | 50 | school settings (view), student/guardian (view), finance (view + manage) |
-| `teacher` | 50 | student/guardian (view), academics (view), attendance (view + record), result (view + enter) |
-| `staff` | 30 | student (view), guardian (view), academics (view), attendance (view) |
+| `principal` | 80 | school settings (view), member view + assign-role, all student/guardian/staff/academics/attendance/result permissions, finance (view) |
+| `bursar` | 50 | school settings (view), student/guardian/staff (view), finance (view + manage) |
+| `teacher` | 50 | student/guardian/staff (view), academics (view), attendance (view + record), result (view + enter) |
+| `staff` | 30 | student (view), guardian (view), staff (view), academics (view), attendance (view) |
 | `parent` | 10 | `portal.parent` |
 | `student` | 10 | `portal.student` |
 
@@ -194,8 +202,8 @@ school, so a cross-school membership can never reach the policy.
 | One role per (user, school), nullable | matches "roles are bundles"; multi-role is a rare need, deferred |
 | Tier-based escalation guard (`target.tier ≤ granter.tier`) | models org hierarchy; the hard invariant "never grant a role above your own" is simple and testable |
 | Platform admin = all permissions *within an entered school* | "retain platform-wide administration" without weakening row-level isolation (`SchoolScope` still applies) |
-| `member.*` + `academics.*` (M8) + `student.*` (M9) + `guardian.*` (M10) enforced; the rest declared but dormant | the vocabulary the role bundles need, activated module by module |
-| `guardian.view` added to Staff in M10 (Bursar/Teacher already had it from M4) | the three read-only roles that see students should also see the guardians on a student's profile — no new escalation |
+| `member.*` + `academics.*` (M8) + `student.*` (M9) + `guardian.*` (M10) + `staff.*` (M11) enforced; the rest declared but dormant | the vocabulary the role bundles need, activated module by module |
+| `guardian.view` added to Staff in M10, `staff.*` widened in M11 (Principal → manage; Bursar/Teacher/Staff → view) | the read-only roles that see students/guardians also see teachers; a Teacher must not manage other teachers, so Teacher gets `staff.view` only — no escalation |
 | Module activation (M7) reuses `school.settings.*`, stays orthogonal to permissions | it is configuration ("is the feature on for this school?"), not "may this user…"; a domain route checks both |
 | `academics.*` (M8) reused as-is, no finer split; sessions re-gated from `school.settings.*` | coarse-on-purpose; the academic structure is one thing under one permission (see `docs/academic-foundation.md`) |
 
@@ -205,6 +213,7 @@ school, so a cross-school membership can never reach the policy.
 - Invitation / brand-new-account flow (M5 adds *existing* users only).
 - Admin UI for `users.status` and `users.is_platform_admin`.
 - Enforcing the remaining dormant permissions — happens in each domain module's
-  milestone (`academics.*` in M8, `student.*` in M9, `guardian.*` in M10).
+  milestone (`academics.*` in M8, `student.*` in M9, `guardian.*` in M10,
+  `staff.*` in M11).
 - Audit logging of role changes.
 - `@role` / permission Blade directives beyond the built-in `@can`.

@@ -12,6 +12,7 @@
         ['route' => 'members.index', 'label' => __('Members'), 'active' => 'members.*', 'allowed' => auth()->user()->can('member.view')],
         ['route' => 'students.index', 'label' => __('Students'), 'active' => 'students.*', 'allowed' => $moduleOn(\App\Enums\Module::Students) && auth()->user()->can('student.view')],
         ['route' => 'guardians.index', 'label' => __('Guardians'), 'active' => 'guardians.*', 'allowed' => $moduleOn(\App\Enums\Module::Guardians) && auth()->user()->can('guardian.view')],
+        ['route' => 'teachers.index', 'label' => __('Teachers'), 'active' => 'teachers.*', 'allowed' => $moduleOn(\App\Enums\Module::Staff) && auth()->user()->can('staff.view')],
         ['route' => 'academic.sessions.index', 'label' => __('Academic'), 'active' => 'academic.*', 'allowed' => $moduleOn(\App\Enums\Module::Academics) && auth()->user()->can('academics.view')],
         ['route' => 'settings.school.edit', 'label' => __('School settings'), 'active' => 'settings.school.*', 'allowed' => auth()->user()->can('school.settings.view')],
         ['route' => 'admin.schools.index', 'label' => __('Schools'), 'active' => 'admin.schools.*', 'allowed' => auth()->user()->can('viewAny', \App\Models\School::class)],

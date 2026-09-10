@@ -146,11 +146,34 @@ Deferred: Parent Portal (guardian sign-in + portal accounts), guardian
 messaging / notifications, pickup authorisation, custody documents, emergency
 contacts, bulk guardian import, duplicate-guardian merge.
 
-## Milestone 11+ — Domain Modules
+## ✅ Milestone 11 — Teacher Management (complete, 2026-09-19)
 
-Staff · Class rosters & teacher assignment · Timetable · Attendance ·
-Assessments & Results · Fees / Invoices / Payments (Paystack) · CBT ·
-Role-specific portals & dashboards · Notifications · Reporting · Promotion.
+The tenant-scoped teacher professional record, an optional link to an existing
+application account, and the teaching-assignment foundation. `App\Models\Teacher`
+(minimal professional data — name / employee number / email / phone / start date
+/ address / notes; no ID / financial / medical / credential fields;
+`TeacherStatus` active/inactive/suspended/resigned; `status` + `user_id` not
+mass-assignable; never hard-deleted) + `App\Models\TeacherAssignment`
+(school-owned + teacher-scoped; teach a `Subject` to a level/arm for a
+session/period; `TeacherAssignmentStatus` active/ended; history preserved;
+duplicate-active check in the Form Request). Teacher ↔ User is a nullable
+`user_id` linked only to a member of the active school — M11 builds no
+invitation / credential / portal flow. `/teachers/*` gated `staff.view` /
+`staff.manage` (M4 permissions, previously dormant) **and** `module:staff` —
+which now depends on `module:academics`. `Module::Staff->isAvailable()` is now
+`true`; `staff.manage` added to Principal, `staff.view` to Bursar / Teacher /
+Staff. Full detail in `docs/teacher-management.md`.
+
+Deferred: Teacher Portal (teacher sign-in + invitations), non-teaching staff
+records, class rosters ("who teaches JSS1"), timetable, attendance, marks,
+payroll / workload, qualifications & documents, bulk teacher import,
+head-of-department / form-teacher designations.
+
+## Milestone 12+ — Domain Modules
+
+Class rosters · Timetable · Attendance · Assessments & Results ·
+Fees / Invoices / Payments (Paystack) · CBT · Role-specific portals &
+dashboards · Notifications · Reporting · Promotion.
 
 Each domain module checks its `App\Enums\Module` flag (`module:` middleware /
 `@module`) **and** its M4 permissions — the two stay orthogonal.

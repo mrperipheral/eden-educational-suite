@@ -74,10 +74,10 @@ class ModuleTest extends TestCase
 
     public function test_only_shipped_modules_report_as_available(): void
     {
-        // Each domain milestone flips its own module to available. As of M10:
-        // Academic Foundation (M8), Student Management (M9) and Guardian
-        // Management (M10); the rest Planned.
-        $available = ['academics', 'students', 'guardians'];
+        // Each domain milestone flips its own module to available. As of M11:
+        // Academic Foundation (M8), Student Management (M9), Guardian Management
+        // (M10) and Teacher Management (M11); the rest Planned.
+        $available = ['academics', 'students', 'guardians', 'staff'];
 
         foreach (Module::cases() as $module) {
             $this->assertSame(

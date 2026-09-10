@@ -97,9 +97,10 @@ request, so tampering with the stored value achieves nothing (proven by
 
 Applied in `routes/web.php` to the tenant-scoped group: `/dashboard`,
 `/members*`, `/settings/school*`, `/academic/*` (also `module:academics`),
-`/students/*` (also `module:students`), `/guardians/*` (also `module:guardians`).
-Account-level routes (`/settings/profile`, `/settings/password`, `/school`) and
-platform routes (`/admin/schools*`) do **not** use it.
+`/students/*` (also `module:students`), `/guardians/*` (also `module:guardians`),
+`/teachers/*` (also `module:staff`). Account-level routes (`/settings/profile`,
+`/settings/password`, `/school`) and platform routes (`/admin/schools*`) do
+**not** use it.
 
 ## 5. `BelongsToSchool` — writing a tenant-owned model
 
@@ -108,11 +109,13 @@ The first real school-owned models ship with Milestone 5
 `App\Models\SchoolModule`; Milestone 8 the academic structure
 (`AcademicPeriod`, `AcademicLevel`, `LevelArm`, `Subject`); Milestone 9
 `App\Models\Student` and `App\Models\Enrollment`; Milestone 10
-`App\Models\Guardian` and `App\Models\GuardianStudent`. Child / link models
-(`AcademicPeriod`, `LevelArm`, `Enrollment`, `GuardianStudent`) carry `school_id`
-*and* their parent FK(s) so a query is tenant-safe without the parent in the join
-(see `docs/academic-foundation.md`, `docs/student-management.md`,
-`docs/guardian-management.md`). All follow the pattern:
+`App\Models\Guardian` and `App\Models\GuardianStudent`; Milestone 11
+`App\Models\Teacher` and `App\Models\TeacherAssignment`. Child / link models
+(`AcademicPeriod`, `LevelArm`, `Enrollment`, `GuardianStudent`,
+`TeacherAssignment`) carry `school_id` *and* their parent FK(s) so a query is
+tenant-safe without the parent in the join (see `docs/academic-foundation.md`,
+`docs/student-management.md`, `docs/guardian-management.md`,
+`docs/teacher-management.md`). All follow the pattern:
 
 ```php
 use App\Support\Tenancy\Concerns\BelongsToSchool;

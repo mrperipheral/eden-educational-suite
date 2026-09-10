@@ -108,18 +108,27 @@ See `docs/architecture.md` for the full rationale. In short:
 
 ## Milestones
 
-Tracked in `PROJECT_STATUS.md` and `docs/roadmap.md`. **Milestones 1–10 (Platform
+Tracked in `PROJECT_STATUS.md` and `docs/roadmap.md`. **Milestones 1–11 (Platform
 Foundation, Authentication, Multi-School Tenant Isolation, Roles & Permissions,
 School Onboarding, School Settings & Configuration, Feature / Module Activation,
-Academic Foundation, Student Management, Guardian / Parent Management) are
-complete.** School settings: `docs/school-settings.md`; module activation:
-`docs/module-activation.md`; academic structure: `docs/academic-foundation.md`;
-students + enrollment: `docs/student-management.md`; guardians + student ↔
-guardian links: `docs/guardian-management.md`. Do not start any further domain
-module (staff, timetable, attendance, fees, results, CBT, notifications,
-promotion, portals, …) without picking up the next milestone explicitly.
+Academic Foundation, Student Management, Guardian / Parent Management, Teacher
+Management) are complete.** School settings: `docs/school-settings.md`; module
+activation: `docs/module-activation.md`; academic structure:
+`docs/academic-foundation.md`; students + enrollment:
+`docs/student-management.md`; guardians + student ↔ guardian links:
+`docs/guardian-management.md`; teachers + teaching assignments:
+`docs/teacher-management.md`. Do not start any further domain module (class
+rosters, timetable, attendance, fees, results, CBT, notifications, promotion,
+portals, …) without picking up the next milestone explicitly.
 
 Module activation is **configuration, not authorization**: a domain route checks
 both its `App\Enums\Module` flag (`module:` middleware / `@module`) **and** its M4
 permission — enabling a module grants nothing. Tenant-owned route ids are
 resolved by tenant-scoped `findOrFail` in the controller, not route-model-bound.
+
+A **person's domain record is separate from their `User` account**: a `Teacher`
+(M11) — and future staff-like records — is a professional record first, with an
+optional nullable `user_id` linked only to an **existing member of the active
+school**, set via a dedicated endpoint (never mass-assigned, never an auto-created
+login). Lifecycle `status` columns stay out of `$fillable` and change only
+through their own endpoint, as `Student` (M9) and `Teacher` (M11) do.

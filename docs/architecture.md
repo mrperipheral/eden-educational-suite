@@ -1,7 +1,7 @@
 # Architecture
 
-Status: Milestone 10 (Guardian / Parent Management) complete. This describes the
-intended shape of the system and what exists today.
+Status: Milestone 11 (Teacher Management) complete. This describes the intended
+shape of the system and what exists today.
 
 ## 1. High-level model
 
@@ -218,16 +218,49 @@ credentials, no messaging.
   validated tenant-scoped (`Rule::exists(...)->where('school_id', …)`), and the
   `{link}` route id `abort(404)`s on a cross-school id before validation.
 
+## 2i. Teacher management (implemented — Milestone 11)
+
+Full reference: **`docs/teacher-management.md`**. The teacher professional
+record, an optional link to an application account, and the teaching-assignment
+foundation the later Timetable / Attendance / Assessment / Results modules build
+on. Records + assignment foundation only — no teacher portal, no credentials, no
+timetable/attendance/marks, no payroll.
+
+- **`App\Models\Teacher`** — school-owned. Minimal professional data (name,
+  `employee_number`, email, phone, start date, address, notes). No identity /
+  financial / medical / credential fields. `status`
+  (`App\Enums\TeacherStatus`: active / inactive / suspended / resigned) and
+  `user_id` are **not** mass-assignable — each changed via a dedicated endpoint.
+  Never hard-deleted.
+- **Teacher ↔ User** — nullable `teachers.user_id`, `unique(school_id, user_id)`,
+  `nullOnDelete`. A teacher record is not automatically a login; it is linked
+  only to an **existing member of the active school**, via
+  `PATCH /teachers/{teacher}/user`. No invitation / password / portal flow.
+- **`App\Models\TeacherAssignment`** — school-owned *and* scoped to its teacher.
+  Points at a `Subject`, an `AcademicLevel` (+ optional `LevelArm`) for an
+  `AcademicSession` (+ optional `AcademicPeriod`). `status` `active` / `ended` —
+  history preserved (`end()`), `DELETE` kept only for a mis-entered row.
+  Duplicate **active** `(teacher, session, period, level, arm, subject)` rejected
+  in the Form Request, not by a DB constraint.
+- **`App\Http\Controllers\Teacher\*`**, `/teachers/*` routes behind
+  `['tenant', 'module:staff']`, gated `staff.view` / `staff.manage` (M4
+  permissions, previously dormant — now enforced). `Module::Staff` now
+  **depends on `Module::Academics`**. `staff.manage` added to Principal;
+  `staff.view` added to Bursar / Teacher / Staff.
+- Level ↔ arm and session ↔ period consistency, and cross-school academic /
+  user ids, are rejected in the Form Request with generic messages (no leak);
+  the assignment Form Request `abort(404)`s on a cross-school route parent.
+
 ### Deferred
 
 - Queue jobs capture/restore the tenant id (no jobs exist yet — see
   `docs/tenancy.md` §7).
 - Invitations / brand-new-account onboarding, school suspension / subscription,
   notification & payment config, the remaining domain modules behind the M7
-  catalogue (staff, timetable, attendance, results, fees, CBT, portals,
-  promotion workflow, bulk student / guardian import), the Parent Portal
-  (guardian sign-in + portal accounts), admin UI for `status` /
-  `is_platform_admin`, subdomain routing.
+  catalogue (class rosters, timetable, attendance, results, fees, CBT, portals,
+  promotion workflow, bulk student / guardian / teacher import), the Parent
+  Portal (guardian sign-in) and Teacher Portal (teacher sign-in), non-teaching
+  staff records, admin UI for `status` / `is_platform_admin`, subdomain routing.
 
 ## 3. Application layers & conventions
 
@@ -317,3 +350,6 @@ pre-auth screens.
 | 2026-09-18 | Student ↔ guardian is a dedicated `GuardianStudent` link model (carries `school_id` + both FKs), not a bare pivot | the link carries behaviour (`relationship`, `is_primary`, `makePrimary()`) and must be `BelongsToSchool` and tenant-safe in its own right (see `docs/guardian-management.md`) |
 | 2026-09-18 | One primary guardian per student, enforced transactionally (not a partial unique index); links created from the student workflow | portable across MySQL/SQLite; matches how a school thinks about "this child's parents"; no unbounded student picker |
 | 2026-09-18 | Guardians store contact data only — no ID/financial/medical/emergency data, no portal credentials | "do not collect unnecessary sensitive information"; sign-in is the Parent Portal's concern, a later milestone |
+| 2026-09-19 | Teacher record is separate from `User`; `user_id` nullable, set via a dedicated endpoint, linked only to an existing member | a teacher is a professional record first, not automatically a login; M11 builds no invitation / credential / portal flow (see `docs/teacher-management.md`) |
+| 2026-09-19 | Teaching assignments are a `TeacherAssignment` model (session req, period/arm opt, subject req); duplicate-active check in the Form Request, not a DB constraint | history is first-class and the Timetable / Attendance / Results modules extend one model; a hard unique key would over-constrain future scheduling |
+| 2026-09-19 | `Module::Staff` depends on `Module::Academics` | a teaching assignment is meaningless without sessions / levels / subjects — a minimal, correct extension of the M7 catalogue |

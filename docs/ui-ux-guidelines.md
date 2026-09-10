@@ -110,6 +110,21 @@ link to create a new guardian). The student profile carries a "Parents /
 guardians" card mirroring the same inline edit / unlink. Read-only roles
 (`guardian.view`) see lists and profiles with no create / edit / link controls.
 
+The **Teachers** area (`resources/views/teachers/`,
+`docs/teacher-management.md`, gated `staff.*` + `module:staff`) is a top-level
+nav item. **List** — name / employee-number / email search + status-filter chips
++ pagination + an active-assignment count; a shared `_form.blade.php` drives
+**create** and **edit**. The **profile** page shows identity / contact, an
+employment-status control, an application-account link control (a `<select>` of
+school members — M11 never creates accounts), and the teaching assignments split
+into **Current** and **Past**. The assignment form
+(`teachers/assignments/_form.blade.php`) is an Alpine cascade — session filters
+the term select, level filters the arm select, plus an independent subject
+select; every id and relationship is re-checked server-side. An assignment is
+removed via `x-confirm` (a hard delete for mistakes; the confirm text points at
+"set status to Ended" to keep history). Read-only roles (`staff.view`) see lists
+and profiles with no create / edit / status / link / assignment controls.
+
 Flash messages (`session('success' | 'error' | 'status')`) are rendered
 automatically by `<x-layouts.app>` as alerts.
 
@@ -140,5 +155,6 @@ automatically by `<x-layouts.app>` as alerts.
 
 Dark mode, dense/table layouts, data-grid, charts, iconography system,
 notification/toast system. The primary nav is permission- and
-module-filtered (Dashboard · Members · Students · Guardians · Academic · School settings ·
-Schools · Account) but not yet role-specific / collapsible. Add here when built.
+module-filtered (Dashboard · Members · Students · Guardians · Teachers · Academic ·
+School settings · Schools · Account) but not yet role-specific / collapsible. Add
+here when built.

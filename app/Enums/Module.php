@@ -103,6 +103,7 @@ enum Module: string
         return match ($this) {
             self::Students => [self::Academics],
             self::Guardians => [self::Students],
+            self::Staff => [self::Academics],
             self::Timetable => [self::Academics],
             self::Attendance => [self::Students],
             self::Assessments => [self::Academics, self::Students],
@@ -128,11 +129,13 @@ enum Module: string
      *     history (`docs/student-management.md`).
      *   - `guardians` — Guardian / Parent Management (M10): guardian records +
      *     student ↔ guardian relationships (`docs/guardian-management.md`).
+     *   - `staff` — Teacher Management (M11): teacher records, optional account
+     *     link, teaching-assignment foundation (`docs/teacher-management.md`).
      */
     public function isAvailable(): bool
     {
         return match ($this) {
-            self::Academics, self::Students, self::Guardians => true,
+            self::Academics, self::Students, self::Guardians, self::Staff => true,
             default => false,
         };
     }
