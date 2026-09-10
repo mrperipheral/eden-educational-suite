@@ -260,6 +260,28 @@ Full detail in `docs/attendance-management.md`. Summary of controls:
 | Historical correctness | records are never hard-deleted; eligibility is the enrollment date range, not current status, so a later withdrawal doesn't alter past registers; correction after locking is an explicit authorized `reopen()`, not a silent edit |
 | CSRF | every form; `@method('PATCH'|'DELETE')` spoofing |
 
+## Implemented in Milestone 14 (Assessment & Assignments)
+
+Full detail in `docs/assessment-management.md`. Summary of controls:
+
+| Control | How |
+|---------|-----|
+| Two gates on every assessment route | `module:assessments` (feature on? else 404) **and** `->can('assessment.view'|'.record'|'.manage')`; write Form Requests re-check via `AssessmentModuleRequest` + `AssessmentAuthorizer` |
+| Enforced permissions | `assessment.view` (School Admin, Principal, Teacher, Staff) / `assessment.record` (School Admin, Principal, Teacher — class + subject-scoped for teachers) / `assessment.manage` (School Admin, Principal — categories + unlock); **Bursar / Parent / Student / role-less → 403** (tested) |
+| Activation ≠ authorization | Assessments module on does not give a Bursar `assessment.view` (tested); a Teacher (`.record`, no `.manage`) cannot touch categories (tested) |
+| Teacher scoping | `AssessmentAuthorizer` — a `.record`-only teacher may create/score only for a `(level, subject)` they hold an **active** M11 assignment for, that arm only; wrong class / wrong subject / no `Teacher` record / other-school assignment all rejected (tested) |
+| Tenant isolation | all five models are `BelongsToSchool`; child rows carry their parent FK. School A cannot view / edit / score / publish / lock / unlock / delete School B's assessment or assignment (404), cannot create one with School B's context ("invalid"), cannot POST School B's student ids (explicit HTTP + model tests) |
+| `status` / `published_at` / `locked_*` protection | **not mass-assignable** — lifecycle only through `publish()` / `unpublish()` / `lock(User)` / `unlock()` (unlock is `assessment.manage`); `created_by` / `locked_by` stamped server-side |
+| Score validation | `nullable` · `numeric` (rejects `NaN` / `Infinity` / text) · `min:0` (no negatives) · `decimal:0,2` · `<= max_score` (server-side vs the parent); `max_score` on a draft can't drop below a recorded score (tested) |
+| Route-model binding | `{assessment}` / `{assignment}` / `{category}` resolved by tenant-scoped `findOrFail`; write Form Requests `abort(404)` on a cross-school route parent before validation |
+| Cross-school id leakage | every session / period / level / arm / subject / category / assignment id validated with `Rule::exists(...)->where('school_id', <tenant>)` → plain "invalid"; a score / submission for a student not on the snapshotted roster is rejected |
+| Roster bulk insert | `AssessmentScore::insert()` / `AssignmentSubmission::insert()` bypass the `creating` hook, so `school_id` is set explicitly from `TenantContext::idOrFail()` |
+| Locked-data protection | a locked assessment returns 403 from the score screen and `PATCH .../scores`; an assessment with recorded scores, and any locked one, cannot be deleted; a closed assignment freezes completion edits |
+| PII minimisation | no personal data on assessments — student references only, plus optional short free-text `comment` / `remark`; no attachments |
+| Historical correctness | scores / submissions are never hard-deleted; eligibility is the enrollment date range, not current status, so a later withdrawal / class-change doesn't alter past assessments; deleting a student cascades scores but keeps the assessment |
+| No premature derived data | column allow-list tests assert `assessments` / `assessment_scores` have no `final_grade` / `percentage` / `subject_average` / `position` / `gpa` / `grade` |
+| CSRF | every form; `@method('PATCH'|'DELETE')` spoofing |
+
 ## Deferred (with the milestone that owns them)
 
 - **Auth follow-ups:** 2FA, "log out other devices" on password change, session
@@ -269,7 +291,7 @@ Full detail in `docs/attendance-management.md`. Summary of controls:
   audit logging of role & membership changes, enforcing the remaining dormant
   domain permissions (each in its module — `academics.*` in M8, `student.*` in
   M9, `guardian.*` in M10, `staff.*` in M11, `timetable.*` in M12,
-  `attendance.*` in M13).
+  `attendance.*` in M13, `assessment.*` in M14).
 - **Tenancy follow-ups:** queue-job tenant propagation, per-tenant rate limiting,
   per-tenant cache keys, audit logging of context switches.
 - **Later:** audit logging (who did what, per school — incl. student record /

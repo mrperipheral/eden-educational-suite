@@ -5,6 +5,11 @@ use App\Http\Controllers\Academic\LevelController;
 use App\Http\Controllers\Academic\PeriodController;
 use App\Http\Controllers\Academic\SessionController as AcademicSessionController;
 use App\Http\Controllers\Academic\SubjectController;
+use App\Http\Controllers\Assessment\AssessmentCategoryController;
+use App\Http\Controllers\Assessment\AssessmentController;
+use App\Http\Controllers\Assessment\AssessmentScoreController;
+use App\Http\Controllers\Assessment\AssignmentController;
+use App\Http\Controllers\Assessment\AssignmentSubmissionController;
 use App\Http\Controllers\Attendance\AttendanceRegisterController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Guardian\GuardianController;
@@ -363,6 +368,86 @@ Route::middleware(['auth', 'verified', 'active'])->group(function () {
                 ->whereNumber('register')->can('attendance.manage')->name('reopen');
             Route::delete('{register}', [AttendanceRegisterController::class, 'destroy'])
                 ->whereNumber('register')->can('attendance.record')->name('destroy');
+        });
+
+        /*
+        | Assessment & assignments (see docs/assessment-management.md). Two gates:
+        |   module:assessments  — is the feature on? (depends on academics + students,
+        |     NOT timetable / attendance / results / cbt)
+        |   ->can('assessment.view' | '.record' | '.manage')  — may this user?
+        | The finer "may this user record for *this* class + subject" rule (a
+        | teacher only for a subject they are assigned to teach that class) is in
+        | App\Support\Assessment\AssessmentAuthorizer, checked in the Form
+        | Requests / controller. Tenant-owned ids ({assessment}, {assignment},
+        | {category}) are resolved by tenant-scoped `findOrFail` (after `tenant`),
+        | so another school's id 404s.
+        */
+        Route::middleware('module:assessments')->prefix('assessments')->name('assessments.')->group(function () {
+            // Assessment categories — school configuration.
+            Route::get('categories', [AssessmentCategoryController::class, 'index'])
+                ->can('assessment.view')->name('categories.index');
+            Route::post('categories', [AssessmentCategoryController::class, 'store'])
+                ->can('assessment.manage')->name('categories.store');
+            Route::patch('categories/{category}', [AssessmentCategoryController::class, 'update'])
+                ->whereNumber('category')->can('assessment.manage')->name('categories.update');
+
+            // Assignments — literal prefix, before {assessment}.
+            Route::get('assignments', [AssignmentController::class, 'index'])
+                ->can('assessment.view')->name('assignments.index');
+            Route::get('assignments/create', [AssignmentController::class, 'create'])
+                ->can('assessment.record')->name('assignments.create');
+            Route::post('assignments', [AssignmentController::class, 'store'])
+                ->can('assessment.record')->name('assignments.store');
+            Route::get('assignments/{assignment}', [AssignmentController::class, 'show'])
+                ->whereNumber('assignment')->can('assessment.view')->name('assignments.show');
+            Route::get('assignments/{assignment}/edit', [AssignmentController::class, 'edit'])
+                ->whereNumber('assignment')->can('assessment.record')->name('assignments.edit');
+            Route::patch('assignments/{assignment}', [AssignmentController::class, 'update'])
+                ->whereNumber('assignment')->can('assessment.record')->name('assignments.update');
+            Route::delete('assignments/{assignment}', [AssignmentController::class, 'destroy'])
+                ->whereNumber('assignment')->can('assessment.record')->name('assignments.destroy');
+            Route::get('assignments/{assignment}/submissions', [AssignmentSubmissionController::class, 'edit'])
+                ->whereNumber('assignment')->can('assessment.record')->name('assignments.submissions.edit');
+            Route::patch('assignments/{assignment}/submissions', [AssignmentSubmissionController::class, 'update'])
+                ->whereNumber('assignment')->can('assessment.record')->name('assignments.submissions.update');
+            Route::post('assignments/{assignment}/publish', [AssignmentController::class, 'publish'])
+                ->whereNumber('assignment')->can('assessment.record')->name('assignments.publish');
+            Route::post('assignments/{assignment}/unpublish', [AssignmentController::class, 'unpublish'])
+                ->whereNumber('assignment')->can('assessment.record')->name('assignments.unpublish');
+            Route::post('assignments/{assignment}/close', [AssignmentController::class, 'close'])
+                ->whereNumber('assignment')->can('assessment.record')->name('assignments.close');
+            Route::post('assignments/{assignment}/reopen', [AssignmentController::class, 'reopen'])
+                ->whereNumber('assignment')->can('assessment.record')->name('assignments.reopen');
+
+            // Assessments.
+            Route::get('/', [AssessmentController::class, 'index'])
+                ->can('assessment.view')->name('index');
+            Route::get('create', [AssessmentController::class, 'create'])
+                ->can('assessment.record')->name('create');
+            Route::post('/', [AssessmentController::class, 'store'])
+                ->can('assessment.record')->name('store');
+            Route::get('{assessment}', [AssessmentController::class, 'show'])
+                ->whereNumber('assessment')->can('assessment.view')->name('show');
+            Route::get('{assessment}/edit', [AssessmentController::class, 'edit'])
+                ->whereNumber('assessment')->can('assessment.record')->name('edit');
+            Route::patch('{assessment}', [AssessmentController::class, 'update'])
+                ->whereNumber('assessment')->can('assessment.record')->name('update');
+            Route::delete('{assessment}', [AssessmentController::class, 'destroy'])
+                ->whereNumber('assessment')->can('assessment.record')->name('destroy');
+            Route::get('{assessment}/scores', [AssessmentScoreController::class, 'edit'])
+                ->whereNumber('assessment')->can('assessment.record')->name('scores.edit');
+            Route::patch('{assessment}/scores', [AssessmentScoreController::class, 'update'])
+                ->whereNumber('assessment')->can('assessment.record')->name('scores.update');
+            Route::post('{assessment}/scores/sync', [AssessmentScoreController::class, 'sync'])
+                ->whereNumber('assessment')->can('assessment.record')->name('scores.sync');
+            Route::post('{assessment}/publish', [AssessmentController::class, 'publish'])
+                ->whereNumber('assessment')->can('assessment.record')->name('publish');
+            Route::post('{assessment}/unpublish', [AssessmentController::class, 'unpublish'])
+                ->whereNumber('assessment')->can('assessment.record')->name('unpublish');
+            Route::post('{assessment}/lock', [AssessmentController::class, 'lock'])
+                ->whereNumber('assessment')->can('assessment.record')->name('lock');
+            Route::post('{assessment}/unlock', [AssessmentController::class, 'unlock'])
+                ->whereNumber('assessment')->can('assessment.manage')->name('unlock');
         });
     });
 });

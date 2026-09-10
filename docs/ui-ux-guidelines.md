@@ -160,6 +160,26 @@ any student is unmarked). The **register detail** shows summary count chips
 locked register renders a read-only roster. Read-only roles (`attendance.view`)
 see the list and detail with no create / record / submit controls.
 
+The **Assessments** area (`resources/views/assessments/` +
+`resources/views/assignments/`, `docs/assessment-management.md`, gated
+`assessment.*` + `module:assessments`) is a top-level nav item. **List** —
+assessments filterable by session / level / class / subject / category / status,
+paginated, each badged **Draft** / **Published** / **Locked** and showing
+`entered / total scored`. **Create** — an Alpine session→term and
+level→(arm, subject) cascade plus category / title / max score / instructions;
+the academic context is fixed after creation, so **Edit** is a reduced form.
+The **score sheet** is the core view, built for a class of 30–100+ on a phone:
+a scrollable list (name · admission number), a right-aligned numeric input with
+`/ max` and live client-side range validation, an optional per-student comment,
+and a **sticky footer** with **Save scores** (disabled while any score is out of
+range). The **assessment detail** shows summary chips
+(`assessments/_summary.blade.php`) and the lifecycle controls (publish / return
+to draft / lock; unlock for `assessment.manage`). **Categories** are managed
+inline at `/assessments/categories`. **Assignments** mirror the shape —
+list / create / detail / a **completion sheet** with a status select + date +
+remark per student and a "set all" bar — plus a draft → published → closed
+lifecycle. Read-only roles (`assessment.view`) see lists and detail only.
+
 Flash messages (`session('success' | 'error' | 'status')`) are rendered
 automatically by `<x-layouts.app>` as alerts.
 
@@ -191,5 +211,6 @@ automatically by `<x-layouts.app>` as alerts.
 Dark mode, dense/table layouts, data-grid, charts, iconography system,
 notification/toast system. The primary nav is permission- and
 module-filtered (Dashboard · Members · Students · Guardians · Teachers ·
-Timetable · Attendance · Academic · School settings · Schools · Account) but not
+Timetable · Attendance · Assessments · Academic · School settings · Schools ·
+Account) but not
 yet role-specific / collapsible. Add here when built.

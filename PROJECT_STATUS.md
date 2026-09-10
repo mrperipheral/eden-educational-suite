@@ -1,12 +1,12 @@
 # Project Status
 
-_Last updated: 2026-09-21_
+_Last updated: 2026-09-22_
 
 ## Current milestone
 
-**Milestone 13 — Attendance Management: COMPLETE.**
+**Milestone 14 — Assessment & Assignments: COMPLETE.**
 
-Next up: **Domain Modules** (Milestone 14+) — Assessments & Results, Fees, CBT,
+Next up: **Domain Modules** (Milestone 15+) — Results & Report Cards, Fees, CBT,
 Notifications, Portals, Promotion. Not started — do not begin without picking it
 up explicitly. See `docs/roadmap.md`.
 
@@ -16,7 +16,7 @@ Multi-school School Management SaaS (management + portals only — no website
 features). PHP 8.3 · Laravel 13.31 · MySQL 8 · Blade + Tailwind v4 · Alpine.js ·
 Vite · PHPUnit · Pint.
 
-## Environment (verified 2026-09-21)
+## Environment (verified 2026-09-22)
 
 | Item | Value |
 |------|-------|
@@ -25,7 +25,7 @@ Vite · PHPUnit · Pint.
 | Node / npm | 22.x |
 | Database | MySQL 8 (app) · SQLite `:memory:` (tests) |
 | Local mail | Mailpit (`127.0.0.1:1025`, UI `:8025`) — `.env` only, not committed |
-| Tests | `php artisan test` — 526 passing |
+| Tests | `php artisan test` — 615 passing |
 | Build | `npm run build` — passing |
 | Formatting | `vendor/bin/pint --test` — passing |
 
@@ -43,8 +43,73 @@ Vite · PHPUnit · Pint.
 - **M10 — Guardian / Parent Management** (`guardian-management-complete`) — `docs/guardian-management.md`.
 - **M11 — Teacher Management** (`teacher-management-complete`) — `docs/teacher-management.md`.
 - **M12 — Timetable Management** (`timetable-management-complete`) — `docs/timetable-management.md`.
-- **M13 — Attendance Management** (this milestone, `attendance-management-complete`) —
-  `docs/attendance-management.md`; see below.
+- **M13 — Attendance Management** (`attendance-management-complete`) — `docs/attendance-management.md`.
+- **M14 — Assessment & Assignments** (this milestone, `assessment-assignments-complete`) —
+  `docs/assessment-management.md`; see below.
+
+## Delivered in Milestone 14
+
+A configurable, tenant-scoped assessment and assignment foundation — the source
+data for M15 Results & Report Cards. Built on the existing `TenantContext` +
+`BelongsToSchool` + `Permission` + `module:assessments` seams, the M9
+`Enrollment` history and the M11 `TeacherAssignment` — no new mechanism, no new
+packages, no Redis/queues.
+
+- **Enums** — `App\Enums\AssessmentStatus` (`draft` / `published` / `locked`),
+  `App\Enums\AssignmentStatus` (`draft` / `published` / `closed`),
+  `App\Enums\AssignmentSubmissionStatus` (`pending` / `submitted` / `late` /
+  `exempt`).
+- **`App\Models\AssessmentCategory`** — school-configured category (name / code /
+  position / active), unique per school. Seeded examples (Classwork / Homework /
+  Test / Examination) are fully editable. Managed at `/assessments/categories`
+  (`assessment.manage`).
+- **`App\Models\Assessment`** — school-owned; academic context (session +
+  period + level + arm + subject) **fixed at creation**. `status` /
+  `published_at` / `locked_*` / `created_by` **not** mass-assignable. Optional
+  `assignment_id` link (no calculation). `eligibleStudents()` (shared
+  `HasClassRoster` trait) + `summary()`. Lifecycle `publish()` / `unpublish()` /
+  `lock(User)` / `unlock()`.
+- **`App\Models\AssessmentScore`** — school-owned **+** assessment-scoped.
+  Nullable `score` (`decimal(6,2)`, null = not entered), `comment`,
+  `recorded_at` / `recorded_by`. Never deleted. **No** grade / percentage /
+  rank stored.
+- **`App\Models\Assignment`** — school-owned; same context rules + `due_on >=
+  assigned_on`, both in the session. `teacher_id` owner (from the creator's
+  `Teacher` record), `created_by`, optional `max_score`. Carries **no scores**.
+  Lifecycle `publish()` / `unpublish()` / `close()` / `reopen()`.
+- **`App\Models\AssignmentSubmission`** — completion tracking only; `status`
+  defaults to `pending`, `submitted_on`, `remark`. No file upload / portal.
+- **Migrations** `2026_09_22_100000`–`100040` (categories, assignments,
+  assessments, assessment_scores, assignment_submissions) — all
+  `BelongsToSchool`, `school_id`-leading indexes, `unique(assessment_id,
+  student_id)` / `unique(assignment_id, student_id)`, **no** global uniqueness on
+  assessments (multiple of a category on different dates are legitimate).
+- **`App\Support\Assessment\AssessmentAuthorizer`** — `assessment.manage` → any
+  class + subject; `assessment.record` only → a `(level, subject)` the teacher
+  holds an **active** M11 assignment for. Tenant scoped; degrades safely with
+  the Staff module off.
+- **`App\Http\Controllers\Assessment\{AssessmentCategory,Assessment,AssessmentScore,Assignment,AssignmentSubmission}Controller`**
+  + `App\Http\Requests\Assessment\*` (11 requests) +
+  `resources/views/{assessments,assignments}/*` (13 views) — list (filters +
+  pagination), Alpine-cascade create forms, draft-only edit forms, detail with
+  lifecycle controls, mobile-first bulk score / completion sheets, inline
+  category CRUD.
+- **Eligibility & workflow** — the roster is snapshotted at creation (one bulk
+  `insert`, one row per then-eligible student). Scores start `null`; a draft's
+  roster can be re-synced with current enrolment; publishing freezes it. Locking
+  freezes scores; only `assessment.manage` unlocks.
+- **`Module::Assessments->isAvailable()`** flipped to `true` (on by default);
+  depends on **`Module::Academics` + `Module::Students`** — not Timetable,
+  Attendance, Results or CBT. "Assessments" is a top-level nav item.
+- **Permissions** — new `assessment.view` / `assessment.record` /
+  `assessment.manage` (27 → 30). `assessment.manage` on Principal; `.view` +
+  `.record` on Teacher; `.view` on Staff. School Admin auto.
+- **Seeder** — Alpha gets 4 categories, 3 assessments (locked / published /
+  draft, mixed scores), 2 assignments (published w/ mixed completion, draft).
+- **Docs** — new `docs/assessment-management.md`; updated `architecture.md`,
+  `authorization.md`, `database-design.md`, `security.md`, `scalability.md`,
+  `module-activation.md`, `roadmap.md`, `PROJECT_STATUS.md`, `CLAUDE.md`,
+  `AGENTS.md`.
 
 ## Delivered in Milestone 13
 
@@ -160,66 +225,86 @@ auto-optimisation or student/parent views. Built on the existing `TenantContext`
   `tenancy.md`, `module-activation.md`, `roadmap.md`, `ui-ux-guidelines.md`,
   `CLAUDE.md`, `AGENTS.md`.
 
-## Authorization & tenant controls (M13)
+## Authorization & tenant controls (M14)
 
-- **Two gates on every `/attendance/*` route:** `module:attendance` (404 when
-  off) **and** `->can('attendance.view'|'.record'|'.manage')`; write Form
-  Requests re-check via `AttendanceModuleRequest` + `AttendanceAuthorizer`.
+- **Two gates on every `/assessments/*` route:** `module:assessments` (404 when
+  off) **and** `->can('assessment.view'|'.record'|'.manage')`; write Form
+  Requests re-check via `AssessmentModuleRequest` + `AssessmentAuthorizer`.
   Module gate ≠ permission (a Bursar with the module on still can't see
-  attendance — tested).
-- `AttendanceRegister` / `AttendanceRecord` are `BelongsToSchool`; the record
-  also carries `attendance_register_id`. `school_id` never from input, immutable
-  (`TenantMismatchException`); a `school_id` in a payload is ignored (tested).
-  The roster bulk `insert` sets `school_id` from `TenantContext` explicitly.
-- `{register}` resolved by tenant-scoped `findOrFail`; the write Form Requests
-  `abort(404)` on a cross-school route parent before validation. Every session /
-  period / level / arm id in the create payload uses
+  assessments — tested).
+- `Assessment` / `AssessmentScore` / `Assignment` / `AssignmentSubmission` /
+  `AssessmentCategory` are `BelongsToSchool`; the child rows also carry their
+  parent FK. `school_id` never from input, immutable (`TenantMismatchException`);
+  a `school_id` in a payload is ignored (tested). Roster bulk `insert`s set
+  `school_id` from `TenantContext` explicitly.
+- `{assessment}` / `{assignment}` / `{category}` resolved by tenant-scoped
+  `findOrFail`; the write Form Requests `abort(404)` on a cross-school route
+  parent before validation. Every session / period / level / arm / subject /
+  category / assignment id in a payload uses
   `Rule::exists(...)->where('school_id', <tenant>)` → generic "invalid", no leak.
-  A mark for a student not on the register's snapshotted roster is rejected —
-  this blocks cross-school and wrong-class student ids. Explicit HTTP + model
-  cross-school isolation tests (view / records / submit / reopen / delete /
-  create-with-foreign-class / post-foreign-student).
+  A score / submission for a student not on the snapshotted roster is rejected —
+  this blocks cross-school and wrong-class student ids. `AssessmentAuthorizer`
+  additionally scopes a teacher to their assigned `(level, subject)`. Explicit
+  HTTP + model cross-school isolation tests (view / edit / score / publish /
+  lock / unlock / delete / create-with-foreign-context / post-foreign-student).
 
 ## Database
 
-M13 adds `attendance_registers` and `attendance_records`. No other schema
-changes.
+M14 adds `assessment_categories`, `assignments`, `assessments`,
+`assessment_scores` and `assignment_submissions`. No other schema changes.
 
-## Routes (application, additions in M13)
+## Routes (application, additions in M14)
 
-Tenant-scoped + `module:attendance`, gated `attendance.view` /
-`attendance.record` / `attendance.manage`. 8 routes under `/attendance/`
-(`attendance.index|create|store|show|records|submit|reopen|destroy`).
+Tenant-scoped + `module:assessments`, gated `assessment.view` /
+`assessment.record` / `assessment.manage`. 30 routes under `/assessments/`
+(`assessments.*` — index/create/store/show/edit/update/destroy/scores.edit/
+scores.update/scores.sync/publish/unpublish/lock/unlock; `assessments.categories.*`;
+`assessments.assignments.*` — index/create/store/show/edit/update/destroy/
+submissions.edit/submissions.update/publish/unpublish/close/reopen).
 
 ## Tests
 
-526 passing (was 472 at M12; +54 in M13, M1–M12 intact). New
-`tests/Feature/Attendance/*` (+ `AttendanceTestCase` base) — `AttendanceRegisterTest`,
-`AttendanceEligibilityTest`, `AttendanceRecordTest`, `AttendanceLifecycleTest`,
-`AttendanceAuthorizationTest`, `AttendanceStructureTest`, `AttendanceTimetableTest`:
-register create / validation / date-vs-session-period / arm-vs-level / duplicate
-prevention / list filters + pagination; eligibility — only students enrolled in
-the exact class on the date, not-yet-enrolled excluded, enrollment-ended-before
-excluded but ended-after included, cross-school student can never be added;
-records — present/absent/late/excused, notes + length limit, correction before
-lock, invalid status rejected, student-not-on-register rejected, DB duplicate
-prevention, full-class one request; lifecycle — submit locks, unmarked blocks
-submit, save+submit still needs all marked, locked rejects edits, only a manager
-reopens, draft deletable; authorization — all 7 roles + role-less, module off →
-404, module on without permission → 403, teacher only for assigned class,
-teacher with no Teacher record can't, teacher assigned in another school can't;
-timetable — full workflow with Timetable module off, dependency graph excludes
-Timetable; tenant isolation of registers + records, ownership immutability,
-`school_id` spoof ignored, tenant-safe route resolution; historical correctness —
-record survives a later withdrawal, deleting a student cascades records but keeps
-the register; N+1 guards on the taking screen, the list and bulk save. New
-`tests/Unit/Enums/AttendanceEnumsTest`. `Unit/Enums/ModuleTest` updated
+615 passing (was 526 at M13; +89 in M14, M1–M13 intact). New
+`tests/Feature/Assessment/*` (+ `AssessmentTestCase` base) — `AssessmentTest`,
+`AssessmentEligibilityTest`, `AssessmentScoreTest`, `AssessmentLifecycleTest`,
+`AssessmentAuthorizationTest`, `AssessmentTeacherScopeTest`,
+`AssessmentCategoryTest`, `AssessmentStructureTest`, `AssignmentTest`:
+assessment create / required-field / max-score-precision / date-vs-session-term /
+period-vs-session / arm-vs-level / subject-offered-at-level / inactive-category /
+empty-class / list filters + pagination / context-immutable-after-creation;
+eligibility — exact-class enrolment, not-yet-enrolled excluded, left-before
+excluded but leaving-after included, cross-school student never scored, draft
+roster re-sync, published roster frozen; scores — zero / maximum / decimal /
+negative-rejected / over-max-rejected / non-numeric-rejected / >2dp-rejected /
+blank-clears / comment length / correction before lock / not-on-roster rejected /
+DB duplicate prevention / full class one request / locked = 403; lifecycle —
+draft→published→locked, unpublish, structure frozen once published, scores while
+published, only manager unlocks, locked/scored can't delete, max-score floor;
+authorization — all 7 roles + role-less, module off → 404, module on without
+permission → 403, only managers touch categories; teacher scope — assigned
+class+subject only, wrong class / wrong subject / no Teacher record / other-school
+assignment all rejected; categories — CRUD, upper-cased code, duplicate name/code
+per school, same name in another school, tenant isolation, code format;
+structure — column allow-lists (no `final_grade` / `percentage` / `position` /
+`gpa`), no result-module relations, historical score survives withdrawal /
+class-change, delete-student cascades scores keeps assessment, locked stays
+readable, N+1 guards on the score sheet / lists / bulk save; assignments — create
+with completion roster + teacher ownership, due-date validation, lifecycle
+draft→published→closed→reopen, structure frozen once published, completion
+tracking + validation, closed rejects edits, recorded-submission blocks delete,
+teacher scope, tenant isolation, ownership immutable, N+1 guard, no-score column
+check, DB duplicate prevention, assessment↔assignment link (same class only). New
+`tests/Unit/Enums/AssessmentEnumsTest`. `Unit/Enums/ModuleTest` updated
 (available list).
 
 ## Known follow-ups / recommendations
 
 - Production env: `SESSION_SECURE_COOKIE=true`, real `MAIL_MAILER`, `APP_DEBUG=false`.
-- Next milestone: Assessments & Results.
+- Next milestone: Results & Report Cards (compile from M14 assessment scores).
+- **Assessment follow-ups** — grading schemes, report cards, subject/term/session
+  averages, positions/ranking, GPA, assignment file attachments + online
+  submission, automated grading, assessment weighting, per-student submission on
+  the portal.
 - **Attendance follow-ups** — attendance rate / percentage analytics, term &
   monthly reports, per-lesson (timetable-driven) registers, portal attendance
   views, absence notifications, an attendance-reason taxonomy, half-day records.
@@ -228,6 +313,6 @@ the register; N+1 guards on the taking screen, the list and bulk save. New
   named period grids, teacher workload limits.
 - **Teacher portal** / **Parent portal** — sign-in + invitations.
 - Promotion / graduation workflow; bulk import; documents / photo.
-- Audit trail + data-erasure handling for student / guardian / teacher / timetable / attendance records.
+- Audit trail + data-erasure handling for student / guardian / teacher / timetable / attendance / assessment records.
 - Apply the stored `timezone` / `locale` / `date_format` at render time.
 - Add a CI workflow (Pint + PHPUnit + `npm run build`).

@@ -65,7 +65,7 @@ enum Module: string
             self::Staff => __('Teacher and non-teaching staff records and assignments.'),
             self::Timetable => __('Weekly period timetables for classes and teachers.'),
             self::Attendance => __('Daily class attendance registers, independent of the timetable.'),
-            self::Assessments => __('Continuous assessment and examination score entry.'),
+            self::Assessments => __('Assessment score entry and class assignments — the source data for results.'),
             self::Results => __('Termly report cards compiled from assessment scores.'),
             self::Fees => __('Fee structures, invoices and payment tracking.'),
             self::LearningMaterials => __('Notes, documents and resources shared with classes.'),
@@ -137,11 +137,16 @@ enum Module: string
      *   - `attendance` — Attendance Management (M13): daily class registers with
      *     a draft → submitted lifecycle (`docs/attendance-management.md`).
      *     Independent of the Timetable module.
+     *   - `assessments` — Assessment & Assignments (M14): configurable
+     *     assessment categories, assessments with a draft → published → locked
+     *     lifecycle and bulk score entry, plus class assignments with
+     *     completion tracking (`docs/assessment-management.md`). Depends on
+     *     Academics + Students only — not Timetable, Attendance, Results or CBT.
      */
     public function isAvailable(): bool
     {
         return match ($this) {
-            self::Academics, self::Students, self::Guardians, self::Staff, self::Timetable, self::Attendance => true,
+            self::Academics, self::Students, self::Guardians, self::Staff, self::Timetable, self::Attendance, self::Assessments => true,
             default => false,
         };
     }

@@ -215,9 +215,38 @@ per-lesson (timetable-driven) registers, portal attendance views, absence
 notifications, an attendance-reason taxonomy, half-day records, a full
 audit-trail / retention workflow.
 
-## Milestone 14+ — Domain Modules
+## ✅ Milestone 14 — Assessment & Assignments (complete, 2026-09-22)
 
-Assessments & Results · Fees / Invoices / Payments (Paystack) ·
+A configurable, tenant-scoped assessment and assignment foundation — the source
+data for M15. `App\Models\AssessmentCategory` (school-configured, editable —
+seeded Classwork / Homework / Test / Examination), `App\Models\Assessment`
+(academic context fixed at creation; `status` draft → published → locked, not
+mass-assignable; optional `assignment_id` link) + `App\Models\AssessmentScore`
+(nullable `decimal(6,2)` score, `0..max_score` / 2 dp, never deleted),
+`App\Models\Assignment` (`due_on >= assigned_on`, `teacher_id` owner, no scores;
+draft → published → closed) + `App\Models\AssignmentSubmission` (completion only —
+`pending` / `submitted` / `late` / `exempt`). Migrations
+`2026_09_22_100000`–`100040`. Eligibility is the M9 enrolment date range
+(`App\Models\Concerns\HasClassRoster`); rosters snapshotted at creation, a draft
+assessment's roster re-syncable, publishing freezes it. Locking freezes scores;
+only `assessment.manage` unlocks. `App\Support\Assessment\AssessmentAuthorizer`
+scopes a teacher to their assigned `(level, subject)`. New `assessment.view` /
+`assessment.record` / `assessment.manage` permissions (Principal → all; Teacher →
+view + record; Staff → view). `Module::Assessments->isAvailable()` is `true`, on
+by default, depends on `module:academics` + `module:students` — **not**
+timetable / attendance / results / cbt. **No** final grades / percentages /
+averages / positions / GPA are stored. Full detail in
+`docs/assessment-management.md`.
+
+Deferred: results & report cards, grading schemes, subject/term/session
+averages, positions & ranking, GPA, promotion & graduation, CBT, portal
+assessment views, assignment file attachments & online submission, automated
+grading / plagiarism, assessment weighting, notifications, a full audit-trail /
+retention workflow.
+
+## Milestone 15+ — Domain Modules
+
+Results & Report Cards · Fees / Invoices / Payments (Paystack) ·
 CBT · Role-specific portals & dashboards · Notifications · Reporting · Promotion.
 
 Each domain module checks its `App\Enums\Module` flag (`module:` middleware /

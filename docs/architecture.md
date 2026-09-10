@@ -1,6 +1,6 @@
 # Architecture
 
-Status: Milestone 13 (Attendance Management) complete. This describes the intended
+Status: Milestone 14 (Assessment & Assignments) complete. This describes the intended
 shape of the system and what exists today.
 
 ## 1. High-level model
@@ -325,13 +325,62 @@ trail.
   save & submit), and a register detail with summary counts and a
   reopen-for-correction control.
 
+## 2l. Assessment & assignments (implemented — Milestone 14)
+
+Full reference: **`docs/assessment-management.md`**. A configurable,
+tenant-scoped assessment and assignment foundation — the source data for M15
+Results & Report Cards. No final grades, report cards, averages, positions/GPA,
+promotion, CBT, portal views, or a full audit trail.
+
+- **`App\Models\AssessmentCategory`** — school-configured category (Classwork /
+  Test / Exam / …), unique per school, editable; seeded examples only. Managed
+  under `assessment.manage`.
+- **`App\Models\Assessment`** — school-owned. Academic context (session +
+  period + level + arm + subject) **fixed at creation**. `status`
+  (`draft` / `published` / `locked`), `published_at` / `locked_*` / `created_by`
+  **not** mass-assignable. Optional `assignment_id` link (records the relation,
+  computes nothing). `eligibleStudents()` + `summary()`.
+- **`App\Models\AssessmentScore`** — school-owned *and* assessment-scoped.
+  Nullable `score` (`decimal(6,2)`, null = not entered), `comment`,
+  `recorded_at` / `recorded_by`. Never deleted. **No** grade / percentage / rank
+  stored anywhere — that is M15's to derive.
+- **`App\Models\Assignment`** — school-owned; same context rules plus `due_on >=
+  assigned_on`, both in the session. `teacher_id` owner, `created_by`, optional
+  `max_score`. Carries **no scores** — tracks completion via
+  `App\Models\AssignmentSubmission` (`pending` / `submitted` / `late` /
+  `exempt`). No file upload, no student-facing submission flow.
+- **Eligibility** — a student is on a roster iff they hold an M9 `Enrollment`
+  for the exact session/level/arm whose `[started_on, ended_on]` range contains
+  the assessment / assigned-on date (shared `App\Models\Concerns\HasClassRoster`;
+  same historical rule as M13). Rosters are snapshotted at creation (one bulk
+  `insert`); a draft assessment's roster can be re-synced with current enrolment,
+  publishing freezes it.
+- **Lifecycle** — `draft` (structure + scores editable) → `published`
+  (scores only, roster frozen) → `locked` (nothing, until an `assessment.manage`
+  holder `unlock()`s it). An assessment with recorded scores, and any locked one,
+  cannot be deleted. Assignments: `draft` → `published` → `closed`, with
+  `unpublish` / `reopen`.
+- **`App\Support\Assessment\AssessmentAuthorizer`** — `assessment.manage` → any
+  class + subject; `assessment.record` only → a `(level, subject)` the teacher
+  holds an active M11 `TeacherAssignment` for. Assignments *scope* teachers, not
+  a dependency (a Staff-off school records through `assessment.manage` holders).
+- **`App\Http\Controllers\Assessment\*`** (5 controllers), `/assessments/*`
+  routes behind `['tenant', 'module:assessments']`, gated
+  `assessment.view` / `assessment.record` / `assessment.manage` (new M4
+  permissions). `Module::Assessments->isAvailable()` is now `true` (**on by
+  default**); it **depends on `Module::Academics` and `Module::Students`** — not
+  Timetable / Attendance / Results / CBT. `assessment.manage` added to Principal.
+- List screens (filters + pagination), Alpine-cascade create forms, draft-only
+  edit forms, detail with lifecycle controls, mobile-first bulk score /
+  completion sheets, and inline category CRUD.
+
 ### Deferred
 
 - Queue jobs capture/restore the tenant id (no jobs exist yet — see
   `docs/tenancy.md` §7).
 - Invitations / brand-new-account onboarding, school suspension / subscription,
   notification & payment config, the remaining domain modules behind the M7
-  catalogue (results, fees, CBT, portals, promotion workflow, bulk
+  catalogue (results & report cards, fees, CBT, portals, promotion workflow, bulk
   import), a rooms/facilities module + timetable templates, the Parent Portal
   (guardian sign-in) and Teacher Portal (teacher sign-in), non-teaching staff
   records, admin UI for `status` / `is_platform_admin`, subdomain routing.
@@ -434,3 +483,9 @@ pre-auth screens.
 | 2026-09-21 | One `AttendanceStatus` enum (`present`/`absent`/`late`/`excused`); a record's `status` is **nullable** (unmarked) and a register can't be submitted while any is unmarked | a single status column beats a spread of `is_present` booleans; the unmarked state + submit guard is the safe operational default — an absent child is never silently recorded present |
 | 2026-09-21 | Eligibility is the enrollment date-range (`[started_on, ended_on]` contains the register date), not current status; the roster is snapshotted at creation | historical registers stay correct when a student later withdraws / changes arm / graduates; the register records who was in the class *that day* |
 | 2026-09-21 | Locked registers are corrected by an `attendance.manage` `reopen()`, not an approval workflow or an audit-log system | the spec forbids a full audit trail here; `recorded_by`/`submitted_by` timestamps preserve the structure a later audit feature needs without building it now |
+| 2026-09-22 | Assessment categories are a per-school `AssessmentCategory` table, not a hard-coded enum | "CA / Test / Exam" differ by school and country; a table lets each school name, order and retire its own; uniqueness stays school-scoped |
+| 2026-09-22 | `Assessment` context (session/period/level/arm/subject) is fixed at creation; only title/category/max-score/instructions edit on a draft | mirrors the timetable's fixed session — a moved assessment would orphan its snapshotted roster and its eligibility basis; recreate instead |
+| 2026-09-22 | Scores are `decimal(6,2)`, **nullable**, bounded `0..max_score` in the Form Request (max lives on the parent); **no** grade / % / average / rank / GPA column anywhere | M14 stores source data only; M15 computes results from it without a schema change; a DB CHECK against a parent column isn't portable |
+| 2026-09-22 | Assessment lifecycle `draft → published → locked`; `unlock` is `assessment.manage` only | draft = still configuring, published = definition settled + scores flowing, locked = finalized; an authorized unlock (not an approval workflow) is the controlled correction path |
+| 2026-09-22 | `Assignment` is separate from `Assessment` — it carries no score, tracks completion via `AssignmentSubmission`, and only *optionally* links to an assessment (`assessments.assignment_id`) | an assignment is set work; grading it is a distinct act; keeping them separate lets M15 decide if/how an assignment contributes to a result without reworking M14 |
+| 2026-09-22 | Assignment file attachments deferred — no `attachment_path` in M14 | the only file handling today is the M6 private-disk logo; safe uploads need a private disk + gated per-file download route + retention, which is its own piece of work |

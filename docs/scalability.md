@@ -31,6 +31,14 @@ below, not a rewrite.
   counts come from `withCount` sub-queries on the list and from the already
   loaded collection on the detail screen. Regression tests assert bounded query
   counts for a full-class taking screen, the register list and a bulk save.
+- Assessments (M14) follow the same pattern: score / completion rosters are one
+  bulk `insert` at creation; the bulk score / completion sheets load the roster
+  and its existing rows in a fixed number of queries (`keyBy` student id) and
+  write only changed rows; list totals are `withCount` sub-queries; the score
+  summary is computed from the loaded collection. Regression tests bound the
+  query count for a 40-student score sheet, the assessment / assignment lists and
+  a 40-student bulk save. A class of 100+ costs one snapshot insert, one roster
+  read and at most one write per changed student.
 
 ### Caching
 - Cache expensive, read-mostly, tenant-scoped computations with a

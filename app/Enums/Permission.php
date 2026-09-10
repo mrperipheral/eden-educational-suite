@@ -53,6 +53,11 @@ enum Permission: string
     case AttendanceRecord = 'attendance.record';
     case AttendanceManage = 'attendance.manage';
 
+    // ---- Assessments & assignments (enforced: Assessment & Assignments M14) ----
+    case AssessmentView = 'assessment.view';
+    case AssessmentRecord = 'assessment.record';
+    case AssessmentManage = 'assessment.manage';
+
     // ---- Declared for later domain milestones (coarse; not yet enforced) -----
     case ResultView = 'result.view';
     case ResultEnter = 'result.enter';

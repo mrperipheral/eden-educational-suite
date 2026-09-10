@@ -1,15 +1,17 @@
 # Database Design
 
-Status: Milestone 13. Tenant + roles + onboarding + school settings + module
+Status: Milestone 14. Tenant + roles + onboarding + school settings + module
 activation + academic foundation + student management + guardian management +
-teacher management + timetable management + attendance management. School-owned
-tables: `school_settings` (M6), `school_modules` (M7), the academic structure —
-`academic_sessions`, `academic_periods`, `academic_levels`, `level_arms`,
-`subjects`, `level_subject` (M8) — `students` + `enrollments` (M9), `guardians` +
-`guardian_student` (M10), `teachers` + `teacher_assignments` (M11),
-`timetables` + `timetable_entries` (M12), and `attendance_registers` +
-`attendance_records` (M13). No results / fees tables yet. This document records
-the conventions every future migration follows.
+teacher management + timetable management + attendance management + assessment &
+assignments. School-owned tables: `school_settings` (M6), `school_modules` (M7),
+the academic structure — `academic_sessions`, `academic_periods`,
+`academic_levels`, `level_arms`, `subjects`, `level_subject` (M8) — `students` +
+`enrollments` (M9), `guardians` + `guardian_student` (M10), `teachers` +
+`teacher_assignments` (M11), `timetables` + `timetable_entries` (M12),
+`attendance_registers` + `attendance_records` (M13), and `assessment_categories`,
+`assignments`, `assessments`, `assessment_scores`, `assignment_submissions`
+(M14). No results / fees tables yet. This document records the conventions every
+future migration follows.
 
 ## Current schema
 
@@ -35,6 +37,11 @@ the conventions every future migration follows.
 | `timetable_entries` | one scheduled lesson. School-owned **+** `timetable_id`. FKs level / arm / subject / teacher (all required — scheduled per class). `weekday`, `start_time`/`end_time` (`HH:MM` strings, half-open), optional text `room`. Overlap indexes on `(school_id, timetable_id, {weekday|teacher|arm|room}, …)`. |
 | `attendance_registers` | one class's attendance for one day. School-owned. FKs session (req) / period (opt) / level (req) / arm (req); `attendance_date`; `status` (`draft`/`submitted`, not mass-assignable), `submitted_at`, `submitted_by`. `unique(school_id, level_arm_id, attendance_date)`, `index(school_id, attendance_date)`, `index(school_id, session, period)`, `index(school_id, status)`. Not tied to the timetable. |
 | `attendance_records` | one student's mark on a register. School-owned **+** `attendance_register_id`. `student_id` FK; `status` (nullable — null = unmarked; `present`/`absent`/`late`/`excused`), text `note`, `recorded_at`, `recorded_by`. `unique(attendance_register_id, student_id)`, `index(school_id, student_id)`, `index(school_id, attendance_register_id, status)`. Never hard-deleted for historical reasons. |
+| `assessment_categories` | school-configured category ("Classwork", "Test", …). School-owned. `unique(school_id, name)`, `unique(school_id, code)`, `index(school_id, is_active, position)`. Deactivated, not deleted. |
+| `assessments` | a gradeable assessment for one class + subject. School-owned. FKs session / period / level / arm / subject / category (all required), optional `assignment_id`. `title`, `assessment_date`, `max_score` (`decimal(6,2)`), `instructions`, `status` (`draft`/`published`/`locked`, not mass-assignable), `published_at`, `locked_at`, `locked_by`, `created_by`. Indexes `(school_id, session, period)`, `(school_id, level, arm)`, `(school_id, subject_id)`, `(school_id, category)`, `(school_id, status)`, `(school_id, assessment_date)`. **No** global uniqueness — many assessments of a category on different dates are valid. No derived grade / percentage / rank columns. |
+| `assessment_scores` | one student's score in an assessment. School-owned **+** `assessment_id`. `student_id` FK; `score` (`decimal(6,2)`, nullable — null = not entered), `comment`, `recorded_at`, `recorded_by`. `unique(assessment_id, student_id)`, `index(school_id, student_id)`, `index(school_id, assessment_id)`. Bounds (`0..max_score`, 2 dp) enforced in the Form Request. Never hard-deleted. |
+| `assignments` | a piece of set work for a class + subject. School-owned. FKs session / period / level / arm / subject (all required), optional `teacher_id` (owner, `nullOnDelete`). `title`, `instructions`, `assigned_on`, `due_on`, optional `max_score`, `status` (`draft`/`published`/`closed`, not mass-assignable), `published_at`, `created_by`. Indexes `(school_id, session, period)`, `(school_id, level, arm)`, `(school_id, subject_id)`, `(school_id, teacher_id)`, `(school_id, status)`, `(school_id, due_on)`. Holds no scores. |
+| `assignment_submissions` | whether one student turned an assignment in. School-owned **+** `assignment_id`. `student_id` FK; `status` (`pending`/`submitted`/`late`/`exempt`, default `pending`), `submitted_on`, `remark`, `recorded_at`, `recorded_by`. `unique(assignment_id, student_id)`, `index(school_id, student_id)`, `index(school_id, assignment_id, status)`. Completion only — no score column. Never hard-deleted. |
 | `school_modules` | per-school feature-module on/off overrides. School-owned. `unique(school_id, module)`. Override-only — a row exists only where a school departs from the `App\Enums\Module` default. |
 | `password_reset_tokens`, `sessions` | auth/session plumbing |
 | `cache`, `cache_locks` | `CACHE_STORE=database` |
@@ -220,6 +227,54 @@ Two migrations, both school-owned (`BelongsToSchool`). See `docs/attendance-mana
   `AttendanceRegister::eligibleStudents()`, not by a DB constraint. Records are
   never hard-deleted — historical attendance survives a student leaving.
 
+### `2026_09_22_100000_*` — Assessment & Assignments (Milestone 14)
+Five migrations, all school-owned (`BelongsToSchool`). See `docs/assessment-management.md`.
+
+- **`assessment_categories`** — `name`, `code` (`string(20)`, nullable,
+  upper-cased), `description`, `position` (`unsignedSmallInteger`), `is_active`.
+  `unique(school_id, name)`, `unique(school_id, code)`,
+  `index(school_id, is_active, position)`.
+- **`assignments`** — created **before** `assessments` so the optional
+  `assessments.assignment_id` FK resolves. Context FKs session / period / level /
+  arm / subject (cascade, all required), `teacher_id` FK (`nullOnDelete`,
+  nullable — owner), `title`, `instructions` (`text`), `assigned_on` / `due_on`
+  (`date`), `max_score` (`decimal(6,2)`, nullable), `status`
+  (`App\Enums\AssignmentStatus`, default `draft`, **not** mass-assignable),
+  `published_at`, `created_by` FK to `users` (`nullOnDelete`). Indexes lead with
+  `school_id` (scope / class / subject / teacher / status / due_on). No score
+  column.
+- **`assessments`** — context FKs session / period / level / arm / subject /
+  `assessment_category_id` (cascade, all required), `assignment_id` FK
+  (`nullOnDelete`, optional), `title`, `assessment_date` (`date`), `max_score`
+  (`decimal(6,2)`, **required**), `instructions` (`text`), `status`
+  (`App\Enums\AssessmentStatus`, default `draft`, **not** mass-assignable),
+  `published_at` / `locked_at` / `locked_by` / `created_by` (all **not**
+  mass-assignable). Indexes `(school_id, session, period)`, `(school_id, level,
+  arm)`, `(school_id, subject_id)`, `(school_id, category)`, `(school_id,
+  status)`, `(school_id, assessment_date)`. **No** unique constraint — repeated
+  assessments of the same category on different dates are legitimate. **No**
+  `final_grade` / `percentage` / `subject_average` / `position` / `gpa` — M15
+  derives those.
+- **`assessment_scores`** — `assessment_id` FK (cascade), `student_id` FK
+  (cascade), `score` (`decimal(6,2)`, **nullable** — null = not entered),
+  `comment` (`string(500)`), `recorded_at`, `recorded_by` FK (`nullOnDelete`).
+  `unique(assessment_id, student_id)`, `index(school_id, student_id)`,
+  `index(school_id, assessment_id)`. Score bounds (`0..assessments.max_score`,
+  2 dp) enforced in `ScoreRequest`, not by a DB constraint (the maximum lives on
+  the parent). Never hard-deleted.
+- **`assignment_submissions`** — `assignment_id` FK (cascade), `student_id` FK
+  (cascade), `status` (`string(15)`, `App\Enums\AssignmentSubmissionStatus`,
+  default `pending`), `submitted_on` (`date`, nullable), `remark` (`string(500)`),
+  `recorded_at`, `recorded_by` FK (`nullOnDelete`).
+  `unique(assignment_id, student_id)`, `index(school_id, student_id)`,
+  `index(school_id, assignment_id, status)`. Completion only — no score column.
+  Never hard-deleted.
+
+The eligibility rule for both roster snapshots (an active `enrollments` row for
+the exact session/level/arm whose date range contains the assessment /
+assigned-on date) lives in `App\Models\Concerns\HasClassRoster`, not a DB
+constraint.
+
 ### `2026_09_15_100000_create_school_modules_table`
 Milestone 7 — per-school feature/module activation. `module` (`string(40)`, an
 `App\Enums\Module` value, **not** cast so an unknown id can't break a page),
@@ -279,7 +334,7 @@ written only via `App\Support\Modules\SchoolModules`. See `docs/module-activatio
 ## Not yet designed (later milestones, will be added here)
 
 `school_user.is_default`, holiday / calendar events, non-teaching staff, class
-rosters, assessments/results, fees/invoices/payments, CBT, rooms/facilities,
-audit log. Each gets an entry here when built.
+rosters, results / report cards / grading schemes, fees/invoices/payments, CBT,
+rooms/facilities, audit log. Each gets an entry here when built.
 
 Permissions and roles are **not** in the database — they are code (`App\Enums`).

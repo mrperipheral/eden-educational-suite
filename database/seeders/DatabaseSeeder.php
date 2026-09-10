@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Enums\AssignmentSubmissionStatus;
 use App\Enums\AttendanceStatus;
 use App\Enums\EnrollmentStatus;
 use App\Enums\GuardianRelationship;
@@ -11,6 +12,9 @@ use App\Enums\StudentStatus;
 use App\Enums\TeacherStatus;
 use App\Models\AcademicLevel;
 use App\Models\AcademicSession;
+use App\Models\Assessment;
+use App\Models\AssessmentCategory;
+use App\Models\Assignment;
 use App\Models\AttendanceRegister;
 use App\Models\Guardian;
 use App\Models\School;
@@ -308,6 +312,122 @@ class DatabaseSeeder extends Seeder
             'attendance_date' => '2025-09-17',
         ]);
         $draft->eligibleStudents()->get()->each(fn (Student $student) => $draft->records()->create([
+            'student_id' => $student->id,
+        ]));
+
+        // Assessments & assignments — configurable categories, a spread of
+        // assessments for Primary 1 Gold / Mathematics (one draft, one published,
+        // one locked) with mixed entered/unentered scores, plus assignments.
+        $categories = collect([
+            ['Classwork', 'CW', 1], ['Homework', 'HW', 2], ['Test', 'TEST', 3], ['Examination', 'EXAM', 4],
+        ])->map(fn ($c) => AssessmentCategory::create([
+            'name' => $c[0], 'code' => $c[1], 'position' => $c[2],
+        ]));
+
+        $maths = $subjects->firstWhere('code', 'MTH');
+        $mathsContext = [
+            'academic_session_id' => $session->id,
+            'academic_period_id' => $firstTerm?->id,
+            'academic_level_id' => $p1->id,
+            'level_arm_id' => $p1Gold->id,
+            'subject_id' => $maths->id,
+        ];
+
+        $lockedAssessment = Assessment::create([
+            ...$mathsContext,
+            'assessment_category_id' => $categories[0]->id,
+            'title' => 'Week 2 Classwork — Counting',
+            'assessment_date' => '2025-09-19',
+            'max_score' => 10,
+        ]);
+        $lockedAssessment->created_by = $admin->id;
+        $lockedAssessment->save();
+        $lockedAssessment->eligibleStudents()->get()->each(function (Student $student, int $i) use ($lockedAssessment) {
+            $lockedAssessment->scores()->create([
+                'student_id' => $student->id,
+                'score' => [8, 6, 9, 7, 10, 5][$i % 6],
+            ]);
+        });
+        $lockedAssessment->publish();
+        $lockedAssessment->lock($admin);
+
+        $publishedAssessment = Assessment::create([
+            ...$mathsContext,
+            'assessment_category_id' => $categories[2]->id,
+            'title' => 'First Term Test — Numbers',
+            'assessment_date' => '2025-10-24',
+            'max_score' => 20,
+            'instructions' => 'Sections A and B. Show your working.',
+        ]);
+        $publishedAssessment->created_by = $admin->id;
+        $publishedAssessment->save();
+        $publishedAssessment->eligibleStudents()->get()->each(function (Student $student, int $i) use ($publishedAssessment) {
+            // Roughly half the class scored so far.
+            if ($i % 2 === 0) {
+                $publishedAssessment->scores()->create(['student_id' => $student->id, 'score' => [15, 18, 12, 9][$i % 4]]);
+            } else {
+                $publishedAssessment->scores()->create(['student_id' => $student->id]);
+            }
+        });
+        $publishedAssessment->publish();
+
+        $draftAssessment = Assessment::create([
+            ...$mathsContext,
+            'assessment_category_id' => $categories[1]->id,
+            'title' => 'Homework — Shapes',
+            'assessment_date' => '2025-11-07',
+            'max_score' => 5,
+        ]);
+        $draftAssessment->created_by = $admin->id;
+        $draftAssessment->save();
+        $draftAssessment->eligibleStudents()->get()->each(fn (Student $student) => $draftAssessment->scores()->create([
+            'student_id' => $student->id,
+        ]));
+
+        // A published assignment with mixed completion, and a draft one.
+        $publishedAssignment = Assignment::create([
+            'academic_session_id' => $session->id,
+            'academic_period_id' => $firstTerm?->id,
+            'academic_level_id' => $p1->id,
+            'level_arm_id' => $p1Gold->id,
+            'subject_id' => $maths->id,
+            'title' => 'Fractions worksheet',
+            'instructions' => 'Complete questions 1–10 in the workbook.',
+            'assigned_on' => '2025-09-22',
+            'due_on' => '2025-09-26',
+            'max_score' => 10,
+        ]);
+        $publishedAssignment->created_by = $admin->id;
+        $publishedAssignment->teacher_id = $tomiwaTeacher->id;
+        $publishedAssignment->save();
+        $submissionStatuses = [
+            AssignmentSubmissionStatus::Submitted, AssignmentSubmissionStatus::Submitted,
+            AssignmentSubmissionStatus::Late, AssignmentSubmissionStatus::Pending, AssignmentSubmissionStatus::Exempt,
+        ];
+        $publishedAssignment->eligibleStudents()->get()->each(function (Student $student, int $i) use ($publishedAssignment, $submissionStatuses) {
+            $status = $submissionStatuses[$i % count($submissionStatuses)];
+            $publishedAssignment->submissions()->create([
+                'student_id' => $student->id,
+                'status' => $status->value,
+                'submitted_on' => $status->isTurnedIn() ? '2025-09-25' : null,
+            ]);
+        });
+        $publishedAssignment->publish();
+
+        $draftAssignment = Assignment::create([
+            'academic_session_id' => $session->id,
+            'academic_period_id' => $firstTerm?->id,
+            'academic_level_id' => $p1->id,
+            'level_arm_id' => $p1Gold->id,
+            'subject_id' => $maths->id,
+            'title' => 'Reading log — Week 6',
+            'assigned_on' => '2025-10-06',
+            'due_on' => '2025-10-10',
+        ]);
+        $draftAssignment->created_by = $admin->id;
+        $draftAssignment->teacher_id = $tomiwaTeacher->id;
+        $draftAssignment->save();
+        $draftAssignment->eligibleStudents()->get()->each(fn (Student $student) => $draftAssignment->submissions()->create([
             'student_id' => $student->id,
         ]));
 

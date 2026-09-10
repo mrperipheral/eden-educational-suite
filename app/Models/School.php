@@ -122,6 +122,30 @@ class School extends Model
     }
 
     /**
+     * @return HasMany<AssessmentCategory, $this>
+     */
+    public function assessmentCategories(): HasMany
+    {
+        return $this->hasMany(AssessmentCategory::class);
+    }
+
+    /**
+     * @return HasMany<Assessment, $this>
+     */
+    public function assessments(): HasMany
+    {
+        return $this->hasMany(Assessment::class);
+    }
+
+    /**
+     * @return HasMany<Assignment, $this>
+     */
+    public function assignments(): HasMany
+    {
+        return $this->hasMany(Assignment::class);
+    }
+
+    /**
      * @return HasMany<Timetable, $this>
      */
     public function timetables(): HasMany

@@ -25,7 +25,7 @@ The full development guide is **[CLAUDE.md](CLAUDE.md)** and the documents under
   (`app/Http/Controllers/Platform/`) is platform-admin only and not
   tenant-scoped; school-owned data is created/edited only inside a tenant context.
 - **Scope discipline:** work the current milestone only. `PROJECT_STATUS.md` and
-  `docs/roadmap.md` say where we are. Milestones 1–13 (Platform Foundation,
+  `docs/roadmap.md` say where we are. Milestones 1–14 (Platform Foundation,
   Authentication, Multi-School Tenant Isolation, Roles & Permissions, School
   Onboarding, School Settings — `docs/school-settings.md`, Feature / Module
   Activation — `docs/module-activation.md`, Academic Foundation —
@@ -34,7 +34,8 @@ The full development guide is **[CLAUDE.md](CLAUDE.md)** and the documents under
   `docs/guardian-management.md`, Teacher Management —
   `docs/teacher-management.md`, Timetable Management —
   `docs/timetable-management.md`, Attendance Management —
-  `docs/attendance-management.md`) are done.
+  `docs/attendance-management.md`, Assessment & Assignments —
+  `docs/assessment-management.md`) are done.
 - **Module activation ≠ authorization:** a domain route checks both its
   `App\Enums\Module` flag (`module:` middleware / `@module`) and its permission;
   enabling a module grants nothing.

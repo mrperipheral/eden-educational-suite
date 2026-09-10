@@ -58,14 +58,16 @@ activation system changes.
 
 - **`isAvailable()`** — whether the functionality behind the module is actually
   built. Each domain milestone flips its own module to `true` when it ships
-  something usable; the admin screen badges the rest **Planned**. As of **M13**:
+  something usable; the admin screen badges the rest **Planned**. As of **M14**:
   `academics` (`docs/academic-foundation.md`), `students`
   (`docs/student-management.md`), `guardians` (`docs/guardian-management.md`),
   `staff` (`docs/teacher-management.md`), `timetable`
-  (`docs/timetable-management.md`) and `attendance`
-  (`docs/attendance-management.md`); everything else is still Planned. `timetable`
+  (`docs/timetable-management.md`), `attendance`
+  (`docs/attendance-management.md`) and `assessments`
+  (`docs/assessment-management.md`); everything else is still Planned. `timetable`
   is available but stays **off by default** — a specialised opt-in; `attendance`
-  is **on by default** and does **not** depend on `timetable`.
+  and `assessments` are **on by default**. `assessments` depends on `academics` +
+  `students` only — not `timetable` / `attendance` / `results` / `cbt`.
 - **Defaults** lean toward a private nursery/primary/secondary school: core
   management on, specialised tools (timetable, learning materials, CBT) off. A
   freshly onboarded school writes **zero** rows — every module simply uses its
@@ -149,15 +151,16 @@ Route::middleware(['tenant', 'module:academics'])->group(function () {
 - **`->can('academics.view')`** — may *this user* do it? (M4, unchanged.)
 
 M8's Academic Foundation, M9's Student Management, M10's Guardian Management,
-M11's Teacher Management, M12's Timetable Management and M13's Attendance
-Management are the real consumers of this seam — see `docs/academic-foundation.md`
-§6, `docs/student-management.md` §6, `docs/guardian-management.md` §6,
-`docs/teacher-management.md` §6, `docs/timetable-management.md` §7 and
-`docs/attendance-management.md` §8. `module:guardians` depends on
+M11's Teacher Management, M12's Timetable Management, M13's Attendance Management
+and M14's Assessment & Assignments are the real consumers of this seam — see
+`docs/academic-foundation.md` §6, `docs/student-management.md` §6,
+`docs/guardian-management.md` §6, `docs/teacher-management.md` §6,
+`docs/timetable-management.md` §7, `docs/attendance-management.md` §8 and
+`docs/assessment-management.md` §9. `module:guardians` depends on
 `module:students`; `module:students` and `module:staff` depend on
 `module:academics`; `module:timetable` depends on both `module:academics` and
-`module:staff`; `module:attendance` depends on `module:academics` and
-`module:students` — **not** `module:timetable`.
+`module:staff`; `module:attendance` and `module:assessments` depend on
+`module:academics` and `module:students` — **not** `module:timetable`.
 
 `@module('attendance') … @endmodule` is the Blade equivalent for nav/dashboards.
 
