@@ -1,6 +1,6 @@
 # Architecture
 
-Status: Milestone 8 (Academic Foundation) complete. This describes the intended
+Status: Milestone 9 (Student Management) complete. This describes the intended
 shape of the system and what exists today.
 
 ## 1. High-level model
@@ -169,14 +169,40 @@ modules will build on. Structure only — no people, no timetable, no marks.
   (M4 permissions, previously dormant — now enforced). Academic sessions moved
   here from `settings/academic-sessions` (M5).
 
+## 2g. Student management (implemented — Milestone 9)
+
+Full reference: **`docs/student-management.md`**. The student record + enrollment
+history the Guardian / Attendance / Assessment / Results / Fees / Promotion /
+Portal modules will hang off. Records only — no people beyond students, no
+placement workflow.
+
+- **`App\Models\Student`** — school-owned. Minimal PII (name, DOB, optional
+  gender, admission details, contact/address, notes). `status`
+  (`App\Enums\StudentStatus`: active / inactive / withdrawn / graduated) is not
+  mass-assignable — changed via a dedicated endpoint. Never hard-deleted.
+- **`App\Models\Enrollment`** — school-owned *and* scoped to its student. Points
+  at an `AcademicSession` (+ optional `AcademicPeriod`), `AcademicLevel` (+
+  optional `LevelArm`). One `active` enrollment per student = the current class
+  (`Enrollment::makeActive()`, the M8 `makeCurrent()` pattern — **not** a
+  promotion workflow). History is preserved: placements are closed, never
+  deleted.
+- **`App\Http\Controllers\Student\*`**, `/students/*` routes behind
+  `['tenant', 'module:students']`, gated `student.view` / `student.manage` (M4
+  permissions, previously dormant — now enforced). `Module::Students` now
+  **depends on `Module::Academics`**.
+- Level ↔ arm and session ↔ period consistency, and cross-school ids, are
+  rejected in the Form Request with generic messages (no leak); the enrollment
+  Form Request `abort(404)`s on a cross-school route parent.
+
 ### Deferred
 
 - Queue jobs capture/restore the tenant id (no jobs exist yet — see
   `docs/tenancy.md` §7).
 - Invitations / brand-new-account onboarding, school suspension / subscription,
   notification & payment config, the remaining domain modules behind the M7
-  catalogue (students, staff, timetable, attendance, results, fees, CBT,
-  portals), admin UI for `status` / `is_platform_admin`, subdomain routing.
+  catalogue (guardians, staff, timetable, attendance, results, fees, CBT,
+  portals, promotion workflow, bulk student import), admin UI for `status` /
+  `is_platform_admin`, subdomain routing.
 
 ## 3. Application layers & conventions
 
@@ -260,3 +286,6 @@ pre-auth screens.
 | 2026-09-10 | Module activation is orthogonal to authorization — `module:` middleware + `->can()` are both required on a domain route | turning a feature on must never grant a permission; M4 stays the sole authority on "may this user…" |
 | 2026-09-16 | Academic sessions moved from `school.settings.*` to `academics.*` + `module:academics`; `AcademicPeriod` / `LevelArm` are `BelongsToSchool` in their own right | sessions/periods/levels/subjects are one structure under one permission; child models stay tenant-safe without the parent in the join (see `docs/academic-foundation.md`) |
 | 2026-09-16 | No hard delete for academic entities — only `is_active` | preserves referential integrity for the modules built on top; deletion / archival is a later concern |
+| 2026-09-17 | Current class is the one `active` `Enrollment`, never a column on `students` | history is first-class; "where now" and "where before" are one model; promotion later just adds rows (see `docs/student-management.md`) |
+| 2026-09-17 | Two status enums (`StudentStatus` vs `EnrollmentStatus`); student `status` not mass-assignable | student↔school vs one-placement are distinct; lifecycle changes get one dedicated, auditable seam |
+| 2026-09-17 | `Module::Students` depends on `Module::Academics` | enrollment is meaningless without sessions/levels — a minimal, correct extension of the M7 catalogue |

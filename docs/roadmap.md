@@ -111,12 +111,28 @@ assignment, timetable, attendance, assessments, results, grading, promotion,
 CBT, per-subject assessment metadata, bulk import / year cloning, hard delete /
 archival.
 
-## Milestone 9+ — Domain Modules
+## ✅ Milestone 9 — Student Management (complete, 2026-09-17)
 
-Students & Guardians · Staff · Enrolment & class membership · Teacher assignment
-· Timetable · Attendance · Assessments & Results · Fees / Invoices / Payments
-(Paystack) · CBT · Role-specific portals & dashboards · Notifications ·
-Reporting.
+The tenant-scoped student record + enrollment-history foundation. `App\Models\Student`
+(minimal PII; `StudentStatus` active/inactive/withdrawn/graduated; never hard-deleted)
++ `App\Models\Enrollment` (school-owned + student-scoped; points at session /
+optional period / level / optional arm; one `active` = the current class via
+`Enrollment::makeActive()` — not a promotion workflow). `/students/*` gated
+`student.view` / `student.manage` (M4 permissions, previously dormant) **and**
+`module:students` — which now depends on `module:academics`.
+`Module::Students->isAvailable()` is now `true`. Full detail in
+`docs/student-management.md`.
+
+Deferred: guardians / parents (linkage + screens), teacher assignment, class
+rosters, attendance, assessments, results, fees, **promotion / graduation
+workflow**, bulk student import, student ID / photo / documents, medical info,
+transfer records, student portal.
+
+## Milestone 10+ — Domain Modules
+
+Guardians · Staff · Class rosters & teacher assignment · Timetable · Attendance ·
+Assessments & Results · Fees / Invoices / Payments (Paystack) · CBT ·
+Role-specific portals & dashboards · Notifications · Reporting · Promotion.
 
 Each domain module checks its `App\Enums\Module` flag (`module:` middleware /
 `@module`) **and** its M4 permissions — the two stay orthogonal.

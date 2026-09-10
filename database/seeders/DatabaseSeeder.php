@@ -2,12 +2,15 @@
 
 namespace Database\Seeders;
 
+use App\Enums\EnrollmentStatus;
 use App\Enums\Module;
 use App\Enums\Role;
+use App\Enums\StudentStatus;
 use App\Models\AcademicLevel;
 use App\Models\AcademicSession;
 use App\Models\School;
 use App\Models\SchoolModule;
+use App\Models\Student;
 use App\Models\Subject;
 use App\Models\User;
 use App\Support\Tenancy\TenantContext;
@@ -107,6 +110,7 @@ class DatabaseSeeder extends Seeder
             'name' => $name, 'code' => $code, 'position' => 0,
         ]));
 
+        $levels = collect();
         foreach ([
             ['Primary 1', 'PRI1', 1], ['Primary 2', 'PRI2', 2], ['Primary 3', 'PRI3', 3],
             ['JSS 1', 'JSS1', 4], ['JSS 2', 'JSS2', 5],
@@ -119,7 +123,34 @@ class DatabaseSeeder extends Seeder
             $level->subjects()->sync(
                 $subjects->pluck('id')->mapWithKeys(fn ($id) => [$id => ['school_id' => $alpha->id]])->all()
             );
+
+            $levels->push($level->load('arms'));
         }
+
+        // A cohort of students for Alpha, each placed in the current session.
+        Student::factory()->count(18)->create()->each(function (Student $student, int $i) use ($levels, $session) {
+            $level = $levels[$i % $levels->count()];
+            $arm = $level->arms[$i % 2];
+
+            $student->enrollments()->create([
+                'academic_session_id' => $session->id,
+                'academic_level_id' => $level->id,
+                'level_arm_id' => $arm->id,
+                'status' => EnrollmentStatus::Active->value,
+                'started_on' => '2025-09-15',
+            ]);
+        });
+
+        // One graduated student with a completed placement — history is kept.
+        $alumnus = Student::factory()->status(StudentStatus::Graduated)->create(['first_name' => 'Ada', 'last_name' => 'Obi']);
+        $alumnus->enrollments()->create([
+            'academic_session_id' => $session->id,
+            'academic_level_id' => $levels->last()->id,
+            'level_arm_id' => $levels->last()->arms->first()->id,
+            'status' => EnrollmentStatus::Completed->value,
+            'started_on' => '2024-09-15',
+            'ended_on' => '2025-07-24',
+        ]);
 
         $tenant->forget();
     }

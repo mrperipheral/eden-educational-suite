@@ -101,6 +101,7 @@ enum Module: string
     public function dependencies(): array
     {
         return match ($this) {
+            self::Students => [self::Academics],
             self::Guardians => [self::Students],
             self::Timetable => [self::Academics],
             self::Attendance => [self::Students],
@@ -123,11 +124,13 @@ enum Module: string
      *
      *   - `academics` — Academic Foundation (M8): sessions, periods, levels,
      *     arms, subjects (`docs/academic-foundation.md`).
+     *   - `students` — Student Management (M9): student records + enrollment
+     *     history (`docs/student-management.md`).
      */
     public function isAvailable(): bool
     {
         return match ($this) {
-            self::Academics => true,
+            self::Academics, self::Students => true,
             default => false,
         };
     }

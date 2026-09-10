@@ -14,6 +14,8 @@ use App\Http\Controllers\SchoolModuleController;
 use App\Http\Controllers\SchoolSettingsController;
 use App\Http\Controllers\Settings\PasswordController;
 use App\Http\Controllers\Settings\ProfileController;
+use App\Http\Controllers\Student\EnrollmentController;
+use App\Http\Controllers\Student\StudentController;
 use App\Models\School;
 use Illuminate\Support\Facades\Route;
 
@@ -172,6 +174,41 @@ Route::middleware(['auth', 'verified', 'active'])->group(function () {
                 ->whereNumber('subject')->can('academics.manage')->name('subjects.edit');
             Route::patch('subjects/{subject}', [SubjectController::class, 'update'])
                 ->whereNumber('subject')->can('academics.manage')->name('subjects.update');
+        });
+
+        /*
+        | Student management (see docs/student-management.md). Two gates:
+        |   module:students  — is the feature on for this school?
+        |   ->can('student.view' | 'student.manage')  — may this user?
+        | Tenant-owned ids resolved by tenant-scoped `findOrFail` in the
+        | controller (after `tenant`), so another school's id 404s.
+        */
+        Route::middleware('module:students')->prefix('students')->name('students.')->group(function () {
+            Route::get('/', [StudentController::class, 'index'])
+                ->can('student.view')->name('index');
+            Route::get('create', [StudentController::class, 'create'])
+                ->can('student.manage')->name('create');
+            Route::post('/', [StudentController::class, 'store'])
+                ->can('student.manage')->name('store');
+
+            // Enrollments — literal prefix so it never collides with {student}.
+            Route::get('{student}/enrollments/create', [EnrollmentController::class, 'create'])
+                ->whereNumber('student')->can('student.manage')->name('enrollments.create');
+            Route::post('{student}/enrollments', [EnrollmentController::class, 'store'])
+                ->whereNumber('student')->can('student.manage')->name('enrollments.store');
+            Route::get('enrollments/{enrollment}/edit', [EnrollmentController::class, 'edit'])
+                ->whereNumber('enrollment')->can('student.manage')->name('enrollments.edit');
+            Route::patch('enrollments/{enrollment}', [EnrollmentController::class, 'update'])
+                ->whereNumber('enrollment')->can('student.manage')->name('enrollments.update');
+
+            Route::get('{student}', [StudentController::class, 'show'])
+                ->whereNumber('student')->can('student.view')->name('show');
+            Route::get('{student}/edit', [StudentController::class, 'edit'])
+                ->whereNumber('student')->can('student.manage')->name('edit');
+            Route::patch('{student}', [StudentController::class, 'update'])
+                ->whereNumber('student')->can('student.manage')->name('update');
+            Route::patch('{student}/status', [StudentController::class, 'updateStatus'])
+                ->whereNumber('student')->can('student.manage')->name('status');
         });
     });
 });

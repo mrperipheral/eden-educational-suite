@@ -211,7 +211,9 @@ gate (Academics is on) but still can't manage config (no `academics.manage`).
 
 ## 9. Deferred
 
-- Students, guardians, staff, enrolment, class/arm membership.
+- Students (**done in M9** — `docs/student-management.md`: `enrollments` links a
+  student to a session / period / level / arm).
+- Guardians, staff, class/arm membership.
 - Teacher → subject / class assignment.
 - Timetable, attendance, assessments, results, grading scales, promotion, CBT.
 - Per-subject metadata for assessments (credit units, weighting, pass mark).

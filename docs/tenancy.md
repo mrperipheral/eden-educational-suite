@@ -96,18 +96,22 @@ request, so tampering with the stored value achieves nothing (proven by
 `EnforceTenantTest` / `CrossSchoolIsolationTest`).
 
 Applied in `routes/web.php` to the tenant-scoped group: `/dashboard`,
-`/members*`, `/settings/school*`, `/academic/*` (also behind `module:academics`).
-Account-level routes (`/settings/profile`, `/settings/password`, `/school`) and
-platform routes (`/admin/schools*`) do **not** use it.
+`/members*`, `/settings/school*`, `/academic/*` (also `module:academics`),
+`/students/*` (also `module:students`). Account-level routes
+(`/settings/profile`, `/settings/password`, `/school`) and platform routes
+(`/admin/schools*`) do **not** use it.
 
 ## 5. `BelongsToSchool` — writing a tenant-owned model
 
 The first real school-owned models ship with Milestone 5
 (`App\Models\SchoolSetting`, `App\Models\AcademicSession`); Milestone 7 adds
-`App\Models\SchoolModule`; Milestone 8 adds the academic structure
-(`AcademicPeriod`, `AcademicLevel`, `LevelArm`, `Subject` — the child models
-carry `school_id` *and* a parent FK so a query is tenant-safe without the parent
-in the join; see `docs/academic-foundation.md`). All follow the pattern:
+`App\Models\SchoolModule`; Milestone 8 the academic structure
+(`AcademicPeriod`, `AcademicLevel`, `LevelArm`, `Subject`); Milestone 9
+`App\Models\Student` and `App\Models\Enrollment`. Child models
+(`AcademicPeriod`, `LevelArm`, `Enrollment`) carry `school_id` *and* a parent FK
+so a query is tenant-safe without the parent in the join (see
+`docs/academic-foundation.md`, `docs/student-management.md`). All follow the
+pattern:
 
 ```php
 use App\Support\Tenancy\Concerns\BelongsToSchool;

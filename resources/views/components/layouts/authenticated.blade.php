@@ -4,14 +4,14 @@
 
 @php
     $currentSchool = app(\App\Support\Tenancy\TenantContext::class)->school();
-
-    $academicEnabled = $currentSchool !== null
-        && app(\App\Support\Modules\SchoolModules::class)->enabled(\App\Enums\Module::Academics);
+    $modules = app(\App\Support\Modules\SchoolModules::class);
+    $moduleOn = fn (\App\Enums\Module $module) => $currentSchool !== null && $modules->enabled($module);
 
     $navLinks = collect([
         ['route' => 'dashboard', 'label' => __('Dashboard'), 'active' => 'dashboard', 'allowed' => true],
         ['route' => 'members.index', 'label' => __('Members'), 'active' => 'members.*', 'allowed' => auth()->user()->can('member.view')],
-        ['route' => 'academic.sessions.index', 'label' => __('Academic'), 'active' => 'academic.*', 'allowed' => $academicEnabled && auth()->user()->can('academics.view')],
+        ['route' => 'students.index', 'label' => __('Students'), 'active' => 'students.*', 'allowed' => $moduleOn(\App\Enums\Module::Students) && auth()->user()->can('student.view')],
+        ['route' => 'academic.sessions.index', 'label' => __('Academic'), 'active' => 'academic.*', 'allowed' => $moduleOn(\App\Enums\Module::Academics) && auth()->user()->can('academics.view')],
         ['route' => 'settings.school.edit', 'label' => __('School settings'), 'active' => 'settings.school.*', 'allowed' => auth()->user()->can('school.settings.view')],
         ['route' => 'admin.schools.index', 'label' => __('Schools'), 'active' => 'admin.schools.*', 'allowed' => auth()->user()->can('viewAny', \App\Models\School::class)],
         ['route' => 'settings.profile.edit', 'label' => __('Account settings'), 'active' => 'settings.profile.*', 'allowed' => true],

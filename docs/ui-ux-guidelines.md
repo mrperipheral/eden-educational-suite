@@ -87,6 +87,17 @@ page. Lists use `<x-empty-state>`, pagination, `is_current` / `Inactive` badges,
 and inline validation. Read-only roles (`academics.view`) see the lists and
 detail pages without any create / edit / toggle controls.
 
+The **Students** area (`resources/views/students/`, `docs/student-management.md`,
+gated `student.*` + `module:students`) is a top-level nav item. **List** —
+search (name / admission number) + status-filter chips + pagination; a shared
+`_form.blade.php` drives **create** and **edit** (dedicated pages — the record
+has many fields). The **profile** page shows identity, contact, a focused
+lifecycle-status control, and the enrollment history with an "Add enrollment"
+action. The enrollment form (`enrollments/_form.blade.php`) is an Alpine
+cascade — picking a session filters the term select, picking a level filters
+the arm select. Read-only roles (`student.view`) see lists and profiles with no
+create / edit / status controls.
+
 Flash messages (`session('success' | 'error' | 'status')`) are rendered
 automatically by `<x-layouts.app>` as alerts.
 
@@ -117,5 +128,5 @@ automatically by `<x-layouts.app>` as alerts.
 
 Dark mode, dense/table layouts, data-grid, charts, iconography system,
 notification/toast system. The primary nav is permission- and
-module-filtered (Dashboard · Members · Academic · School settings · Schools ·
+module-filtered (Dashboard · Members · Students · Academic · School settings · Schools ·
 Account) but not yet role-specific / collapsible. Add here when built.

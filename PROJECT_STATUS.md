@@ -1,15 +1,15 @@
 # Project Status
 
-_Last updated: 2026-09-16_
+_Last updated: 2026-09-17_
 
 ## Current milestone
 
-**Milestone 8 — Academic Foundation: COMPLETE.**
+**Milestone 9 — Student Management: COMPLETE.**
 
-Next up: **Domain Modules** (Milestone 9+) — Students & Guardians, Staff,
-Enrolment / class membership, Teacher assignment, Timetable, Attendance,
-Assessments & Results, Fees, CBT, Notifications, Portals. Not started — do not
-begin without picking it up explicitly. See `docs/roadmap.md`.
+Next up: **Domain Modules** (Milestone 10+) — Guardians, Staff, Class rosters &
+teacher assignment, Timetable, Attendance, Assessments & Results, Fees, CBT,
+Notifications, Portals, Promotion. Not started — do not begin without picking it
+up explicitly. See `docs/roadmap.md`.
 
 ## What the application is
 
@@ -17,7 +17,7 @@ Multi-school School Management SaaS (management + portals only — no website
 features). PHP 8.3 · Laravel 13.31 · MySQL 8 · Blade + Tailwind v4 + Alpine.js +
 Vite · PHPUnit · Pint.
 
-## Environment (verified 2026-09-16)
+## Environment (verified 2026-09-17)
 
 | Item | Value |
 |------|-------|
@@ -25,7 +25,8 @@ Vite · PHPUnit · Pint.
 | Laravel | 13.31.0 |
 | Node / npm | 22.x |
 | Database | MySQL 8 (app) · SQLite `:memory:` (tests) |
-| Tests | `php artisan test` — 305 passing |
+| Local mail | Mailpit (`127.0.0.1:1025`, UI `:8025`) — `.env` only, not committed |
+| Tests | `php artisan test` — 340 passing |
 | Build | `npm run build` — passing |
 | Formatting | `vendor/bin/pint --test` — passing |
 
@@ -38,97 +39,102 @@ Vite · PHPUnit · Pint.
 - **M5 — School Onboarding** (`school-onboarding-complete`) — `docs/onboarding.md`.
 - **M6 — School Settings & Configuration** (`school-settings-complete`) — `docs/school-settings.md`.
 - **M7 — Feature / Module Activation** (`feature-activation-complete`) — `docs/module-activation.md`.
-- **M8 — Academic Foundation** (this milestone, `academic-foundation-complete`) —
-  `docs/academic-foundation.md`; see below.
+- **M8 — Academic Foundation** (`academic-foundation-complete`) — `docs/academic-foundation.md`.
+- **M9 — Student Management** (this milestone, `student-management-complete`) —
+  `docs/student-management.md`; see below.
 
-## Delivered in Milestone 8
+## Delivered in Milestone 9
 
-The configurable academic structure every later domain module builds on.
-Structure only — no students, guardians, staff, timetable, attendance,
-assessments, results, grading, promotion or CBT. Built on the existing
-`TenantContext` + `BelongsToSchool` + `Permission` + `module:academics` seams —
-no new authorization or tenancy mechanism, no new packages, no Redis/queues.
+The tenant-scoped student record + enrollment-history foundation for the later
+Guardian / Attendance / Assessment / Results / Fees / Promotion / Portal
+modules. Records only — no people beyond students, no placement workflow. Built
+on the existing `TenantContext` + `BelongsToSchool` + `Permission` +
+`module:students` seams — no new mechanism, no new packages, no Redis/queues.
 
-- **`App\Models\AcademicSession`** (M5, extended) — the year; one `is_current`
-  per school; never deleted. Gains `periods()` / `currentPeriod()`.
-- **`App\Models\AcademicPeriod`** (new) — a term / semester within a session.
-  `BelongsToSchool` **and** scoped to its session. `name`, `starts_on`/`ends_on`,
-  `position`, `is_active`, `is_current` (one per session, `makeCurrent()`
-  demotes siblings + activates). **Any number of periods** — no "three terms".
-- **`App\Models\AcademicLevel`** (new) — class / year group. `name`, `code`,
-  `position`, `is_active`; `arms()` + `subjects()`. No level names hard-coded.
-- **`App\Models\LevelArm`** (new) — stream within a level. `BelongsToSchool` +
-  scoped to its level. `name`, `code`, `position`, `is_active`.
-- **`App\Models\Subject`** (new) — `name`, `code`, `description`, `position`
-  (soft), `is_active`. No subject list hard-coded.
-- **`level_subject`** (new) — which subjects a level offers; carries `school_id`,
-  written from `TenantContext` during the sync. The only cross-model link M8
-  ships (no teacher / timetable / enrolment).
-- **Migrations** `2026_09_16_100000`–`…100040` — 5 tables, all `BelongsToSchool`,
-  indexes leading with `school_id` / a tenant-scoped parent id, uniqueness scoped
-  to school / session / level.
-- **`App\Http\Controllers\Academic\{Session,Period,Level,Arm,Subject}Controller`**
-  + `App\Http\Requests\Academic\*` + `resources/views/academic/*` (Sessions &
-  terms · Levels & arms · Subjects sub-nav). Inline "add" cards for editors,
-  dedicated `edit` pages, `show` pages for children, `?q=` subject search,
-  pagination, empty states, `is_current` / `Inactive` badges.
-- **Routes** — `/academic/*` behind `['tenant', 'module:academics']`, gated
-  `academics.view` (reads) / `academics.manage` (writes). Sessions **moved here**
-  from `settings/academic-sessions` (M5) and re-gated from `school.settings.*`.
-- **`Module::Academics->isAvailable()`** flipped to `true`. "Academic" is a
-  top-level nav item (permission- + module-filtered). Dashboard onboarding
-  checklist's session step points to the new route and is module-gated.
-- **Seeder** — Alpha gets a current session with 3 terms, 5 levels × 2 arms,
-  6 subjects, and every level linked to the subject set.
-- **Docs** — new `docs/academic-foundation.md`; updated `architecture.md`,
+- **Enums** — `App\Enums\StudentStatus` (active / inactive / withdrawn /
+  graduated), `App\Enums\EnrollmentStatus` (active / completed / withdrawn),
+  `App\Enums\Gender` (male / female / other).
+- **`App\Models\Student`** — school-owned. Minimal PII: name (first / middle /
+  last / preferred), DOB, optional gender, `admission_number`
+  (`unique(school_id, admission_number)`), admission date, contact/address,
+  notes. `status` **not** mass-assignable — model default `active`, changed only
+  via a dedicated endpoint. Never hard-deleted. `search()` / `ordered()` scopes.
+- **`App\Models\Enrollment`** — school-owned **and** student-scoped. FKs to
+  `AcademicSession` (req), `AcademicPeriod` (opt), `AcademicLevel` (req),
+  `LevelArm` (opt); `status`, `started_on`, `ended_on`. `makeActive()` (a
+  transaction closing any other open enrollment) enforces **one active
+  enrollment per student** — the current class, derived, never a column on
+  `students`. Not a promotion workflow.
+- **Migrations** `2026_09_17_100000` (`students`), `…100010` (`enrollments`) —
+  both `BelongsToSchool`, indexes leading with `school_id` (or `student_id`),
+  `admission_number` unique per school, a roster index for future modules.
+- **`App\Http\Controllers\Student\{Student,Enrollment}Controller`** +
+  `App\Http\Requests\Student\*` (`StudentRequest`, `UpdateStudentStatusRequest`,
+  `EnrollmentRequest`) + `resources/views/students/*` — list (search + status
+  filter + pagination), dedicated create/edit, profile with lifecycle-status
+  control + enrollment history, Alpine-cascade enrollment form (session→term,
+  level→arm).
+- **Routes** — `/students/*` behind `['tenant', 'module:students']`, gated
+  `student.view` (reads) / `student.manage` (writes) — M4 permissions,
+  previously dormant, now enforced (School Admin + Principal manage; Bursar +
+  Teacher + Staff read; Parent / Student → 403).
+- **`Module::Students->isAvailable()`** flipped to `true`; **`Module::Students`
+  now depends on `Module::Academics`** (enrollment needs the academic
+  structure). "Students" is a top-level nav item (permission- + module-filtered).
+- **Seeder** — Alpha gets 18 enrolled students + 1 graduated alumnus with a
+  completed placement (history retained).
+- **Docs** — new `docs/student-management.md`; updated `architecture.md`,
   `authorization.md`, `database-design.md`, `security.md`, `tenancy.md`,
-  `module-activation.md`, `onboarding.md`, `roadmap.md`, `ui-ux-guidelines.md`,
-  `CLAUDE.md`, `AGENTS.md`.
+  `module-activation.md`, `roadmap.md`, `ui-ux-guidelines.md`,
+  `academic-foundation.md`, `CLAUDE.md`, `AGENTS.md`.
 
 ## Authorization & tenant controls
 
-- **Two gates on every academic route:** `module:academics` (404 when off) **and**
-  `->can('academics.view'|'.manage')`; Form Requests re-check `academics.manage`.
-- School Admin + Principal manage; Teacher + Staff read-only; Bursar / Parent /
-  Student / role-less → 403. Module gate and permissions are independent.
-- Every model `BelongsToSchool`; child models also carry `school_id`. `school_id`
-  never from input, immutable (`TenantMismatchException`). Route ids resolved by
-  tenant-scoped `findOrFail` (not route-model-bound) → cross-school id 404s. Form
-  Requests resolve parent ids tenant-scoped so a cross-school id 404s rather than
-  leaking a validation error. `level_subject` sync validates subject ids against
-  the active school. Explicit cross-school tests for all six of these.
+- **Two gates on every student route:** `module:students` (404 when off) **and**
+  `->can('student.view'|'.manage')`; write Form Requests re-check `student.manage`.
+  Module gate ≠ permission (a Parent still can't see students — tested).
+- `Student` / `Enrollment` are `BelongsToSchool`; `Enrollment` also carries
+  `student_id`. `school_id` never from input, immutable (`TenantMismatchException`).
+  `students.status` not mass-assignable (a `status` in the edit payload is
+  ignored — tested).
+- Route ids resolved by tenant-scoped `findOrFail`; `EnrollmentRequest`
+  `abort(404)`s on a cross-school student/enrollment before validation runs, so
+  a cross-school route id never produces an information-leaking validation
+  response. Academic ids validated with `Rule::exists(...)->where('school_id', <tenant>)`
+  → generic "invalid" for a cross-school id. Level↔arm / session↔period
+  consistency checked. Explicit HTTP + model cross-school isolation tests.
 
 ## Database
 
-M8 adds `academic_periods`, `academic_levels`, `level_arms`, `subjects`,
-`level_subject`. `academic_sessions` unchanged. No other schema changes.
+M9 adds `students` and `enrollments`. No other schema changes.
 
-## Routes (application, additions in M8)
+## Routes (application, additions in M9)
 
-Tenant-scoped + `module:academics`, gated `academics.view` / `academics.manage`.
-23 routes under `/academic/` (`academic.{sessions,periods,levels,arms,subjects}.*`).
-The M5 `/settings/academic-sessions` routes and `academic-sessions.*` names are
-**removed** — replaced by `/academic/sessions` / `academic.sessions.*`.
+Tenant-scoped + `module:students`, gated `student.view` / `student.manage`.
+11 routes under `/students/` (`students.*`, `students.enrollments.*`).
 
 ## Tests
 
-305 passing (was 264 at M7; +41 in M8, M1–M7 intact). New
-`tests/Feature/Academic/*` — `AcademicSessionTest`, `AcademicPeriodTest`,
-`AcademicLevelTest`, `LevelArmTest`, `SubjectTest`, `AcademicStructureTest` (+ an
-`AcademicTestCase` base): creation / editing / validation / uniqueness,
-one-current-per-scope, configurable period count, relationships, level↔subject
-sync + its cross-school rejection, authorization per role, module-disabled 404s,
-cross-school isolation, ownership immutability, route-binding isolation.
-`Unit/Enums/ModuleTest` and `Feature/Onboarding/OnboardingChecklistTest` updated
-for the moved route + available module.
+340 passing (was 305 at M8; +35 in M9, M1–M8 intact). New
+`tests/Feature/Student/*` (+ `StudentTestCase` base) — `StudentTest`,
+`EnrollmentTest`, `StudentStructureTest`: creation / editing / validation;
+admission-number uniqueness per school (and reusable across schools); statuses
+via the dedicated endpoint (+ not-mass-assignable); search / pagination;
+enrollment creation / editing; one-active-per-student; historical enrollments
+retained; session/period/level/arm relations; invalid level/arm & period/session
+combinations; cross-school academic ids rejected without leaking; authorization
+per role; module-disabled 404s; cross-school read/create/edit isolation;
+ownership immutability; tenant-safe route resolution; a list N+1 guard. New
+`tests/Unit/Enums/StudentEnumsTest`. `Unit/Enums/ModuleTest` updated (available
+list).
 
 ## Known follow-ups / recommendations
 
 - Production env: `SESSION_SECURE_COOKIE=true`, real `MAIL_MAILER`, `APP_DEBUG=false`.
-- Next milestone: students / guardians / staff, class & arm membership, teacher →
-  subject/class assignment — each behind its `module:*` + permissions.
-- Period-within-session bounds & non-overlap validation; bulk import / cloning a
-  previous year's structure; hard delete / archival of academic entities.
+- Next milestone: guardians / parents (linkage + screens — M9's student
+  `contact_*` fields are a stopgap), then class rosters / teacher assignment.
+- Promotion / graduation workflow; bulk student import; student ID / photo /
+  documents; medical & emergency info; transfer records.
+- Audit trail + data-erasure handling for student records.
 - Apply the stored `timezone` / `locale` / `date_format` at render time.
 - Add a CI workflow (Pint + PHPUnit + `npm run build`).
-- Audit logging of academic / settings / module / membership changes.

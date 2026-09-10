@@ -1,11 +1,12 @@
 # Database Design
 
-Status: Milestone 8. Tenant + roles + onboarding + school settings + module
-activation + academic foundation. School-owned tables: `school_settings` (M6),
-`school_modules` (M7), and the academic structure — `academic_sessions`,
-`academic_periods`, `academic_levels`, `level_arms`, `subjects`, `level_subject`
-(M8). No student / guardian / staff / timetable / attendance / results tables
-yet. This document records the conventions every future migration follows.
+Status: Milestone 9. Tenant + roles + onboarding + school settings + module
+activation + academic foundation + student management. School-owned tables:
+`school_settings` (M6), `school_modules` (M7), the academic structure —
+`academic_sessions`, `academic_periods`, `academic_levels`, `level_arms`,
+`subjects`, `level_subject` (M8) — and `students` + `enrollments` (M9). No
+guardian / staff / timetable / attendance / results tables yet. This document
+records the conventions every future migration follows.
 
 ## Current schema
 
@@ -21,6 +22,8 @@ yet. This document records the conventions every future migration follows.
 | `level_arms` | streams within a level. School-owned **+** `academic_level_id`. `unique(level_id, name/code/position)`. |
 | `subjects` | school subjects. School-owned. `unique(school_id, name)`, `unique(school_id, code)`. |
 | `level_subject` | which subjects a level offers. School-owned. `unique(academic_level_id, subject_id)`, `index(school_id, academic_level_id)`. |
+| `students` | student records. School-owned. `unique(school_id, admission_number)`, `index(school_id, status)`, `index(school_id, last_name, first_name)`. Never hard-deleted. |
+| `enrollments` | a student's academic placement over time. School-owned **+** `student_id`. `index(school_id, student_id, status)`, roster index `(school_id, session, level, arm)`. One `active` row per student. |
 | `school_modules` | per-school feature-module on/off overrides. School-owned. `unique(school_id, module)`. Override-only — a row exists only where a school departs from the `App\Enums\Module` default. |
 | `password_reset_tokens`, `sessions` | auth/session plumbing |
 | `cache`, `cache_locks` | `CACHE_STORE=database` |
@@ -95,6 +98,25 @@ Five migrations, all school-owned (`BelongsToSchool`), all indexes leading with
   `unique(academic_level_id, subject_id)`, `index(school_id, academic_level_id)`,
   `index(school_id, subject_id)`. The only cross-model link M8 ships.
 
+### `2026_09_17_100000_*` — Student Management (Milestone 9)
+Two migrations, both school-owned (`BelongsToSchool`). See `docs/student-management.md`.
+
+- **`students`** — `first_name` / `last_name` (req), `middle_name` /
+  `preferred_name`, `date_of_birth`, `gender` (`App\Enums\Gender`),
+  `admission_number` (req), `admitted_on`, `status` (`App\Enums\StudentStatus`,
+  default `active`, **not** mass-assignable), `contact_email` / `contact_phone` /
+  `address_line1/2` / `city` / `state`, `notes`.
+  `unique(school_id, admission_number)`, `index(school_id, status)`,
+  `index(school_id, last_name, first_name)`. Minimal PII; never hard-deleted.
+- **`enrollments`** — `student_id` FK (cascade), `academic_session_id` /
+  `academic_level_id` FK (cascade, required), `academic_period_id` /
+  `level_arm_id` FK (`nullOnDelete`, optional), `status`
+  (`App\Enums\EnrollmentStatus`, default `active`), `started_on`, `ended_on`.
+  `index(school_id, student_id, status)`, roster index
+  `(school_id, academic_session_id, academic_level_id, level_arm_id)`. One
+  `active` row per student (enforced in `Enrollment::makeActive()`). History is
+  preserved — placements are closed, never deleted.
+
 ### `2026_09_15_100000_create_school_modules_table`
 Milestone 7 — per-school feature/module activation. `module` (`string(40)`, an
 `App\Enums\Module` value, **not** cast so an unknown id can't break a page),
@@ -148,9 +170,8 @@ written only via `App\Support\Modules\SchoolModules`. See `docs/module-activatio
 
 ## Not yet designed (later milestones, will be added here)
 
-`school_user.is_default`, holiday / calendar events, students, guardians, staff,
-class/arm membership, teacher assignment, enrolment, attendance,
-assessments/results, fees/invoices/payments, CBT, audit log. Each gets an entry
-here when built.
+`school_user.is_default`, holiday / calendar events, guardians, staff, teacher
+assignment, class rosters, attendance, assessments/results,
+fees/invoices/payments, CBT, audit log. Each gets an entry here when built.
 
 Permissions and roles are **not** in the database — they are code (`App\Enums`).

@@ -89,6 +89,14 @@ class School extends Model
         return $this->hasMany(Subject::class);
     }
 
+    /**
+     * @return HasMany<Student, $this>
+     */
+    public function students(): HasMany
+    {
+        return $this->hasMany(Student::class);
+    }
+
     public function isActive(): bool
     {
         return $this->status === SchoolStatus::Active;

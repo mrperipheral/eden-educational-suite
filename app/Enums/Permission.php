@@ -23,20 +23,24 @@ enum Permission: string
     case SchoolSettingsView = 'school.settings.view';
     case SchoolSettingsUpdate = 'school.settings.update';
 
-    // ---- People & access (enforced by the Members module in this milestone) --
+    // ---- People & access (enforced: Members M4/M5) --------------------------
     case MemberView = 'member.view';
     case MemberAssignRole = 'member.assign-role';
     case MemberRemove = 'member.remove';
 
-    // ---- Declared for later domain milestones (coarse; not yet enforced) -----
+    // ---- Academic structure (enforced: Academic Foundation M8) --------------
+    case AcademicsView = 'academics.view';
+    case AcademicsManage = 'academics.manage';
+
+    // ---- Students (enforced: Student Management M9) ------------------------
     case StudentView = 'student.view';
     case StudentManage = 'student.manage';
+
+    // ---- Declared for later domain milestones (coarse; not yet enforced) -----
     case GuardianView = 'guardian.view';
     case GuardianManage = 'guardian.manage';
     case StaffView = 'staff.view';
     case StaffManage = 'staff.manage';
-    case AcademicsView = 'academics.view';
-    case AcademicsManage = 'academics.manage';
     case AttendanceView = 'attendance.view';
     case AttendanceRecord = 'attendance.record';
     case ResultView = 'result.view';

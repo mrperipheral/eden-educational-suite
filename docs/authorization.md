@@ -14,7 +14,7 @@ role set, composed with the strict `TenantContext` from Milestone 3.
 | Runtime check | `User::hasPermission()` / `roleIn()` / `permissionsIn()` / `canGrantRole()` |
 | Gate wiring | `App\Providers\AuthServiceProvider` — one `Gate::define()` per permission |
 | Fine-grained rules | `App\Policies\MembershipPolicy` (self / escalation guards) |
-| Features that use it | Members (`/members*`), school settings + module activation (`school.settings.*`), academic structure (`/academic/*`, `academics.*` — M8), school provisioning (`SchoolPolicy`) |
+| Features that use it | Members (`/members*`), school settings + module activation (`school.settings.*`), academic structure (`/academic/*`, `academics.*` — M8), students (`/students/*`, `student.*` — M9), school provisioning (`SchoolPolicy`) |
 
 ```
 Request → auth · verified · active · tenant  (TenantContext::set(School))
@@ -58,10 +58,14 @@ and `hasPermission()` are the only things that would change.
   gate `/academic/*` (sessions, periods, levels, arms, subjects — moved here
   from `school.settings.*`). School Admin + Principal manage; Teacher + Staff
   read; Bursar / Parent / Student get 403. See `docs/academic-foundation.md`.
+- **Students (enforced — M9):** `student.view`, `student.manage` — gate
+  `/students/*` (records + enrollment history). School Admin + Principal manage;
+  Bursar + Teacher + Staff read; Parent / Student get 403. See
+  `docs/student-management.md`.
 - **People & access (enforced):** `member.view`, `member.assign-role`
   (also gates *adding* an existing user — M5), `member.remove`
 - **Declared for later domain milestones** (not yet enforced — the modules that
-  check them don't exist): `student.*`, `guardian.*`, `staff.*`,
+  check them don't exist): `guardian.*`, `staff.*`,
   `attendance.*`, `result.*`, `finance.*`, `portal.parent`, `portal.student`
 
 They exist now so the role bundles are meaningful and testable. A domain
@@ -185,7 +189,7 @@ school, so a cross-school membership can never reach the policy.
 | One role per (user, school), nullable | matches "roles are bundles"; multi-role is a rare need, deferred |
 | Tier-based escalation guard (`target.tier ≤ granter.tier`) | models org hierarchy; the hard invariant "never grant a role above your own" is simple and testable |
 | Platform admin = all permissions *within an entered school* | "retain platform-wide administration" without weakening row-level isolation (`SchoolScope` still applies) |
-| `member.*` + `academics.*` enforced (M8); the rest declared but dormant | the vocabulary the role bundles need, activated module by module |
+| `member.*` + `academics.*` (M8) + `student.*` (M9) enforced; the rest declared but dormant | the vocabulary the role bundles need, activated module by module |
 | Module activation (M7) reuses `school.settings.*`, stays orthogonal to permissions | it is configuration ("is the feature on for this school?"), not "may this user…"; a domain route checks both |
 | `academics.*` (M8) reused as-is, no finer split; sessions re-gated from `school.settings.*` | coarse-on-purpose; the academic structure is one thing under one permission (see `docs/academic-foundation.md`) |
 
@@ -195,6 +199,6 @@ school, so a cross-school membership can never reach the policy.
 - Invitation / brand-new-account flow (M5 adds *existing* users only).
 - Admin UI for `users.status` and `users.is_platform_admin`.
 - Enforcing the remaining dormant permissions — happens in each domain module's
-  milestone (`academics.*` enforced in M8).
+  milestone (`academics.*` in M8, `student.*` in M9).
 - Audit logging of role changes.
 - `@role` / permission Blade directives beyond the built-in `@can`.
