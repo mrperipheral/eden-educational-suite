@@ -102,6 +102,7 @@ enum Role: string
 
             self::Staff => [
                 Permission::StudentView,
+                Permission::GuardianView,
                 Permission::AcademicsView,
                 Permission::AttendanceView,
             ],

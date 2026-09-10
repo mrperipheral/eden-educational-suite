@@ -126,11 +126,13 @@ enum Module: string
      *     arms, subjects (`docs/academic-foundation.md`).
      *   - `students` — Student Management (M9): student records + enrollment
      *     history (`docs/student-management.md`).
+     *   - `guardians` — Guardian / Parent Management (M10): guardian records +
+     *     student ↔ guardian relationships (`docs/guardian-management.md`).
      */
     public function isAvailable(): bool
     {
         return match ($this) {
-            self::Academics, self::Students => true,
+            self::Academics, self::Students, self::Guardians => true,
             default => false,
         };
     }

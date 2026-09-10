@@ -62,6 +62,71 @@
             @endif
         </x-card>
 
+        {{-- Guardians --}}
+        @module('guardians')
+            @can('guardian.view')
+                <x-card :title="__('Parents / guardians')">
+                    <x-slot:actions>
+                        @can('guardian.manage')
+                            <x-button :href="route('guardians.links.create', $student->id)" size="sm">{{ __('Add guardian') }}</x-button>
+                        @endcan
+                    </x-slot:actions>
+
+                    @if ($student->guardianLinks->isEmpty())
+                        <p class="text-sm text-gray-500">{{ __('No parents or guardians linked yet.') }}</p>
+                    @else
+                        <ul class="divide-y divide-gray-100">
+                            @foreach ($student->guardianLinks->sortByDesc('is_primary') as $link)
+                                <li x-data="{ editing: false }" class="py-3 first:pt-0 last:pb-0">
+                                    <div class="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                                        <div class="min-w-0">
+                                            <p class="text-sm font-medium text-gray-900">
+                                                <a href="{{ route('guardians.show', $link->guardian->id) }}" class="hover:text-brand-700">
+                                                    {{ $link->guardian->fullName() }}
+                                                </a>
+                                                @if ($link->is_primary)
+                                                    <x-badge variant="brand" class="ml-1">{{ __('Primary') }}</x-badge>
+                                                @endif
+                                            </p>
+                                            <p class="text-xs text-gray-500">
+                                                {{ $link->relationship->label() }}
+                                                @if ($link->guardian->phone) · {{ $link->guardian->phone }} @endif
+                                                @if ($link->guardian->email) · {{ $link->guardian->email }} @endif
+                                            </p>
+                                        </div>
+                                        @can('guardian.manage')
+                                            <div class="flex shrink-0 items-center gap-2">
+                                                <x-button type="button" size="sm" variant="ghost" x-on:click="editing = ! editing">{{ __('Edit') }}</x-button>
+                                                <x-confirm :action="route('guardians.links.destroy', $link->id)" method="DELETE" size="sm"
+                                                    :confirm="__('Unlink')"
+                                                    :title="__('Unlink guardian?')"
+                                                    :message="__('This removes the relationship. The guardian record is kept.')">
+                                                    {{ __('Unlink') }}
+                                                </x-confirm>
+                                            </div>
+                                        @endcan
+                                    </div>
+
+                                    @can('guardian.manage')
+                                        <form x-show="editing" x-cloak method="POST" action="{{ route('guardians.links.update', $link->id) }}"
+                                            class="mt-3 rounded-md bg-gray-50 p-3">
+                                            @csrf
+                                            @method('PATCH')
+                                            @include('guardians._relationship-fields', ['link' => $link])
+                                            <div class="mt-3 flex items-center gap-2">
+                                                <x-button type="submit" size="sm">{{ __('Save') }}</x-button>
+                                                <x-button type="button" size="sm" variant="ghost" x-on:click="editing = false">{{ __('Cancel') }}</x-button>
+                                            </div>
+                                        </form>
+                                    @endcan
+                                </li>
+                            @endforeach
+                        </ul>
+                    @endif
+                </x-card>
+            @endcan
+        @endmodule
+
         {{-- Status control --}}
         @can('student.manage')
             <x-card :title="__('Lifecycle status')">

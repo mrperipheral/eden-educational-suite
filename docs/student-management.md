@@ -171,8 +171,9 @@ on does not give a Parent `student.view` (tested).
 
 ## 9. Deferred
 
-- **Guardians / parents** — the linkage, the screens, contact-of-record. (M9's
-  student `contact_*` fields are a stopgap.)
+- **Guardians / parents** — the linkage, the screens, contact-of-record: **done
+  in M10** (`docs/guardian-management.md`). M9's student `contact_*` fields
+  remain as a quick "reach the family" fallback.
 - Teacher assignment, class rosters, attendance, assessments, results, grading,
   fees — each its own module.
 - **Promotion / graduation workflow** — bulk term roll-over, "promote class X to

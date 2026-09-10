@@ -10,6 +10,7 @@ use Database\Factories\StudentFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
@@ -85,6 +86,29 @@ class Student extends Model
     public function currentEnrollment(): HasOne
     {
         return $this->hasOne(Enrollment::class)->where('status', EnrollmentStatus::Active->value);
+    }
+
+    /**
+     * The student's parents / guardians, with the relationship type and
+     * primary-contact flag from the pivot.
+     *
+     * @return BelongsToMany<Guardian, $this>
+     */
+    public function guardians(): BelongsToMany
+    {
+        return $this->belongsToMany(Guardian::class, 'guardian_student')
+            ->withPivot(['relationship', 'is_primary'])
+            ->withTimestamps();
+    }
+
+    /**
+     * The raw link rows — used when adding / editing / removing a relationship.
+     *
+     * @return HasMany<GuardianStudent, $this>
+     */
+    public function guardianLinks(): HasMany
+    {
+        return $this->hasMany(GuardianStudent::class);
     }
 
     public function fullName(): string

@@ -1,13 +1,13 @@
 # Project Status
 
-_Last updated: 2026-09-17_
+_Last updated: 2026-09-18_
 
 ## Current milestone
 
-**Milestone 9 — Student Management: COMPLETE.**
+**Milestone 10 — Guardian / Parent Management: COMPLETE.**
 
-Next up: **Domain Modules** (Milestone 10+) — Guardians, Staff, Class rosters &
-teacher assignment, Timetable, Attendance, Assessments & Results, Fees, CBT,
+Next up: **Domain Modules** (Milestone 11+) — Staff, Class rosters & teacher
+assignment, Timetable, Attendance, Assessments & Results, Fees, CBT,
 Notifications, Portals, Promotion. Not started — do not begin without picking it
 up explicitly. See `docs/roadmap.md`.
 
@@ -17,7 +17,7 @@ Multi-school School Management SaaS (management + portals only — no website
 features). PHP 8.3 · Laravel 13.31 · MySQL 8 · Blade + Tailwind v4 + Alpine.js +
 Vite · PHPUnit · Pint.
 
-## Environment (verified 2026-09-17)
+## Environment (verified 2026-09-18)
 
 | Item | Value |
 |------|-------|
@@ -26,7 +26,7 @@ Vite · PHPUnit · Pint.
 | Node / npm | 22.x |
 | Database | MySQL 8 (app) · SQLite `:memory:` (tests) |
 | Local mail | Mailpit (`127.0.0.1:1025`, UI `:8025`) — `.env` only, not committed |
-| Tests | `php artisan test` — 340 passing |
+| Tests | `php artisan test` — 374 passing |
 | Build | `npm run build` — passing |
 | Formatting | `vendor/bin/pint --test` — passing |
 
@@ -40,101 +40,105 @@ Vite · PHPUnit · Pint.
 - **M6 — School Settings & Configuration** (`school-settings-complete`) — `docs/school-settings.md`.
 - **M7 — Feature / Module Activation** (`feature-activation-complete`) — `docs/module-activation.md`.
 - **M8 — Academic Foundation** (`academic-foundation-complete`) — `docs/academic-foundation.md`.
-- **M9 — Student Management** (this milestone, `student-management-complete`) —
-  `docs/student-management.md`; see below.
+- **M9 — Student Management** (`student-management-complete`) — `docs/student-management.md`.
+- **M10 — Guardian / Parent Management** (this milestone, `guardian-management-complete`) —
+  `docs/guardian-management.md`; see below.
 
-## Delivered in Milestone 9
+## Delivered in Milestone 10
 
-The tenant-scoped student record + enrollment-history foundation for the later
-Guardian / Attendance / Assessment / Results / Fees / Promotion / Portal
-modules. Records only — no people beyond students, no placement workflow. Built
-on the existing `TenantContext` + `BelongsToSchool` + `Permission` +
-`module:students` seams — no new mechanism, no new packages, no Redis/queues.
+Tenant-scoped guardian / parent records and the student ↔ guardian relationship —
+the contact foundation the later Parent Portal / Notifications modules build on.
+Records + linkage only — no portal, no credentials, no messaging. Built on the
+existing `TenantContext` + `BelongsToSchool` + `Permission` + `module:guardians`
+seams — no new mechanism, no new packages, no Redis/queues.
 
-- **Enums** — `App\Enums\StudentStatus` (active / inactive / withdrawn /
-  graduated), `App\Enums\EnrollmentStatus` (active / completed / withdrawn),
-  `App\Enums\Gender` (male / female / other).
-- **`App\Models\Student`** — school-owned. Minimal PII: name (first / middle /
-  last / preferred), DOB, optional gender, `admission_number`
-  (`unique(school_id, admission_number)`), admission date, contact/address,
-  notes. `status` **not** mass-assignable — model default `active`, changed only
-  via a dedicated endpoint. Never hard-deleted. `search()` / `ordered()` scopes.
-- **`App\Models\Enrollment`** — school-owned **and** student-scoped. FKs to
-  `AcademicSession` (req), `AcademicPeriod` (opt), `AcademicLevel` (req),
-  `LevelArm` (opt); `status`, `started_on`, `ended_on`. `makeActive()` (a
-  transaction closing any other open enrollment) enforces **one active
-  enrollment per student** — the current class, derived, never a column on
-  `students`. Not a promotion workflow.
-- **Migrations** `2026_09_17_100000` (`students`), `…100010` (`enrollments`) —
-  both `BelongsToSchool`, indexes leading with `school_id` (or `student_id`),
-  `admission_number` unique per school, a roster index for future modules.
-- **`App\Http\Controllers\Student\{Student,Enrollment}Controller`** +
-  `App\Http\Requests\Student\*` (`StudentRequest`, `UpdateStudentStatusRequest`,
-  `EnrollmentRequest`) + `resources/views/students/*` — list (search + status
-  filter + pagination), dedicated create/edit, profile with lifecycle-status
-  control + enrollment history, Alpine-cascade enrollment form (session→term,
-  level→arm).
-- **Routes** — `/students/*` behind `['tenant', 'module:students']`, gated
-  `student.view` (reads) / `student.manage` (writes) — M4 permissions,
+- **Enum** — `App\Enums\GuardianRelationship` (mother / father / grandparent /
+  aunt_uncle / sibling / legal_guardian / other).
+- **`App\Models\Guardian`** — school-owned. Minimal contact data: name (first /
+  middle / last / preferred), phone, alternate phone, email, address, notes. No
+  identity / financial / medical / emergency data, no portal credentials. No
+  global uniqueness; never hard-deleted. `search()` / `ordered()` scopes.
+- **`App\Models\GuardianStudent`** — the link. School-owned **and** carries
+  `student_id` + `guardian_id`. `relationship` (required), `is_primary` (at most
+  one per student — `makePrimary()`, the M8/M9 "one at a time" pattern, scoped
+  per student). `unique(student_id, guardian_id)` — no duplicate links.
+- **Migrations** `2026_09_18_100000` (`guardians`), `…100010` (`guardian_student`)
+  — both `BelongsToSchool`, indexes leading with `school_id`, FKs cascade.
+- **`App\Http\Controllers\Guardian\{Guardian,GuardianLink}Controller`** +
+  `App\Http\Requests\Guardian\*` (`GuardianRequest`, `GuardianLinkRequest`) +
+  `resources/views/guardians/*` — list (search + pagination), dedicated
+  create/edit, guardian profile with linked-students management, and a "link a
+  guardian" page reached from the student profile. The student profile gains a
+  "Parents / guardians" card (add / edit relationship / unlink).
+- **Routes** — `/guardians/*` behind `['tenant', 'module:guardians']`, gated
+  `guardian.view` (reads) / `guardian.manage` (writes) — M4 permissions,
   previously dormant, now enforced (School Admin + Principal manage; Bursar +
   Teacher + Staff read; Parent / Student → 403).
-- **`Module::Students->isAvailable()`** flipped to `true`; **`Module::Students`
-  now depends on `Module::Academics`** (enrollment needs the academic
-  structure). "Students" is a top-level nav item (permission- + module-filtered).
-- **Seeder** — Alpha gets 18 enrolled students + 1 graduated alumnus with a
-  completed placement (history retained).
-- **Docs** — new `docs/student-management.md`; updated `architecture.md`,
+- **`Module::Guardians->isAvailable()`** flipped to `true`; **`Module::Guardians`
+  depends on `Module::Students`** (already declared in the M7 catalogue).
+  "Guardians" is a top-level nav item (permission- + module-filtered).
+- **Permissions** — `Permission::GuardianView` added to the **Staff** role
+  bundle (the third read-only role that already holds `student.view`); no other
+  bundle change (Principal / Bursar / Teacher already carried the guardian
+  permissions from M4).
+- **Seeder** — Alpha gets 17 guardians / 18 links: a primary contact per student
+  for the first dozen, a second guardian for a few, and one guardian shared
+  across two siblings.
+- **Docs** — new `docs/guardian-management.md`; updated `architecture.md`,
   `authorization.md`, `database-design.md`, `security.md`, `tenancy.md`,
   `module-activation.md`, `roadmap.md`, `ui-ux-guidelines.md`,
-  `academic-foundation.md`, `CLAUDE.md`, `AGENTS.md`.
+  `student-management.md`, `CLAUDE.md`, `AGENTS.md`.
 
 ## Authorization & tenant controls
 
-- **Two gates on every student route:** `module:students` (404 when off) **and**
-  `->can('student.view'|'.manage')`; write Form Requests re-check `student.manage`.
-  Module gate ≠ permission (a Parent still can't see students — tested).
-- `Student` / `Enrollment` are `BelongsToSchool`; `Enrollment` also carries
-  `student_id`. `school_id` never from input, immutable (`TenantMismatchException`).
-  `students.status` not mass-assignable (a `status` in the edit payload is
-  ignored — tested).
-- Route ids resolved by tenant-scoped `findOrFail`; `EnrollmentRequest`
-  `abort(404)`s on a cross-school student/enrollment before validation runs, so
-  a cross-school route id never produces an information-leaking validation
-  response. Academic ids validated with `Rule::exists(...)->where('school_id', <tenant>)`
-  → generic "invalid" for a cross-school id. Level↔arm / session↔period
-  consistency checked. Explicit HTTP + model cross-school isolation tests.
+- **Two gates on every guardian route:** `module:guardians` (404 when off)
+  **and** `->can('guardian.view'|'.manage')`; write Form Requests re-check
+  `guardian.manage`. Module gate ≠ permission (a Parent still can't see guardians
+  — tested).
+- `Guardian` / `GuardianStudent` are `BelongsToSchool`; the link also carries
+  `student_id` + `guardian_id`. `school_id` never from input, immutable
+  (`TenantMismatchException`); a `school_id` in the create payload is ignored
+  (tested).
+- Route ids resolved by tenant-scoped `findOrFail`; `GuardianLinkRequest`
+  `abort(404)`s on a cross-school `{link}` before validation. `student_id` /
+  `guardian_id` in the link payload use `Rule::exists(...)->where('school_id', <tenant>)`
+  → generic "invalid" for a cross-school id, no leak. Duplicate links rejected
+  (`unique(student_id, guardian_id)` + a friendly Form Request message).
+  Explicit HTTP + model cross-school isolation tests.
 
 ## Database
 
-M9 adds `students` and `enrollments`. No other schema changes.
+M10 adds `guardians` and `guardian_student`. No other schema changes.
 
-## Routes (application, additions in M9)
+## Routes (application, additions in M10)
 
-Tenant-scoped + `module:students`, gated `student.view` / `student.manage`.
-11 routes under `/students/` (`students.*`, `students.enrollments.*`).
+Tenant-scoped + `module:guardians`, gated `guardian.view` / `guardian.manage`.
+10 routes under `/guardians/` (`guardians.*`, `guardians.links.*`).
 
 ## Tests
 
-340 passing (was 305 at M8; +35 in M9, M1–M8 intact). New
-`tests/Feature/Student/*` (+ `StudentTestCase` base) — `StudentTest`,
-`EnrollmentTest`, `StudentStructureTest`: creation / editing / validation;
-admission-number uniqueness per school (and reusable across schools); statuses
-via the dedicated endpoint (+ not-mass-assignable); search / pagination;
-enrollment creation / editing; one-active-per-student; historical enrollments
-retained; session/period/level/arm relations; invalid level/arm & period/session
-combinations; cross-school academic ids rejected without leaking; authorization
-per role; module-disabled 404s; cross-school read/create/edit isolation;
-ownership immutability; tenant-safe route resolution; a list N+1 guard. New
-`tests/Unit/Enums/StudentEnumsTest`. `Unit/Enums/ModuleTest` updated (available
+374 passing (was 340 at M9; +34 in M10, M1–M9 intact). New
+`tests/Feature/Guardian/*` (+ `GuardianTestCase` base) — `GuardianTest`,
+`GuardianStudentLinkTest`, `GuardianStructureTest`: guardian creation / editing /
+validation; PII-minimisation column check; search / pagination; linking from the
+student workflow; multiple guardians per student; a guardian linked to multiple
+students; explicit relationship type (required + validated); one-primary-per-student;
+duplicate-link prevention; link edit (relationship + promote to primary); link
+removal keeps both records; FK cascade; authorization per role; module-disabled
+404s; cross-school guardian isolation; cross-school student/guardian linking
+rejection without leak; `school_id` spoof / immutability; tenant-safe route
+resolution; N+1 guards on the student profile and the guardian profile. New
+`tests/Unit/Enums/GuardianEnumsTest`. `Unit/Enums/ModuleTest` updated (available
 list).
 
 ## Known follow-ups / recommendations
 
 - Production env: `SESSION_SECURE_COOKIE=true`, real `MAIL_MAILER`, `APP_DEBUG=false`.
-- Next milestone: guardians / parents (linkage + screens — M9's student
-  `contact_*` fields are a stopgap), then class rosters / teacher assignment.
-- Promotion / graduation workflow; bulk student import; student ID / photo /
-  documents; medical & emergency info; transfer records.
-- Audit trail + data-erasure handling for student records.
+- Next milestone: staff / teachers, then class rosters & teacher assignment.
+- **Parent Portal** — guardian sign-in + portal accounts (M10 stores no
+  credentials); guardian messaging / notifications.
+- Promotion / graduation workflow; bulk student & guardian import; student ID /
+  photo / documents; medical & emergency info; transfer records.
+- Audit trail + data-erasure handling for student and guardian records.
 - Apply the stored `timezone` / `locale` / `date_format` at render time.
 - Add a CI workflow (Pint + PHPUnit + `npm run build`).

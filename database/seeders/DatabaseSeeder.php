@@ -3,11 +3,13 @@
 namespace Database\Seeders;
 
 use App\Enums\EnrollmentStatus;
+use App\Enums\GuardianRelationship;
 use App\Enums\Module;
 use App\Enums\Role;
 use App\Enums\StudentStatus;
 use App\Models\AcademicLevel;
 use App\Models\AcademicSession;
+use App\Models\Guardian;
 use App\Models\School;
 use App\Models\SchoolModule;
 use App\Models\Student;
@@ -128,7 +130,7 @@ class DatabaseSeeder extends Seeder
         }
 
         // A cohort of students for Alpha, each placed in the current session.
-        Student::factory()->count(18)->create()->each(function (Student $student, int $i) use ($levels, $session) {
+        $cohort = Student::factory()->count(18)->create()->each(function (Student $student, int $i) use ($levels, $session) {
             $level = $levels[$i % $levels->count()];
             $arm = $level->arms[$i % 2];
 
@@ -140,6 +142,39 @@ class DatabaseSeeder extends Seeder
                 'started_on' => '2025-09-15',
             ]);
         });
+
+        // Guardians — one primary contact per student for the first dozen, a
+        // second guardian for a few, and one guardian shared across two siblings.
+        $cohort->take(12)->each(function (Student $student, int $i) {
+            $mother = Guardian::factory()->create([
+                'last_name' => $student->last_name,
+                'phone' => '+234 802 000 '.str_pad((string) (1000 + $i), 4, '0', STR_PAD_LEFT),
+            ]);
+            $student->guardianLinks()->create([
+                'guardian_id' => $mother->id,
+                'relationship' => GuardianRelationship::Mother->value,
+                'is_primary' => true,
+            ]);
+
+            if ($i % 3 === 0) {
+                $father = Guardian::factory()->create(['last_name' => $student->last_name]);
+                $student->guardianLinks()->create([
+                    'guardian_id' => $father->id,
+                    'relationship' => GuardianRelationship::Father->value,
+                    'is_primary' => false,
+                ]);
+            }
+        });
+
+        // Siblings sharing a guardian.
+        $sharedGuardian = Guardian::factory()->create(['last_name' => 'Ade', 'first_name' => 'Folake']);
+        foreach ($cohort->slice(12, 2) as $sibling) {
+            $sibling->guardianLinks()->create([
+                'guardian_id' => $sharedGuardian->id,
+                'relationship' => GuardianRelationship::LegalGuardian->value,
+                'is_primary' => true,
+            ]);
+        }
 
         // One graduated student with a completed placement — history is kept.
         $alumnus = Student::factory()->status(StudentStatus::Graduated)->create(['first_name' => 'Ada', 'last_name' => 'Obi']);

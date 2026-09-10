@@ -123,14 +123,32 @@ optional period / level / optional arm; one `active` = the current class via
 `Module::Students->isAvailable()` is now `true`. Full detail in
 `docs/student-management.md`.
 
-Deferred: guardians / parents (linkage + screens), teacher assignment, class
-rosters, attendance, assessments, results, fees, **promotion / graduation
-workflow**, bulk student import, student ID / photo / documents, medical info,
-transfer records, student portal.
+Deferred: guardians / parents (linkage + screens — done in M10), teacher
+assignment, class rosters, attendance, assessments, results, fees, **promotion /
+graduation workflow**, bulk student import, student ID / photo / documents,
+medical info, transfer records, student portal.
 
-## Milestone 10+ — Domain Modules
+## ✅ Milestone 10 — Guardian / Parent Management (complete, 2026-09-18)
 
-Guardians · Staff · Class rosters & teacher assignment · Timetable · Attendance ·
+Tenant-scoped guardian / parent records and the student ↔ guardian relationship.
+`App\Models\Guardian` (minimal contact data — name / phones / email / address /
+notes; no ID / financial / medical / emergency data; no portal credentials; no
+global uniqueness; never hard-deleted) + `App\Models\GuardianStudent` (the link:
+school-owned + carries `student_id` + `guardian_id`; explicit
+`GuardianRelationship`; one `is_primary` per student via `makePrimary()`;
+`unique(student_id, guardian_id)`). `/guardians/*` gated `guardian.view` /
+`guardian.manage` (M4 permissions, previously dormant) **and** `module:guardians`
+— which depends on `module:students`. `Module::Guardians->isAvailable()` is now
+`true`; `guardian.view` added to the Staff bundle. Links are created from the
+student profile. Full detail in `docs/guardian-management.md`.
+
+Deferred: Parent Portal (guardian sign-in + portal accounts), guardian
+messaging / notifications, pickup authorisation, custody documents, emergency
+contacts, bulk guardian import, duplicate-guardian merge.
+
+## Milestone 11+ — Domain Modules
+
+Staff · Class rosters & teacher assignment · Timetable · Attendance ·
 Assessments & Results · Fees / Invoices / Payments (Paystack) · CBT ·
 Role-specific portals & dashboards · Notifications · Reporting · Promotion.
 

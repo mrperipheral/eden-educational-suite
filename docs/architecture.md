@@ -1,7 +1,7 @@
 # Architecture
 
-Status: Milestone 9 (Student Management) complete. This describes the intended
-shape of the system and what exists today.
+Status: Milestone 10 (Guardian / Parent Management) complete. This describes the
+intended shape of the system and what exists today.
 
 ## 1. High-level model
 
@@ -194,14 +194,39 @@ placement workflow.
   rejected in the Form Request with generic messages (no leak); the enrollment
   Form Request `abort(404)`s on a cross-school route parent.
 
+## 2h. Guardian management (implemented — Milestone 10)
+
+Full reference: **`docs/guardian-management.md`**. Tenant-scoped guardian /
+parent records and the student ↔ guardian relationship the later Parent Portal /
+Notifications modules build on. Records + linkage only — no portal, no
+credentials, no messaging.
+
+- **`App\Models\Guardian`** — school-owned. Minimal contact data (name, phone,
+  alternate phone, email, address, notes). No identity / financial / medical /
+  emergency data, no portal credentials. No global uniqueness; never
+  hard-deleted.
+- **`App\Models\GuardianStudent`** — the link. School-owned *and* carries
+  `student_id` + `guardian_id`. `relationship`
+  (`App\Enums\GuardianRelationship`), `is_primary` (at most one per student via
+  `makePrimary()`, the M8/M9 "one at a time" pattern). `unique(student_id,
+  guardian_id)` — no duplicate links.
+- **`App\Http\Controllers\Guardian\*`**, `/guardians/*` routes behind
+  `['tenant', 'module:guardians']`, gated `guardian.view` / `guardian.manage`
+  (M4 permissions, previously dormant — now enforced). `Module::Guardians`
+  **depends on `Module::Students`**. `guardian.view` added to the Staff bundle.
+- Links are created from the student's profile; `student_id` / `guardian_id` are
+  validated tenant-scoped (`Rule::exists(...)->where('school_id', …)`), and the
+  `{link}` route id `abort(404)`s on a cross-school id before validation.
+
 ### Deferred
 
 - Queue jobs capture/restore the tenant id (no jobs exist yet — see
   `docs/tenancy.md` §7).
 - Invitations / brand-new-account onboarding, school suspension / subscription,
   notification & payment config, the remaining domain modules behind the M7
-  catalogue (guardians, staff, timetable, attendance, results, fees, CBT,
-  portals, promotion workflow, bulk student import), admin UI for `status` /
+  catalogue (staff, timetable, attendance, results, fees, CBT, portals,
+  promotion workflow, bulk student / guardian import), the Parent Portal
+  (guardian sign-in + portal accounts), admin UI for `status` /
   `is_platform_admin`, subdomain routing.
 
 ## 3. Application layers & conventions
@@ -289,3 +314,6 @@ pre-auth screens.
 | 2026-09-17 | Current class is the one `active` `Enrollment`, never a column on `students` | history is first-class; "where now" and "where before" are one model; promotion later just adds rows (see `docs/student-management.md`) |
 | 2026-09-17 | Two status enums (`StudentStatus` vs `EnrollmentStatus`); student `status` not mass-assignable | student↔school vs one-placement are distinct; lifecycle changes get one dedicated, auditable seam |
 | 2026-09-17 | `Module::Students` depends on `Module::Academics` | enrollment is meaningless without sessions/levels — a minimal, correct extension of the M7 catalogue |
+| 2026-09-18 | Student ↔ guardian is a dedicated `GuardianStudent` link model (carries `school_id` + both FKs), not a bare pivot | the link carries behaviour (`relationship`, `is_primary`, `makePrimary()`) and must be `BelongsToSchool` and tenant-safe in its own right (see `docs/guardian-management.md`) |
+| 2026-09-18 | One primary guardian per student, enforced transactionally (not a partial unique index); links created from the student workflow | portable across MySQL/SQLite; matches how a school thinks about "this child's parents"; no unbounded student picker |
+| 2026-09-18 | Guardians store contact data only — no ID/financial/medical/emergency data, no portal credentials | "do not collect unnecessary sensitive information"; sign-in is the Parent Portal's concern, a later milestone |

@@ -6,6 +6,8 @@ use App\Http\Controllers\Academic\PeriodController;
 use App\Http\Controllers\Academic\SessionController as AcademicSessionController;
 use App\Http\Controllers\Academic\SubjectController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\Guardian\GuardianController;
+use App\Http\Controllers\Guardian\GuardianLinkController;
 use App\Http\Controllers\HealthController;
 use App\Http\Controllers\MemberController;
 use App\Http\Controllers\Platform\SchoolController as PlatformSchoolController;
@@ -209,6 +211,40 @@ Route::middleware(['auth', 'verified', 'active'])->group(function () {
                 ->whereNumber('student')->can('student.manage')->name('update');
             Route::patch('{student}/status', [StudentController::class, 'updateStatus'])
                 ->whereNumber('student')->can('student.manage')->name('status');
+        });
+
+        /*
+        | Guardian / parent management (see docs/guardian-management.md). Two gates:
+        |   module:guardians  — is the feature on for this school? (depends on students)
+        |   ->can('guardian.view' | 'guardian.manage')  — may this user?
+        | Tenant-owned ids ({guardian}, {link}, {student}) are resolved by
+        | tenant-scoped `findOrFail` in the controller (after `tenant`), so
+        | another school's id 404s.
+        */
+        Route::middleware('module:guardians')->prefix('guardians')->name('guardians.')->group(function () {
+            Route::get('/', [GuardianController::class, 'index'])
+                ->can('guardian.view')->name('index');
+            Route::get('create', [GuardianController::class, 'create'])
+                ->can('guardian.manage')->name('create');
+            Route::post('/', [GuardianController::class, 'store'])
+                ->can('guardian.manage')->name('store');
+
+            // Student ↔ guardian links — literal prefixes, before {guardian}.
+            Route::get('students/{student}/link', [GuardianLinkController::class, 'create'])
+                ->whereNumber('student')->can('guardian.manage')->name('links.create');
+            Route::post('links', [GuardianLinkController::class, 'store'])
+                ->can('guardian.manage')->name('links.store');
+            Route::patch('links/{link}', [GuardianLinkController::class, 'update'])
+                ->whereNumber('link')->can('guardian.manage')->name('links.update');
+            Route::delete('links/{link}', [GuardianLinkController::class, 'destroy'])
+                ->whereNumber('link')->can('guardian.manage')->name('links.destroy');
+
+            Route::get('{guardian}', [GuardianController::class, 'show'])
+                ->whereNumber('guardian')->can('guardian.view')->name('show');
+            Route::get('{guardian}/edit', [GuardianController::class, 'edit'])
+                ->whereNumber('guardian')->can('guardian.manage')->name('edit');
+            Route::patch('{guardian}', [GuardianController::class, 'update'])
+                ->whereNumber('guardian')->can('guardian.manage')->name('update');
         });
     });
 });

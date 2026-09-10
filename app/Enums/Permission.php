@@ -36,9 +36,11 @@ enum Permission: string
     case StudentView = 'student.view';
     case StudentManage = 'student.manage';
 
-    // ---- Declared for later domain milestones (coarse; not yet enforced) -----
+    // ---- Guardians (enforced: Guardian Management M10) --------------------
     case GuardianView = 'guardian.view';
     case GuardianManage = 'guardian.manage';
+
+    // ---- Declared for later domain milestones (coarse; not yet enforced) -----
     case StaffView = 'staff.view';
     case StaffManage = 'staff.manage';
     case AttendanceView = 'attendance.view';

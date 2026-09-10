@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Student;
 
+use App\Enums\GuardianRelationship;
 use App\Enums\StudentStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Student\StudentRequest;
@@ -64,12 +65,16 @@ class StudentController extends Controller
         $this->authorize('student.view');
 
         $student = Student::query()
-            ->with(['enrollments' => fn ($q) => $q->with(['session', 'period', 'level', 'arm'])->ordered()])
+            ->with([
+                'enrollments' => fn ($q) => $q->with(['session', 'period', 'level', 'arm'])->ordered(),
+                'guardianLinks' => fn ($q) => $q->with('guardian'),
+            ])
             ->findOrFail($student);
 
         return view('students.show', [
             'student' => $student,
             'statuses' => StudentStatus::all(),
+            'relationships' => GuardianRelationship::all(),
         ]);
     }
 

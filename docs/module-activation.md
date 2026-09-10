@@ -58,9 +58,10 @@ activation system changes.
 
 - **`isAvailable()`** — whether the functionality behind the module is actually
   built. Each domain milestone flips its own module to `true` when it ships
-  something usable; the admin screen badges the rest **Planned**. As of **M9**:
-  `academics` (`docs/academic-foundation.md`) and `students`
-  (`docs/student-management.md`); everything else is still Planned.
+  something usable; the admin screen badges the rest **Planned**. As of **M10**:
+  `academics` (`docs/academic-foundation.md`), `students`
+  (`docs/student-management.md`) and `guardians`
+  (`docs/guardian-management.md`); everything else is still Planned.
 - **Defaults** lean toward a private nursery/primary/secondary school: core
   management on, specialised tools (timetable, learning materials, CBT) off. A
   freshly onboarded school writes **zero** rows — every module simply uses its
@@ -143,9 +144,11 @@ Route::middleware(['tenant', 'module:academics'])->group(function () {
   If not, the route 404s (the feature is not part of that school's app).
 - **`->can('academics.view')`** — may *this user* do it? (M4, unchanged.)
 
-M8's Academic Foundation and M9's Student Management are the first real
-consumers of this seam — see `docs/academic-foundation.md` §6 and
-`docs/student-management.md` §6.
+M8's Academic Foundation, M9's Student Management and M10's Guardian Management
+are the real consumers of this seam — see `docs/academic-foundation.md` §6,
+`docs/student-management.md` §6 and `docs/guardian-management.md` §6.
+`module:guardians` depends on `module:students`, which depends on
+`module:academics`.
 
 `@module('attendance') … @endmodule` is the Blade equivalent for nav/dashboards.
 

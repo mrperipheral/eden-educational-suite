@@ -180,6 +180,25 @@ Full detail in `docs/student-management.md`. Summary of controls:
 | No hard delete | students and enrollments are never deleted; a leaver is a `status` change, history retained |
 | CSRF | every form; `@method('PATCH')` spoofing |
 
+## Implemented in Milestone 10 (Guardian / Parent Management)
+
+Full detail in `docs/guardian-management.md`. Summary of controls:
+
+| Control | State |
+|---------|-------|
+| Two gates on every guardian route | `module:guardians` (feature on? else 404) **and** `->can('guardian.view'|'.manage')`; write Form Requests re-check `guardian.manage` |
+| Enforced permissions | `guardian.view` (School Admin, Principal, Bursar, Teacher, Staff) / `guardian.manage` (School Admin, Principal); Parent / Student / role-less → 403 (tested) |
+| Activation ≠ authorization | Guardians module on does not give a Parent `guardian.view` (tested) |
+| Tenant isolation | `Guardian` and `GuardianStudent` are `BelongsToSchool`; the link also carries `student_id` + `guardian_id`. School A's guardians / links cannot be read, created, edited or deleted from School B (explicit HTTP + model tests) |
+| `school_id` protection | never in `$fillable`, never from input, stamped from `TenantContext`, immutable (`updating` hook → `TenantMismatchException`, tested per model); a `school_id` in the create payload is ignored (tested) |
+| Route-model binding | tenant-owned ids (`{guardian}`, `{link}`, `{student}`) resolved by tenant-scoped `findOrFail`; another school's id 404s |
+| Cross-school id leakage | `GuardianLinkRequest` `abort(404)`s on a cross-school `{link}` before validation; `student_id` / `guardian_id` in the link payload use `Rule::exists(...)->where('school_id', <tenant>)`, so a cross-school id fails with a plain "invalid" message, never a 500 or an oracle |
+| Duplicate relationships | `unique(student_id, guardian_id)` + a friendly `Rule::unique` message; a repeat link is rejected, no row written |
+| Primary-guardian invariant | at most one `is_primary` link per student, enforced transactionally in `GuardianStudent::makePrimary()` (scoped per student) |
+| PII minimisation | name / phones / email / address / notes only — no government ID / BVN / NIN, no financial / medical / emergency data, **no portal credentials** |
+| No hard delete | guardians are never deleted by the UI; removing a link keeps both records; FKs cascade for a future data-erasure tool |
+| CSRF | every form; `@method('PATCH'|'DELETE')` spoofing |
+
 ## Deferred (with the milestone that owns them)
 
 - **Auth follow-ups:** 2FA, "log out other devices" on password change, session
@@ -187,15 +206,16 @@ Full detail in `docs/student-management.md`. Summary of controls:
 - **Authz follow-ups:** multi-role per school, custom/runtime roles, invitations
   / brand-new-account onboarding, admin UI for `status` / `is_platform_admin`,
   audit logging of role & membership changes, enforcing the remaining dormant
-  domain permissions (each in its module — `academics.*` in M8, `student.*` in M9).
+  domain permissions (each in its module — `academics.*` in M8, `student.*` in
+  M9, `guardian.*` in M10).
 - **Tenancy follow-ups:** queue-job tenant propagation, per-tenant rate limiting,
   per-tenant cache keys, audit logging of context switches.
 - **Later:** audit logging (who did what, per school — incl. student record /
   status changes), virus scanning of uploads (type/size/dimension validation and
   out-of-webroot storage are done in M6 — see `docs/school-settings.md` §4),
   encryption of sensitive PII at rest, data export / erasure (GDPR-style)
-  handling for student records, 2FA for admins, security headers (CSP) review,
-  dependency scanning in CI.
+  handling for student and guardian records, 2FA for admins, security headers
+  (CSP) review, dependency scanning in CI.
 
 ## Review checklist for every PR
 

@@ -1,12 +1,13 @@
 # Database Design
 
-Status: Milestone 9. Tenant + roles + onboarding + school settings + module
-activation + academic foundation + student management. School-owned tables:
-`school_settings` (M6), `school_modules` (M7), the academic structure —
-`academic_sessions`, `academic_periods`, `academic_levels`, `level_arms`,
-`subjects`, `level_subject` (M8) — and `students` + `enrollments` (M9). No
-guardian / staff / timetable / attendance / results tables yet. This document
-records the conventions every future migration follows.
+Status: Milestone 10. Tenant + roles + onboarding + school settings + module
+activation + academic foundation + student management + guardian management.
+School-owned tables: `school_settings` (M6), `school_modules` (M7), the academic
+structure — `academic_sessions`, `academic_periods`, `academic_levels`,
+`level_arms`, `subjects`, `level_subject` (M8) — `students` + `enrollments` (M9),
+and `guardians` + `guardian_student` (M10). No staff / timetable / attendance /
+results tables yet. This document records the conventions every future migration
+follows.
 
 ## Current schema
 
@@ -24,6 +25,8 @@ records the conventions every future migration follows.
 | `level_subject` | which subjects a level offers. School-owned. `unique(academic_level_id, subject_id)`, `index(school_id, academic_level_id)`. |
 | `students` | student records. School-owned. `unique(school_id, admission_number)`, `index(school_id, status)`, `index(school_id, last_name, first_name)`. Never hard-deleted. |
 | `enrollments` | a student's academic placement over time. School-owned **+** `student_id`. `index(school_id, student_id, status)`, roster index `(school_id, session, level, arm)`. One `active` row per student. |
+| `guardians` | parent / guardian contact records. School-owned. `index(school_id, last_name, first_name)`, `index(school_id, phone)`, `index(school_id, email)`. No global uniqueness; minimal contact data; never hard-deleted. |
+| `guardian_student` | student ↔ guardian link. School-owned **+** `student_id` **+** `guardian_id`. `unique(student_id, guardian_id)`, `index(school_id, student_id, is_primary)`, `index(school_id, guardian_id)`. `relationship`, `is_primary` (at most one per student). |
 | `school_modules` | per-school feature-module on/off overrides. School-owned. `unique(school_id, module)`. Override-only — a row exists only where a school departs from the `App\Enums\Module` default. |
 | `password_reset_tokens`, `sessions` | auth/session plumbing |
 | `cache`, `cache_locks` | `CACHE_STORE=database` |
@@ -117,6 +120,21 @@ Two migrations, both school-owned (`BelongsToSchool`). See `docs/student-managem
   `active` row per student (enforced in `Enrollment::makeActive()`). History is
   preserved — placements are closed, never deleted.
 
+### `2026_09_18_100000_*` — Guardian Management (Milestone 10)
+Two migrations, both school-owned (`BelongsToSchool`). See `docs/guardian-management.md`.
+
+- **`guardians`** — `first_name` / `last_name` (req), `middle_name` /
+  `preferred_name`, `email`, `phone`, `alt_phone`, `address_line1/2` / `city` /
+  `state`, `notes`. `index(school_id, last_name, first_name)`,
+  `index(school_id, phone)`, `index(school_id, email)`. No uniqueness — a
+  guardian has no natural school-owned identifier. Minimal contact data only (no
+  ID / financial / medical / emergency data, no credentials); never hard-deleted.
+- **`guardian_student`** — `student_id` FK (cascade) + `guardian_id` FK
+  (cascade), `relationship` (`App\Enums\GuardianRelationship`), `is_primary`
+  (bool, default false). `unique(student_id, guardian_id)` (no duplicate links),
+  `index(school_id, student_id, is_primary)`, `index(school_id, guardian_id)`.
+  One `is_primary` row per student (enforced in `GuardianStudent::makePrimary()`).
+
 ### `2026_09_15_100000_create_school_modules_table`
 Milestone 7 — per-school feature/module activation. `module` (`string(40)`, an
 `App\Enums\Module` value, **not** cast so an unknown id can't break a page),
@@ -170,8 +188,8 @@ written only via `App\Support\Modules\SchoolModules`. See `docs/module-activatio
 
 ## Not yet designed (later milestones, will be added here)
 
-`school_user.is_default`, holiday / calendar events, guardians, staff, teacher
-assignment, class rosters, attendance, assessments/results,
-fees/invoices/payments, CBT, audit log. Each gets an entry here when built.
+`school_user.is_default`, holiday / calendar events, staff, teacher assignment,
+class rosters, attendance, assessments/results, fees/invoices/payments, CBT,
+audit log. Each gets an entry here when built.
 
 Permissions and roles are **not** in the database — they are code (`App\Enums`).

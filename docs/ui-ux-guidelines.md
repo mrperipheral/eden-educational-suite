@@ -98,6 +98,18 @@ cascade — picking a session filters the term select, picking a level filters
 the arm select. Read-only roles (`student.view`) see lists and profiles with no
 create / edit / status controls.
 
+The **Guardians** area (`resources/views/guardians/`,
+`docs/guardian-management.md`, gated `guardian.*` + `module:guardians`) is a
+top-level nav item. **List** — name / phone / email search + pagination + a
+linked-student count; a shared `_form.blade.php` drives **create** and **edit**.
+The **profile** page shows contact details and the linked students, each with an
+inline (Alpine) relationship-edit form and an `x-confirm` unlink. The student ↔
+guardian link is added from the **student's** profile ("Add guardian" → a page
+with a guardian `<select>` + relationship + primary-contact checkbox, plus a
+link to create a new guardian). The student profile carries a "Parents /
+guardians" card mirroring the same inline edit / unlink. Read-only roles
+(`guardian.view`) see lists and profiles with no create / edit / link controls.
+
 Flash messages (`session('success' | 'error' | 'status')`) are rendered
 automatically by `<x-layouts.app>` as alerts.
 
@@ -128,5 +140,5 @@ automatically by `<x-layouts.app>` as alerts.
 
 Dark mode, dense/table layouts, data-grid, charts, iconography system,
 notification/toast system. The primary nav is permission- and
-module-filtered (Dashboard · Members · Students · Academic · School settings · Schools ·
-Account) but not yet role-specific / collapsible. Add here when built.
+module-filtered (Dashboard · Members · Students · Guardians · Academic · School settings ·
+Schools · Account) but not yet role-specific / collapsible. Add here when built.
