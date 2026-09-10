@@ -1,15 +1,16 @@
 # Database Design
 
-Status: Milestone 2. **No school-domain tables exist yet.** This document
-records the conventions every future migration follows.
+Status: Milestone 3. The tenant foundation (`schools`, `school_user`) exists; no
+school-*domain* tables (students, staff, classes …) yet. This document records
+the conventions every future migration follows.
 
 ## Current schema
 
-Laravel framework tables plus one authentication column:
-
 | Table | Purpose |
 |-------|---------|
-| `users` | authentication identities. `id, name, email (unique), email_verified_at, password, status, remember_token, timestamps` |
+| `users` | auth identities. `id, name, email (unique), email_verified_at, password, status, is_platform_admin, remember_token, timestamps` |
+| `schools` | tenant root. `id, name, slug (unique), status, timestamps` |
+| `school_user` | User↔School membership. PK `(school_id, user_id)`, cascade both ways |
 | `password_reset_tokens`, `sessions` | auth/session plumbing |
 | `cache`, `cache_locks` | `CACHE_STORE=database` |
 | `jobs`, `job_batches`, `failed_jobs` | `QUEUE_CONNECTION=database` |
@@ -17,15 +18,23 @@ Laravel framework tables plus one authentication column:
 
 Engine: MySQL 8 / MariaDB, InnoDB, `utf8mb4`.
 
-### Migration `2026_09_10_120000_add_status_to_users_table`
+### `2026_09_10_120000_add_status_to_users_table`
+`users.status` — `string(20)`, default `'active'`, **indexed**. `App\Enums\UserStatus`.
 
-Adds `users.status` — `string(20)`, default `'active'`, **indexed**. Backed by
-`App\Enums\UserStatus` (`active` / `suspended` / `disabled`); gates
-authentication. Indexed because admin user lists will filter on it once the
-staff / multi-school modules exist. No `school_id` on `users` — the user↔school
-relationship is Milestone 3.
+### `2026_09_11_100000_create_schools_table`
+Tenant root. `status` `string(20)` default `'active'` **indexed**
+(`App\Enums\SchoolStatus`: `active` / `suspended`). `slug` unique, used as the
+route key. Not tenant-scoped.
 
-## Multi-tenant conventions (to apply from the next milestone on)
+### `2026_09_11_100010_create_school_user_table`
+Membership pivot. Composite PK `(school_id, user_id)` covers "members of school";
+the `user_id` FK index covers "schools for user". No role column (later milestone).
+
+### `2026_09_11_100020_add_is_platform_admin_to_users_table`
+`users.is_platform_admin` boolean default false. Not indexed (tiny cardinality),
+not mass-assignable. The platform-owner primitive — see `docs/tenancy.md` §2.
+
+## Multi-tenant conventions (ACTIVE — enforced by `BelongsToSchool` from M3 on)
 
 1. **`school_id` on every school-owned table.**
    `$table->foreignId('school_id')->constrained()->cascadeOnDelete();`
@@ -41,7 +50,8 @@ relationship is Milestone 3.
 3. **Foreign keys stay within the same tenant.** A `class_id` on a table that
    also has `school_id` must point at a `classes` row with the same `school_id`.
    Enforced by the `BelongsToSchool` global scope at the application layer and by
-   validation rules scoped to `TenantContext::id()`.
+   validation rules scoped to `TenantContext::id()`. Never add `school_id` to a
+   model's `$fillable` — the `BelongsToSchool` trait is the only writer.
 
 4. **No cross-tenant leakage through nullable FKs or polymorphic types** without
    an explicit tenant check.
@@ -68,6 +78,6 @@ relationship is Milestone 3.
 
 ## Not yet designed (later milestones, will be added here)
 
-`schools`, roles/permissions, students, guardians, staff, classes/sections,
-subjects, enrolment, attendance, assessments/results, fees/invoices/payments,
-CBT, audit log. Each gets an entry here when built.
+Roles/permissions, `school_user` role/default columns, students, guardians,
+staff, classes/sections, subjects, enrolment, attendance, assessments/results,
+fees/invoices/payments, CBT, audit log. Each gets an entry here when built.

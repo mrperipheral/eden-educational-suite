@@ -26,11 +26,17 @@ package. Full detail in `docs/authentication.md`.
 Deferred to their own milestone: **role & permission model** (evaluate Spatie
 Permission then), 2FA, auth audit logging.
 
-## Milestone 3 — Multi-School Core
+## ✅ Milestone 3 — Multi-School / Strict Tenant Isolation (complete, 2026-09-11)
 
-`schools` table and model, `EnforceTenant` middleware, `BelongsToSchool` trait +
-global scope + `creating` hook, tenant-scoped validation helpers, cross-tenant
-isolation test suite, school switching for multi-school users.
+`schools` table + model, `school_user` membership, `users.is_platform_admin`,
+`TenantContext` (resolve/set/bypass), `EnforceTenant` middleware, school picker /
+switcher, `BelongsToSchool` trait + `SchoolScope` global scope + `creating` /
+`updating` hooks (unspoofable, immutable `school_id`), `SchoolPolicy`,
+`MissingTenantContext` / `TenantMismatch` exceptions, cross-school isolation test
+suite. Full detail in `docs/tenancy.md`.
+
+Deferred: `school_user` roles, membership management UI, queue-job tenant
+propagation, subdomain routing.
 
 ## Milestone 3.x — Roles & Permissions
 

@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Models\School;
 use App\Models\User;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
@@ -11,15 +12,22 @@ class DatabaseSeeder extends Seeder
     use WithoutModelEvents;
 
     /**
-     * Seed the application's database.
+     * Local development data: two schools, a member of one, and a platform admin.
      */
     public function run(): void
     {
-        // User::factory(10)->create();
+        $alpha = School::factory()->create(['name' => 'Alpha Academy', 'slug' => 'alpha-academy']);
+        School::factory()->create(['name' => 'Beta School', 'slug' => 'beta-school']);
 
-        User::factory()->create([
+        $member = User::factory()->create([
             'name' => 'Test User',
             'email' => 'test@example.com',
+        ]);
+        $member->schools()->attach($alpha);
+
+        User::factory()->platformAdmin()->create([
+            'name' => 'Platform Owner',
+            'email' => 'owner@example.com',
         ]);
     }
 }

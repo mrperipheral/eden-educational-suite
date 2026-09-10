@@ -61,12 +61,16 @@ See `docs/architecture.md` for the full rationale. In short:
   Plain classes, constructor-injected. Do not create a service/repository layer
   for simple CRUD.
 - **Models** (`app/Models`) — guard mass assignment (`$fillable` or the PHP 8
-  `#[Fillable]` attribute, as `User` does). Casts via `casts()`. Tenant-owned
-  models will use the `BelongsToSchool` trait (later milestone) — never a manual
-  `where('school_id', …)` scattered through the codebase.
-- **Tenancy** — `App\Support\Tenancy\TenantContext` (request-scoped singleton) is
-  the single source of truth for "which school are we acting as". Resolve it from
-  the container; never read a raw `school_id` from user input.
+  `#[Fillable]` attribute, as `User` does). Casts via `casts()`.
+- **Tenancy** (see `docs/tenancy.md`) — every school-owned model
+  `use App\Support\Tenancy\Concerns\BelongsToSchool` (adds the `SchoolScope`
+  global scope + stamps/locks `school_id`). **Never** add `school_id` to
+  `$fillable`, never write a manual `where('school_id', …)`, never read
+  `school_id` from the request. The active school is
+  `App\Support\Tenancy\TenantContext` (request-scoped); routes that touch tenant
+  data get the `tenant` middleware. Cross-tenant work is explicit
+  (`TenantContext::runWithoutScope()`). Every school-owned migration leads its
+  lookup indexes with `school_id`.
 - **Enums** (`app/Enums`) — closed value sets backed by string columns
   (`UserStatus`). Add behaviour to the enum, not `match` ladders in callers.
 - **Middleware** (`app/Http/Middleware`) — cross-cutting request guards; register
@@ -94,6 +98,7 @@ See `docs/architecture.md` for the full rationale. In short:
 ## Milestones
 
 Tracked in `PROJECT_STATUS.md` and `docs/roadmap.md`. **Milestones 1 (Platform
-Foundation) and 2 (Authentication & User Foundation) are complete.** Do not start
-Multi-School Core, Roles & Permissions, Onboarding or any domain module without
+Foundation), 2 (Authentication & User Foundation) and 3 (Multi-School / Strict
+Tenant Isolation) are complete.** Do not start Roles & Permissions, School
+Onboarding or any domain module (students, staff, academics, fees, …) without
 picking up the next milestone explicitly.

@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\HealthController;
+use App\Http\Controllers\SchoolContextController;
 use App\Http\Controllers\Settings\PasswordController;
 use App\Http\Controllers\Settings\ProfileController;
 use Illuminate\Support\Facades\Route;
@@ -13,14 +14,16 @@ Route::view('/', 'welcome')->name('home');
 Route::get('/health', HealthController::class)->name('health');
 
 /*
-| Authenticated application.
+| Authenticated — account level (no school context required).
 |
 |   auth      — must be signed in
 |   verified  — must have confirmed their email address
 |   active    — account must not be suspended/disabled (checked every request)
 */
 Route::middleware(['auth', 'verified', 'active'])->group(function () {
-    Route::get('dashboard', DashboardController::class)->name('dashboard');
+    // Choosing / switching the active school. Runs before a tenant exists.
+    Route::get('school', [SchoolContextController::class, 'create'])->name('school-context.create');
+    Route::post('school', [SchoolContextController::class, 'store'])->name('school-context.store');
 
     Route::redirect('settings', 'settings/profile');
     Route::get('settings/profile', [ProfileController::class, 'edit'])->name('settings.profile.edit');
@@ -30,6 +33,14 @@ Route::middleware(['auth', 'verified', 'active'])->group(function () {
         ->name('settings.profile.destroy');
 
     Route::put('settings/password', [PasswordController::class, 'update'])->name('settings.password.update');
+
+    /*
+    | Authenticated — tenant scoped. `tenant` resolves the active school into
+    | TenantContext or redirects to the school picker.
+    */
+    Route::middleware('tenant')->group(function () {
+        Route::get('dashboard', DashboardController::class)->name('dashboard');
+    });
 });
 
 require __DIR__.'/auth.php';

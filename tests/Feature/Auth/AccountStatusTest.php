@@ -39,12 +39,14 @@ class AccountStatusTest extends TestCase
     {
         $user = User::factory()->create();
 
-        $this->actingAs($user)->withoutVite()->get('/dashboard')->assertOk();
+        // An account-level route (no tenant context needed) — this test is only
+        // about the `active` middleware.
+        $this->actingAs($user)->withoutVite()->get('/settings/profile')->assertOk();
 
         // `status` is intentionally not mass-assignable; an admin flow sets it directly.
         $user->forceFill(['status' => UserStatus::Suspended])->save();
 
-        $this->get('/dashboard')->assertRedirect('/login');
+        $this->get('/settings/profile')->assertRedirect('/login');
         $this->assertGuest();
     }
 

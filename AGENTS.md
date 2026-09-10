@@ -9,15 +9,18 @@ The full development guide is **[CLAUDE.md](CLAUDE.md)** and the documents under
   No public website / website-builder features — ever.
 - **Stack:** PHP 8.3+, Laravel 13, MySQL, Blade + Tailwind v4 + Alpine.js + Vite,
   PHPUnit, Pint. No React/Vue/Inertia.
-- **Tenancy:** one shared database, logical isolation via `school_id`. Use
-  `App\Support\Tenancy\TenantContext`; never trust a `school_id` from user input.
+- **Tenancy** (`docs/tenancy.md`): one shared DB, logical isolation via
+  `school_id`. School-owned models `use BelongsToSchool`; never put `school_id`
+  in `$fillable`, never `where('school_id')` by hand, never read `school_id` from
+  the request. Active school = `App\Support\Tenancy\TenantContext`; tenant routes
+  get the `tenant` middleware.
 - **Security:** server-side authorization (Policies), Form Request validation,
   CSRF on every write. Frontend hiding is not authorization.
 - **Auth:** native Laravel, no starter package. See `docs/authentication.md`.
   Check permissions, never role names.
 - **Scope discipline:** work the current milestone only. `PROJECT_STATUS.md` and
-  `docs/roadmap.md` say where we are. Milestones 1 (Platform Foundation) and 2
-  (Authentication & User Foundation) are done.
+  `docs/roadmap.md` say where we are. Milestones 1–3 (Platform Foundation,
+  Authentication, Multi-School Tenant Isolation) are done.
 - **Before finishing:** `php artisan test`, `vendor/bin/pint`, `npm run build`.
 - This file and `docs/` are development-only and must never become a runtime
   dependency of the application.

@@ -13,9 +13,10 @@ column.
 2. **Validate every input** through a Form Request (or `validate()` for trivial
    read filters). Never trust shape, type, range or ownership of request data.
 3. **Tenant isolation is enforced, not assumed.** School A must never read or
-   mutate School B data. This is guaranteed by `TenantContext` + the (upcoming)
-   `BelongsToSchool` global scope + tenant-scoped validation, and proven by
-   dedicated cross-tenant tests.
+   mutate School B data. Guaranteed by `TenantContext` + the `BelongsToSchool`
+   global scope (`SchoolScope`, which *throws* rather than run unscoped) + the
+   `creating`/`updating` hooks that make `school_id` unspoofable and immutable,
+   and proven by the cross-tenant test suite. Full reference: `docs/tenancy.md`.
 4. **Least privilege.** Roles/permissions (a later milestone) grant the minimum;
    platform-admin capability is separate from any school role. Code checks
    permissions, never role names.
@@ -57,13 +58,32 @@ Full detail in `docs/authentication.md`. Summary of controls:
 | Transport / cookies | `session.secure` forced true in production by `AppServiceProvider`; `http_only` + `same_site=lax` defaults |
 | Authorization direction | documented (User → Permission → School → Policy → Action); roles/permissions not yet implemented |
 
+## Implemented in Milestone 3 (Multi-School Tenant Isolation)
+
+Full detail in `docs/tenancy.md`. Summary of controls:
+
+| Control | State |
+|---------|-------|
+| Cross-tenant reads | `SchoolScope` global scope constrains every `BelongsToSchool` query to `TenantContext::idOrFail()` |
+| Fail closed | no active context + no explicit bypass ⇒ `MissingTenantContextException`, never an unscoped query |
+| `school_id` spoofing | `creating` hook stamps it from the context and rejects any different supplied value (`TenantMismatchException`); column is never in `$fillable` |
+| `school_id` tampering | `updating` hook makes it immutable |
+| Cross-tenant find / update / delete | scoped query returns `null` / affects 0 rows (route binding ⇒ 404) |
+| Context resolution | `EnforceTenant` re-checks `School` existence + status + `User::canAccessSchool()` **every request**; session holds only an id |
+| Session tampering | changing `tenant.school_id` is inert — access is re-validated server-side |
+| Platform admin | `is_platform_admin` (not mass-assignable); no `Gate::before` blanket-allow — acts through a chosen tenant context |
+| School resource authz | `SchoolPolicy` — platform actions require platform admin; `enter` also requires an active school |
+| Suspended school | cannot be entered (`SchoolPolicy::enter`, `EnforceTenant`) |
+| Tenant-aware indexes | `school_id`-leading composite indexes are a documented requirement (`docs/database-design.md`) |
+
 ## Deferred (with the milestone that owns them)
 
 - **Auth follow-ups:** role/permission enforcement, 2FA, "log out other devices"
   on password change, session listing, auth-event audit logging, templated
   transactional emails.
-- **M3:** `EnforceTenant` middleware, `BelongsToSchool` scope, cross-tenant test
-  suite, per-tenant rate limiting considerations.
+- **Tenancy follow-ups:** queue-job tenant propagation, per-tenant rate limiting,
+  per-tenant cache keys, audit logging of context switches, membership
+  management / onboarding.
 - **Later:** audit logging (who did what, per school), secure file upload
   (type/size validation, out-of-webroot or object storage, virus posture),
   encryption of sensitive PII at rest, data export/erasure handling, 2FA for

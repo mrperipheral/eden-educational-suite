@@ -9,9 +9,12 @@ below, not a rewrite.
 
 ### Database access
 - Every list query is **paginated** (`paginate()` / `cursorPaginate()`), never an
-  unbounded fetch.
+  unbounded fetch. (The school picker already follows this — 15/page.)
 - Every tenant query is **indexed with `school_id` first** (see
-  `database-design.md`).
+  `database-design.md`). `SchoolScope` adds exactly one `school_id = ?` predicate
+  — the same column read replicas and future partitioning would key on.
+- `EnforceTenant` costs one PK `schools` load + one indexed `school_user`
+  existence check per tenant request; it loads no domain data.
 - **No N+1.** Eager-load relations; `Model::preventLazyLoading()` is on outside
   production so violations surface in dev and tests.
 - Prefer `select` of needed columns on hot paths; avoid `SELECT *` for wide rows.

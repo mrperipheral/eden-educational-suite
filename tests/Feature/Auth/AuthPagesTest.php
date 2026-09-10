@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Auth;
 
+use App\Models\School;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -53,6 +54,7 @@ class AuthPagesTest extends TestCase
     public function test_dashboard_uses_the_application_shell(): void
     {
         $user = User::factory()->create();
+        $user->schools()->attach(School::factory()->create());
 
         $this->actingAs($user)->get('/dashboard')
             ->assertOk()

@@ -56,4 +56,15 @@ class UserFactory extends Factory
             'status' => UserStatus::Disabled,
         ]);
     }
+
+    /**
+     * Platform owner. Not self-serviceable in the app — set via seeder / admin
+     * tooling only.
+     */
+    public function platformAdmin(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'is_platform_admin' => true,
+        ]);
+    }
 }

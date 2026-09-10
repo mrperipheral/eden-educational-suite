@@ -1,18 +1,22 @@
 <x-layouts.authenticated :title="__('Dashboard')">
     <div class="space-y-6">
-        <x-card :title="__('Welcome, :name', ['name' => auth()->user()->name])">
-            <p class="text-sm text-gray-600">
-                {{ __('Your account is set up and verified. School management features arrive in upcoming releases.') }}
+        <x-card :title="__('Current school')">
+            <p class="text-sm text-gray-700">
+                {{ __('You are working in') }}
+                <strong>{{ $school->name }}</strong>.
+            </p>
+            <p class="mt-1 text-xs text-gray-500">
+                {{ __('Everything you see and do is scoped to this school. Other schools\' data is never visible here.') }}
             </p>
         </x-card>
 
         <x-empty-state
             :title="__('Nothing to show yet')"
-            :description="__('This is a placeholder dashboard. Once your school is set up, this area will show the things that need your attention.')"
+            :description="__('This is a placeholder dashboard. Once the school modules are built, this area will show what needs your attention in :school.', ['school' => $school->name])"
         >
             <x-slot:actions>
                 <x-button :href="route('settings.profile.edit')" variant="secondary" size="sm">
-                    {{ __('Review account settings') }}
+                    {{ __('Account settings') }}
                 </x-button>
             </x-slot:actions>
         </x-empty-state>

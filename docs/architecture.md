@@ -1,7 +1,7 @@
 # Architecture
 
-Status: Milestone 2 (Authentication & User Foundation) complete. This describes
-the intended shape of the system and what exists today.
+Status: Milestone 3 (Multi-School / Strict Tenant Isolation) complete. This
+describes the intended shape of the system and what exists today.
 
 ## 1. High-level model
 
@@ -33,32 +33,39 @@ There is **no 500-school limit** anywhere in the design. Growth beyond that is a
 capacity exercise (indexes, read replicas, caching, queue workers), not an
 architectural rewrite.
 
-## 2. Tenant context (implemented)
+## 2. Multi-school tenant isolation (implemented — Milestone 3)
 
-`App\Support\Tenancy\TenantContext` is a request-scoped singleton
-(`$this->app->scoped(...)` in `AppServiceProvider`). It holds the active
-`school_id` and nothing else.
+One Laravel app, one shared database, logical isolation keyed by `school_id`.
+Full reference: **`docs/tenancy.md`**. Summary:
 
-| Method | Purpose |
-|--------|---------|
-| `set(int $id)` / `forget()` | lifecycle, called by middleware (later milestone) |
-| `has()` / `id()` | read current tenant |
-| `idOrFail()` | read, or throw — for code that must be scoped |
-| `runWithoutScope(callable)` | explicit, narrow escape hatch for platform-wide jobs |
-| `isBypassed()` | queried by the future global scope |
+- **`schools`** is the tenant root; **`school_user`** maps a many-to-many
+  membership; **`users.is_platform_admin`** is the platform-owner primitive
+  (separate from any per-school role, no `Gate::before` blanket-allow).
+- **`App\Support\Tenancy\TenantContext`** (request-scoped singleton) holds the
+  active school. `set()/setId()`, `id()/idOrFail()`, `school()/schoolOrFail()`,
+  `forget()`, `isBypassed()`, `runWithoutScope()`.
+- **`App\Http\Middleware\EnforceTenant`** (`tenant` alias) resolves the school
+  from the session selection (re-validated every request) or auto-selects a
+  single-school member, else redirects to the picker (`GET/POST /school`,
+  `SchoolContextController`).
+- **`App\Support\Tenancy\Concerns\BelongsToSchool`** + **`SchoolScope`** apply to
+  every school-owned model: a global scope that constrains reads/updates/deletes
+  to the active school (and **throws** — `MissingTenantContextException` — rather
+  than run unscoped), a `creating` hook that stamps `school_id` from the context
+  and rejects mismatches (`TenantMismatchException`), and an `updating` hook that
+  makes `school_id` immutable.
+- **`App\Policies\SchoolPolicy`** authorizes the school resource; platform
+  actions require `is_platform_admin`, `view`/`enter` allow members too.
 
 **Rule:** application code never reads `school_id` from the request. It asks
-`TenantContext`. This makes isolation a property of the framework wiring, not of
-every developer remembering a `where()` clause.
+`TenantContext`. Isolation is a property of the framework wiring, not of every
+developer remembering a `where()` clause.
 
-### Planned build-out (not in this milestone)
+### Deferred
 
-- `EnforceTenant` middleware: resolves the school for the authenticated user /
-  route, calls `TenantContext::set()`, 403s if the user has no access to it.
-- `BelongsToSchool` trait: adds a global scope filtering by
-  `TenantContext::id()` (unless `isBypassed()`), and a `creating` hook that
-  stamps `school_id`. Tenant-owned models `use BelongsToSchool`.
-- Queue jobs serialise and restore the tenant id.
+- Queue jobs capture/restore the tenant id (no jobs exist yet — see
+  `docs/tenancy.md` §7).
+- `school_user` roles, membership management UI, onboarding, subdomain routing.
 
 ## 3. Application layers & conventions
 
@@ -70,9 +77,9 @@ every developer remembering a `where()` clause.
 | Policies | `app/Policies` | model authorization, invoked server-side |
 | Services | `app/Services` | multi-step / cross-model business operations |
 | Models | `app/Models` | persistence, casts, mass-assignment guards, scopes |
-| Enums | `app/Enums` | closed value sets (`UserStatus`), backed by string columns |
-| Middleware | `app/Http/Middleware` | cross-cutting request guards (`EnsureAccountIsActive`) |
-| Support | `app/Support` | framework-agnostic helpers, value objects, tenancy |
+| Enums | `app/Enums` | closed value sets (`UserStatus`, `SchoolStatus`), backed by string columns |
+| Middleware | `app/Http/Middleware` | cross-cutting request guards (`EnsureAccountIsActive`, `EnforceTenant`) |
+| Support | `app/Support` | framework-agnostic helpers; `Support\Tenancy` = tenant context, `BelongsToSchool` trait, `SchoolScope`, exceptions |
 | Views | `resources/views/<area>` | pages |
 | UI components | `resources/views/components` | layouts + design-system primitives |
 
@@ -126,3 +133,7 @@ pre-auth screens.
 | 2026-09-10 | Account status = `users.status` string enum, gated at login + per-request middleware | three fixed states; login-only checks leave suspended sessions live |
 | 2026-09-10 | `verified` middleware on the app group only; `password.confirm` on account deletion only | users must be able to verify / leave; avoid unnecessary password prompts |
 | 2026-09-10 | Role/permission system still deferred | belongs to its own milestone; direction documented in `docs/authentication.md` §11 |
+| 2026-09-11 | `SchoolScope` throws on missing tenant context (fail closed) | an unscoped query would leak every school's data |
+| 2026-09-11 | `creating` hook forces `school_id` from context; `school_id` immutable on update | `school_id` cannot be spoofed via mass assignment or explicit set |
+| 2026-09-11 | Many-to-many `User`↔`School`; `is_platform_admin` boolean, no `Gate::before` | multi-campus staff are real; platform admins still act within a chosen tenant, not around it |
+| 2026-09-11 | School context in the session, re-validated every request | stateless-friendly; tampering with the stored id is inert |

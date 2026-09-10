@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Auth;
 
+use App\Models\School;
 use App\Models\User;
 use Illuminate\Auth\Events\Lockout;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -107,6 +108,7 @@ class AuthenticationTest extends TestCase
     public function test_authenticated_verified_user_can_reach_dashboard(): void
     {
         $user = User::factory()->create();
+        $user->schools()->attach(School::factory()->create());
 
         $this->actingAs($user)->withoutVite()->get('/dashboard')->assertOk()->assertSee('Dashboard');
     }

@@ -2,40 +2,57 @@
 
 namespace App\Support\Tenancy;
 
-use RuntimeException;
+use App\Models\School;
+use App\Support\Tenancy\Exceptions\MissingTenantContextException;
 
 /**
  * Central per-request tenant (school) context.
  *
- * This is the single seam through which the application answers the question
- * "which school are we acting for right now?". Later milestones build tenant
- * isolation on top of it:
+ * The single seam through which the application answers "which school are we
+ * acting for right now?". Everything tenant-aware reads from here:
  *
- *   - middleware resolves the current school from the authenticated user /
- *     route and calls {@see self::set()};
- *   - a `BelongsToSchool` model trait applies a global scope that reads
- *     {@see self::id()} so queries are automatically constrained;
- *   - a model `creating` hook stamps `school_id` from {@see self::id()}.
+ *   - the `EnforceTenant` middleware resolves the school for the authenticated
+ *     user / session and calls `set()`;
+ *   - `SchoolScope` (a global scope on every `BelongsToSchool` model) reads
+ *     `idOrFail()` to constrain queries;
+ *   - the same trait's `creating` hook stamps `school_id` from `id()`.
  *
  * Application code must never read a raw `school_id` from the request. It asks
- * this object instead, so isolation cannot be forgotten in one controller.
+ * this object, so isolation is a property of the framework wiring rather than of
+ * every developer remembering a `where()` clause.
  *
- * Registered as a singleton in AppServiceProvider; resolve via the container
- * or the `App\Support\Tenancy\Tenant` facade-style helper, not `new`.
+ * Registered as `scoped()` (one instance per request) in AppServiceProvider.
  */
 class TenantContext
 {
+    private ?School $school = null;
+
     private ?int $schoolId = null;
 
     private bool $bypassed = false;
 
-    public function set(int $schoolId): void
+    /**
+     * Establish the active tenant from a loaded School model (the common path).
+     */
+    public function set(School $school): void
+    {
+        $this->school = $school;
+        $this->schoolId = $school->getKey();
+    }
+
+    /**
+     * Establish the active tenant from an id alone — for queue jobs / console
+     * routines that carry an id but have no need for the model.
+     */
+    public function setId(int $schoolId): void
     {
         $this->schoolId = $schoolId;
+        $this->school = null;
     }
 
     public function forget(): void
     {
+        $this->school = null;
         $this->schoolId = null;
     }
 
@@ -50,17 +67,39 @@ class TenantContext
     }
 
     /**
-     * Return the current school id or fail loudly. Use this in code paths that
-     * must be tenant-scoped so a missing context is a bug, not silent data
-     * leakage.
+     * The current school id, or fail loudly. Used by the global scope so a
+     * missing context is a bug, never silent cross-tenant exposure.
      */
     public function idOrFail(): int
     {
         if ($this->schoolId === null) {
-            throw new RuntimeException('No tenant (school) context has been set for this request.');
+            throw MissingTenantContextException::make();
         }
 
         return $this->schoolId;
+    }
+
+    /**
+     * The current School model. Lazily loaded (and cached) if only an id was set.
+     */
+    public function school(): ?School
+    {
+        if ($this->school === null && $this->schoolId !== null) {
+            $this->school = School::find($this->schoolId);
+        }
+
+        return $this->school;
+    }
+
+    public function schoolOrFail(): School
+    {
+        $school = $this->school();
+
+        if ($school === null) {
+            throw MissingTenantContextException::make();
+        }
+
+        return $school;
     }
 
     /**
@@ -73,8 +112,9 @@ class TenantContext
     }
 
     /**
-     * Escape hatch for genuinely cross-tenant work (platform admin reports,
-     * scheduled jobs, migrations). Keep the callback as small as possible.
+     * Escape hatch for genuinely cross-tenant work — platform-admin reports,
+     * scheduled maintenance, migrations. Keep the callback as small as possible;
+     * anything inside it can read and write every school's data.
      *
      * @template TReturn
      *

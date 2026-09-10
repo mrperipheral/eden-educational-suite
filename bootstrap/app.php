@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\EnforceTenant;
 use App\Http\Middleware\EnsureAccountIsActive;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -15,6 +16,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
             'active' => EnsureAccountIsActive::class,
+            'tenant' => EnforceTenant::class,
         ]);
 
         $middleware->redirectTo(

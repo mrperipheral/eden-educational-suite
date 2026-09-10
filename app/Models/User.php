@@ -9,17 +9,19 @@ use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
 /**
  * Application user / authentication identity.
  *
- * Domain profiles (staff, guardian, student) and the user↔school relationship
- * are added in later milestones — this model stays intentionally thin.
+ * A user may belong to several schools (`schools()`); the active one for a
+ * request is resolved by App\Http\Middleware\EnforceTenant into
+ * App\Support\Tenancy\TenantContext.
  *
- * `status` is never mass-assignable: it is an administrative flag, not
- * something a registering or self-editing user may set.
+ * Neither `status` nor `is_platform_admin` is mass-assignable — both are
+ * administrative flags, not values a registering or self-editing user may set.
  */
 #[Fillable(['name', 'email', 'password'])]
 #[Hidden(['password', 'remember_token'])]
@@ -37,6 +39,7 @@ class User extends Authenticatable implements MustVerifyEmail
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'status' => UserStatus::class,
+            'is_platform_admin' => 'boolean',
         ];
     }
 
@@ -47,7 +50,18 @@ class User extends Authenticatable implements MustVerifyEmail
      */
     protected $attributes = [
         'status' => UserStatus::Active->value,
+        'is_platform_admin' => false,
     ];
+
+    /**
+     * Schools this user is a member of.
+     *
+     * @return BelongsToMany<School, $this>
+     */
+    public function schools(): BelongsToMany
+    {
+        return $this->belongsToMany(School::class)->withTimestamps();
+    }
 
     /**
      * Whether this account is permitted to authenticate. Checked server-side at
@@ -61,5 +75,35 @@ class User extends Authenticatable implements MustVerifyEmail
     public function isActive(): bool
     {
         return $this->status === UserStatus::Active;
+    }
+
+    /**
+     * Platform owner. A capability that spans the whole platform, entirely
+     * separate from any per-school role. Platform admins still act on school
+     * data through a selected tenant context, not around it.
+     */
+    public function isPlatformAdmin(): bool
+    {
+        return (bool) $this->is_platform_admin;
+    }
+
+    public function belongsToSchool(School|int $school): bool
+    {
+        $schoolId = $school instanceof School ? $school->getKey() : $school;
+
+        if ($this->relationLoaded('schools')) {
+            return $this->schools->contains('id', $schoolId);
+        }
+
+        return $this->schools()->whereKey($schoolId)->exists();
+    }
+
+    /**
+     * Whether this user may establish a tenant context for the given school:
+     * a member, or any platform admin.
+     */
+    public function canAccessSchool(School $school): bool
+    {
+        return $this->isPlatformAdmin() || $this->belongsToSchool($school);
     }
 }
