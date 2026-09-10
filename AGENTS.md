@@ -1,47 +1,20 @@
-<laravel-boost-guidelines>
-# Laravel Application
+# AGENTS.md
 
-This repository contains a Laravel application. Complete the following setup before working on the user's request.
+Guidance for coding agents working in this repository.
 
-## Prerequisites
+The full development guide is **[CLAUDE.md](CLAUDE.md)** and the documents under
+**[docs/](docs/)**. Read them before making changes. Key points:
 
-Verify that PHP and Composer are available:
-
-```sh
-php -v
-composer -V
-```
-
-If either command is unavailable, detect the user's operating system and install the prerequisites with the appropriate command:
-
-macOS:
-
-```sh
-/bin/bash -c "$(curl -fsSL https://php.new/install/mac/8.5)"
-```
-
-Windows PowerShell:
-
-```powershell
-Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://php.new/install/windows/8.5'))
-```
-
-Linux:
-
-```sh
-/bin/bash -c "$(curl -fsSL https://php.new/install/linux/8.5)"
-```
-
-After installation, ask the user to restart their terminal. If the agent needs the restarted shell to continue, ask the user to reopen their terminal and rerun their original prompt.
-
-## Agent Setup
-
-Install Laravel Boost from the application root before making application changes:
-
-```sh
-composer require laravel/boost --dev
-php artisan boost:install
-```
-
-Boost replaces these bootstrap instructions with guidelines tailored to the application. After installation, read `AGENTS.md` again and continue with the user's original request using the generated guidelines.
-</laravel-boost-guidelines>
+- **Product:** multi-school School Management SaaS (management + portals only).
+  No public website / website-builder features — ever.
+- **Stack:** PHP 8.3+, Laravel 13, MySQL, Blade + Tailwind v4 + Alpine.js + Vite,
+  PHPUnit, Pint. No React/Vue/Inertia.
+- **Tenancy:** one shared database, logical isolation via `school_id`. Use
+  `App\Support\Tenancy\TenantContext`; never trust a `school_id` from user input.
+- **Security:** server-side authorization (Policies), Form Request validation,
+  CSRF on every write. Frontend hiding is not authorization.
+- **Scope discipline:** work the current milestone only. `PROJECT_STATUS.md` and
+  `docs/roadmap.md` say where we are. Milestone 1 (Platform Foundation) is done.
+- **Before finishing:** `php artisan test`, `vendor/bin/pint`, `npm run build`.
+- This file and `docs/` are development-only and must never become a runtime
+  dependency of the application.

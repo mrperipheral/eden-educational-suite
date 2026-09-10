@@ -1,47 +1,90 @@
-<laravel-boost-guidelines>
-# Laravel Application
+# School Management Platform — Development Guide
 
-This repository contains a Laravel application. Complete the following setup before working on the user's request.
+> **Development-only documentation.** This file (and everything under `docs/`) is
+> guidance for people and coding agents working on the codebase. It is **never** a
+> runtime dependency: no application code reads it, and the app must build, boot
+> and pass tests with these files absent.
 
-## Prerequisites
+## What this project is
 
-Verify that PHP and Composer are available:
+A production-quality, multi-school **School Management SaaS**. Initial target:
+private nursery, primary and secondary schools in Nigeria. The architecture stays
+flexible enough to support other institution types later.
 
-```sh
-php -v
-composer -V
-```
+The product is **school management and portals only**. Explicitly **out of scope**:
+public school websites, website builder / themes / engine, public school pages,
+public content management.
 
-If either command is unavailable, detect the user's operating system and install the prerequisites with the appropriate command:
+## Tech stack
 
-macOS:
+| Area        | Choice |
+|-------------|--------|
+| Language    | PHP 8.3+ |
+| Framework   | Laravel 13 |
+| Database    | MySQL / MariaDB (one shared DB, logical tenant isolation) |
+| Views       | Blade |
+| CSS         | Tailwind CSS v4 (`@tailwindcss/vite`, config lives in `resources/css/app.css`) |
+| JS          | Alpine.js (the only JS framework — no React / Vue / Inertia without an explicit decision in `docs/architecture.md`) |
+| Build       | Vite |
+| Tests       | PHPUnit (`php artisan test`) |
+| Formatting  | Laravel Pint (`vendor/bin/pint`) |
 
-```sh
-/bin/bash -c "$(curl -fsSL https://php.new/install/mac/8.5)"
-```
+## Local setup
 
-Windows PowerShell:
-
-```powershell
-Set-ExecutionPolicy Bypass -Scope Process -Force; [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072; iex ((New-Object System.Net.WebClient).DownloadString('https://php.new/install/windows/8.5'))
-```
-
-Linux:
-
-```sh
-/bin/bash -c "$(curl -fsSL https://php.new/install/linux/8.5)"
-```
-
-After installation, ask the user to restart their terminal. If the agent needs the restarted shell to continue, ask the user to reopen their terminal and rerun their original prompt.
-
-## Agent Setup
-
-Install Laravel Boost from the application root before making application changes:
+PHP / Composer / Node are provided here by Laragon; `php`, `composer` and `node`
+may not be on `PATH` in every shell. Laragon paths:
+`C:\laragon\bin\php\php-8.3.30-Win32-vs16-x64`, `C:\laragon\bin\composer`,
+`C:\laragon\bin\nodejs\node-v22`.
 
 ```sh
-composer require laravel/boost --dev
-php artisan boost:install
+composer install
+npm install
+cp .env.example .env        # then set DB_* and run key:generate
+php artisan key:generate
+php artisan migrate
+npm run build               # or: npm run dev
+php artisan test
 ```
 
-Boost replaces these bootstrap instructions with guidelines tailored to the application. After installation, read `AGENTS.md` again and continue with the user's original request using the generated guidelines.
-</laravel-boost-guidelines>
+## Project conventions
+
+See `docs/architecture.md` for the full rationale. In short:
+
+- **Controllers** (`app/Http/Controllers`) — thin. Resourceful where it fits
+  (`index/create/store/show/edit/update/destroy`). No business logic beyond
+  orchestration; push anything non-trivial into a service.
+- **Form Requests** (`app/Http/Requests`) — every write action validates through a
+  Form Request. Authorization that depends on the request lives in `authorize()`.
+- **Policies** (`app/Policies`) — model authorization. Controllers call
+  `authorize()` / `Gate`. **Frontend hiding is never authorization.**
+- **Services** (`app/Services`) — multi-step or cross-model business operations.
+  Plain classes, constructor-injected. Do not create a service/repository layer
+  for simple CRUD.
+- **Models** (`app/Models`) — guard mass assignment (`$fillable` or the PHP 8
+  `#[Fillable]` attribute, as `User` does). Casts via `casts()`. Tenant-owned
+  models will use the `BelongsToSchool` trait (later milestone) — never a manual
+  `where('school_id', …)` scattered through the codebase.
+- **Tenancy** — `App\Support\Tenancy\TenantContext` (request-scoped singleton) is
+  the single source of truth for "which school are we acting as". Resolve it from
+  the container; never read a raw `school_id` from user input.
+- **Views** — pages in `resources/views/<area>/`, layouts and reusable UI as Blade
+  components in `resources/views/components/`. Use `<x-layouts.app>` /
+  `<x-layouts.guest>`.
+- **Tests** — feature tests for every route and each authorization boundary; unit
+  tests for services and value objects. Tenant isolation gets explicit
+  cross-tenant "cannot see / cannot touch" tests once schools exist.
+
+## Guardrails
+
+- Server-side authorization, validation and CSRF on every state change.
+- No secrets in the repo. `.env` is git-ignored; `.env.example` carries
+  placeholders only.
+- No artificial tenant/school limit anywhere.
+- Design for scale (indexes, pagination, no N+1, caching, queues later) but do not
+  build infrastructure the current milestone does not need.
+
+## Milestones
+
+Tracked in `PROJECT_STATUS.md` and `docs/roadmap.md`. **Milestone 1 (Platform
+Foundation) is complete.** Do not start Authentication, Multi-School, Onboarding
+or any domain module without picking up the next milestone explicitly.
