@@ -108,14 +108,16 @@ See `docs/architecture.md` for the full rationale. In short:
 
 ## Milestones
 
-Tracked in `PROJECT_STATUS.md` and `docs/roadmap.md`. **Milestones 1–7 (Platform
+Tracked in `PROJECT_STATUS.md` and `docs/roadmap.md`. **Milestones 1–8 (Platform
 Foundation, Authentication, Multi-School Tenant Isolation, Roles & Permissions,
-School Onboarding, School Settings & Configuration, Feature / Module Activation)
-are complete.** School settings: `docs/school-settings.md`; module activation:
-`docs/module-activation.md`. Do not start any domain module (students, staff,
-academics, attendance, fees, results, CBT, notifications, …) without picking up
-the next milestone explicitly.
+School Onboarding, School Settings & Configuration, Feature / Module Activation,
+Academic Foundation) are complete.** School settings: `docs/school-settings.md`;
+module activation: `docs/module-activation.md`; academic structure (sessions,
+periods, levels, arms, subjects): `docs/academic-foundation.md`. Do not start any
+further domain module (students, guardians, staff, timetable, attendance, fees,
+results, CBT, notifications, …) without picking up the next milestone explicitly.
 
-Module activation is **configuration, not authorization**: a future domain route
-checks both its `App\Enums\Module` flag (`module:` middleware / `@module`) **and**
-its M4 permission — enabling a module grants nothing.
+Module activation is **configuration, not authorization**: a domain route checks
+both its `App\Enums\Module` flag (`module:` middleware / `@module`) **and** its M4
+permission — enabling a module grants nothing. Tenant-owned route ids are
+resolved by tenant-scoped `findOrFail` in the controller, not route-model-bound.

@@ -18,7 +18,10 @@ class AcademicSessionFactory extends Factory
      */
     public function definition(): array
     {
-        $year = fake()->numberBetween(2024, 2030);
+        // A distinct year per generated row so `unique(school_id, name)` never
+        // trips a factory that makes several sessions in one test.
+        static $counter = 0;
+        $year = 2000 + ($counter++ % 300);
 
         return [
             'name' => $year.'/'.($year + 1),

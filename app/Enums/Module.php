@@ -120,10 +120,14 @@ enum Module: string
      * domain milestone flips its own module to `true` the moment it ships a
      * usable feature; until then the toggle is a forward-looking preference and
      * the UI badges the module "Planned".
+     *
+     *   - `academics` — Academic Foundation (M8): sessions, periods, levels,
+     *     arms, subjects (`docs/academic-foundation.md`).
      */
     public function isAvailable(): bool
     {
         return match ($this) {
+            self::Academics => true,
             default => false,
         };
     }

@@ -1,7 +1,7 @@
 # Architecture
 
-Status: Milestone 7 (Feature / Module Activation) complete. This describes
-the intended shape of the system and what exists today.
+Status: Milestone 8 (Academic Foundation) complete. This describes the intended
+shape of the system and what exists today.
 
 ## 1. High-level model
 
@@ -149,14 +149,34 @@ application's feature modules on or off independently. M7 ships the activation
   Activation is **configuration, not authorization** — it grants nothing; a
   domain route checks both `module:` *and* `->can('…')`.
 
+## 2f. Academic foundation (implemented — Milestone 8)
+
+Full reference: **`docs/academic-foundation.md`**. The configurable academic
+structure the Student / Teacher / Timetable / Attendance / Assessment / Results
+modules will build on. Structure only — no people, no timetable, no marks.
+
+- **`App\Models\AcademicSession`** (M5, extended) — the year; one `is_current`
+  per school. Now has `AcademicPeriod` children.
+- **`App\Models\AcademicPeriod`** — a term / semester within a session.
+  `BelongsToSchool` *and* scoped to its session; one `is_current` per session;
+  any number per session (no "three terms" assumption).
+- **`App\Models\AcademicLevel`** + **`App\Models\LevelArm`** — classes and their
+  streams. Named, coded, ordered, active/inactive. No level names hard-coded.
+- **`App\Models\Subject`** + the `level_subject` link — school subjects and
+  which levels offer them. The only cross-model relationship M8 ships.
+- **`App\Http\Controllers\Academic\*`**, `/academic/*` routes behind
+  `['tenant', 'module:academics']`, gated `academics.view` / `academics.manage`
+  (M4 permissions, previously dormant — now enforced). Academic sessions moved
+  here from `settings/academic-sessions` (M5).
+
 ### Deferred
 
 - Queue jobs capture/restore the tenant id (no jobs exist yet — see
   `docs/tenancy.md` §7).
 - Invitations / brand-new-account onboarding, school suspension / subscription,
-  the Academic Management milestone, notification & payment config, the domain
-  modules behind the M7 catalogue, admin UI for `status` / `is_platform_admin`,
-  subdomain routing.
+  notification & payment config, the remaining domain modules behind the M7
+  catalogue (students, staff, timetable, attendance, results, fees, CBT,
+  portals), admin UI for `status` / `is_platform_admin`, subdomain routing.
 
 ## 3. Application layers & conventions
 
@@ -238,3 +258,5 @@ pre-auth screens.
 | 2026-09-14 | School settings expanded as typed columns on `SchoolSetting`, three sectioned pages; logo on the private disk behind a gated no-path route | validated/queryable, no JSON blob or second settings system; prevents logo traversal / cross-tenant access (see `docs/school-settings.md`) |
 | 2026-09-10 | Module catalogue is `App\Enums\Module`; `school_modules` is override-only; reuse `school.settings.*` | modules are behaviour reviewed as code; a new school writes nothing; activation is configuration, not a new permission (see `docs/module-activation.md`) |
 | 2026-09-10 | Module activation is orthogonal to authorization — `module:` middleware + `->can()` are both required on a domain route | turning a feature on must never grant a permission; M4 stays the sole authority on "may this user…" |
+| 2026-09-16 | Academic sessions moved from `school.settings.*` to `academics.*` + `module:academics`; `AcademicPeriod` / `LevelArm` are `BelongsToSchool` in their own right | sessions/periods/levels/subjects are one structure under one permission; child models stay tenant-safe without the parent in the join (see `docs/academic-foundation.md`) |
+| 2026-09-16 | No hard delete for academic entities — only `is_active` | preserves referential integrity for the modules built on top; deletion / archival is a later concern |

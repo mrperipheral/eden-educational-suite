@@ -8,15 +8,18 @@ use Database\Factories\AcademicSessionFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Facades\DB;
 
 /**
- * A school's academic year. School-owned ({@see BelongsToSchool}) — reads,
- * updates and deletes are constrained to the active tenant, and `school_id` is
- * stamped from the context, never from input.
+ * A school's academic year — the top of the academic structure
+ * (see `docs/academic-foundation.md`). School-owned ({@see BelongsToSchool}):
+ * reads, updates and deletes are constrained to the active tenant, and
+ * `school_id` is stamped from the context, never from input.
  *
- * Structure beyond "a named date range" (terms, holidays, the academic
- * calendar) belongs to the Academic Management milestone.
+ * A session divides into {@see AcademicPeriod}s (terms / semesters). How many is
+ * the school's choice — nothing here assumes three.
  */
 class AcademicSession extends Model
 {
@@ -43,9 +46,27 @@ class AcademicSession extends Model
     }
 
     /**
+     * @return HasMany<AcademicPeriod, $this>
+     */
+    public function periods(): HasMany
+    {
+        return $this->hasMany(AcademicPeriod::class);
+    }
+
+    /**
+     * The session's current period, if one is set.
+     *
+     * @return HasOne<AcademicPeriod, $this>
+     */
+    public function currentPeriod(): HasOne
+    {
+        return $this->hasOne(AcademicPeriod::class)->where('is_current', true);
+    }
+
+    /**
      * Make this the school's current session, demoting any other. The update
-     * query is tenant-scoped by {@see SchoolScope}, so only
-     * this school's sessions are touched.
+     * query is tenant-scoped by {@see SchoolScope}, so only this school's
+     * sessions are touched.
      */
     public function makeCurrent(): void
     {

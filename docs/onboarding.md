@@ -13,7 +13,7 @@ architecture (tenant context, permissions/Gate, policies).
 | Initial School Admin | `StoreSchoolRequest::initialAdmin()` + `User::joinSchool($school, Role::SchoolAdmin)` in the controller |
 | Add existing user | `MemberController@create/@store` — `GET /members/create`, `POST /members`; `AddMemberRequest`; `MembershipPolicy::add` + `User::canGrantRole()` |
 | School settings | `App\Models\SchoolSetting` (1:1, `BelongsToSchool`) + `SchoolSettingsController` — `GET/PATCH /settings/school` |
-| Academic session | `App\Models\AcademicSession` (`BelongsToSchool`) + `AcademicSessionController` — `GET/POST /settings/academic-sessions`, `PATCH /settings/academic-sessions/{session}` |
+| Academic session | `App\Models\AcademicSession` (`BelongsToSchool`) — **M8** moved this into the academic area: `GET/POST /academic/sessions` etc., gated `academics.*` + `module:academics` (`docs/academic-foundation.md`) |
 | Onboarding progress | derived on the dashboard (`DashboardController::onboarding()`) |
 
 ```
@@ -108,36 +108,36 @@ only cares that the row exists and has been reviewed:
 
 ## 6. Initial academic session
 
-`academic_sessions` — `App\Models\AcademicSession` uses `BelongsToSchool`:
+`App\Models\AcademicSession` (`BelongsToSchool`) — `name`
+(`unique(school_id, name)`), `starts_on` / `ends_on` (`ends_on` after
+`starts_on`), `is_current` (one per school, `makeCurrent()`, not mass-assignable).
 
-| Column | Notes |
-|--------|-------|
-| `name` | e.g. "2025/2026" — any label, `unique(['school_id', 'name'])` |
-| `starts_on`, `ends_on` | dates; `ends_on` must be after `starts_on` |
-| `is_current` | at most one per school; set via `makeCurrent()` (transactional, tenant-scoped); **not** mass-assignable |
-
-- `GET /settings/academic-sessions` (`school.settings.view`), `POST` /
-  `PATCH .../{session}` (`school.settings.update`).
+- **Milestone 8** moved this out of school settings into the academic area:
+  `GET/POST /academic/sessions`, gated `academics.view` / `academics.manage`
+  **and** `module:academics`. Sessions now have `AcademicPeriod` (term) children
+  and sit alongside levels / arms / subjects — see `docs/academic-foundation.md`.
 - The **first** session a school creates automatically becomes current.
+- The onboarding checklist's "Create the first academic session" step links to
+  `academic.sessions.index` and is shown only while the Academic module is on
+  (`DashboardController::onboarding()`).
 - `{session}` is resolved by id in the controller (not route-model-bound) so the
-  lookup runs *after* the `tenant` middleware — `SchoolScope` then constrains it
-  and another school's id simply 404s.
-- **No Nigerian assumptions.** No terms, no fixed count, no hardcoded calendar —
-  the Academic Management milestone builds that structure on top.
+  lookup runs *after* the `tenant` middleware — another school's id 404s.
 
 ## 7. Onboarding progress
 
 `DashboardController::onboarding()` — only for users with
-`school.settings.update` (School Admin / platform admin in context). Three
-derived steps:
+`school.settings.update` (School Admin / platform admin in context). Derived
+steps:
 
 1. **Assign a School Admin** — `School::hasSchoolAdmin()` (a `school_user` row
    with `role = school_admin`).
-2. **Create the first academic session** — `academicSessions()->exists()`.
-3. **Review school settings** — `settings.completed_at` is set.
+2. **Review school settings** — `settings.completed_at` is set.
+3. **Create the first academic session** — `academicSessions()->exists()`, shown
+   only while the Academic module is enabled (`SchoolModules::enabled(Module::Academics)`).
 
-Three small indexed queries, gated by permission (a Teacher/Parent never pays the
-cost). When all three are done the checklist collapses to "onboarding complete".
+A few small indexed queries, gated by permission (a Teacher/Parent never pays the
+cost). When every applicable step is done the checklist collapses to "onboarding
+complete".
 
 ## 8. Security & performance
 
@@ -161,7 +161,7 @@ cost). When all three are done the checklist collapses to "onboarding complete".
 | Provisioning is platform-level; school-owned data is configured in-context | "Platform Admin must operate through controlled school context when modifying school-owned data" — the `/admin` area only creates the shell |
 | Initial admin assigned in the controller (not the service), guarded by `canGrantRole` | keeps the escalation rule visible and meaningful; the service stays a pure "create the row" step |
 | Add-member reuses `member.assign-role` (+ `canGrantRole`), no new permission | it *is* "give this person a role in my school"; smaller permission surface |
-| Academic sessions gated by `school.settings.*`, not `academics.*` | the year container is configuration; `academics.*` stays dormant for its own milestone |
+| Academic sessions gated by `school.settings.*` in M5, then moved to `academics.*` in M8 | while `academics.*` was dormant the year container rode school settings; once the academic module exists (M8) sessions belong with periods/levels/subjects under one permission |
 | `SchoolSetting` typed columns, not a JSON blob or key/value table | validated, indexable; M6 (`docs/school-settings.md`) added the remaining columns |
 | `{session}` resolved by id, not route-model-bound | binding runs before `tenant`, so a `BelongsToSchool` bind would hit `SchoolScope` with no context |
 | `timezone` default `Africa/Lagos` | sensible default for the initial market; a settable field, not a code assumption |

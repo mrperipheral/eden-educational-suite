@@ -96,17 +96,18 @@ request, so tampering with the stored value achieves nothing (proven by
 `EnforceTenantTest` / `CrossSchoolIsolationTest`).
 
 Applied in `routes/web.php` to the tenant-scoped group: `/dashboard`,
-`/members*`, `/settings/school`, `/settings/academic-sessions*`. Account-level
-routes (`/settings/profile`, `/settings/password`, `/school`) and platform
-routes (`/admin/schools*`) do **not** use it.
+`/members*`, `/settings/school*`, `/academic/*` (also behind `module:academics`).
+Account-level routes (`/settings/profile`, `/settings/password`, `/school`) and
+platform routes (`/admin/schools*`) do **not** use it.
 
 ## 5. `BelongsToSchool` — writing a tenant-owned model
 
-The first real school-owned models ship with Milestone 5:
-`App\Models\SchoolSetting` (1:1 with a school — Milestone 6 expanded its columns
-and added a private-disk `logo_path` written only through the model, never
-`$fillable`; see `docs/school-settings.md`) and `App\Models\AcademicSession`.
-Both follow the pattern:
+The first real school-owned models ship with Milestone 5
+(`App\Models\SchoolSetting`, `App\Models\AcademicSession`); Milestone 7 adds
+`App\Models\SchoolModule`; Milestone 8 adds the academic structure
+(`AcademicPeriod`, `AcademicLevel`, `LevelArm`, `Subject` — the child models
+carry `school_id` *and* a parent FK so a query is tenant-safe without the parent
+in the join; see `docs/academic-foundation.md`). All follow the pattern:
 
 ```php
 use App\Support\Tenancy\Concerns\BelongsToSchool;

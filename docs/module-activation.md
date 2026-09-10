@@ -57,9 +57,10 @@ activation system changes.
 | Student Portal | `student-portal` | Portals | on | students |
 
 - **`isAvailable()`** — whether the functionality behind the module is actually
-  built. **Every module is `false` in M7.** Each domain milestone flips its own
-  module to `true` when it ships something usable. The admin screen badges
-  not-yet-available modules **Planned**.
+  built. Each domain milestone flips its own module to `true` when it ships
+  something usable; the admin screen badges the rest **Planned**. As of **M8**
+  `academics` is available (`docs/academic-foundation.md`); everything else is
+  still Planned.
 - **Defaults** lean toward a private nursery/primary/secondary school: core
   management on, specialised tools (timetable, learning materials, CBT) off. A
   freshly onboarded school writes **zero** rows — every module simply uses its
@@ -133,14 +134,17 @@ dependencies default-on (also tested).
 Two orthogonal checks — a domain route typically has **both**:
 
 ```php
-Route::middleware(['tenant', 'module:attendance'])->group(function () {
-    Route::get('attendance', …)->can('attendance.view');
+Route::middleware(['tenant', 'module:academics'])->group(function () {
+    Route::get('academic/levels', …)->can('academics.view');
 });
 ```
 
-- **`module:attendance`** middleware — is the module switched on for this
-  school? If not, the route 404s (the feature is not part of that school's app).
-- **`->can('attendance.view')`** — may *this user* do it? (M4, unchanged.)
+- **`module:academics`** middleware — is the module switched on for this school?
+  If not, the route 404s (the feature is not part of that school's app).
+- **`->can('academics.view')`** — may *this user* do it? (M4, unchanged.)
+
+M8's Academic Foundation is the first real consumer of this seam — see
+`docs/academic-foundation.md` §6.
 
 `@module('attendance') … @endmodule` is the Blade equivalent for nav/dashboards.
 

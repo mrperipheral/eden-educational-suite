@@ -39,7 +39,7 @@ class OnboardingChecklistTest extends TestCase
 
         // Complete settings + a session.
         $this->patch('/settings/school', ['contact_email' => 'office@school.example']);
-        $this->post('/settings/academic-sessions', [
+        $this->post('/academic/sessions', [
             'name' => '2025/2026', 'starts_on' => '2025-09-01', 'ends_on' => '2026-07-31',
         ]);
 

@@ -72,12 +72,18 @@ class ModuleTest extends TestCase
         }
     }
 
-    public function test_no_module_reports_as_available_yet(): void
+    public function test_only_shipped_modules_report_as_available(): void
     {
-        // M7 ships the activation system, not the modules themselves. Each
-        // domain milestone flips its own module to available.
+        // Each domain milestone flips its own module to available. As of M8 that
+        // is Academic Foundation; everything else is still Planned.
+        $available = ['academics'];
+
         foreach (Module::cases() as $module) {
-            $this->assertFalse($module->isAvailable(), $module->value);
+            $this->assertSame(
+                in_array($module->value, $available, true),
+                $module->isAvailable(),
+                $module->value,
+            );
         }
     }
 

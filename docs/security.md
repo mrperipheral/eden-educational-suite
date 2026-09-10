@@ -143,14 +143,31 @@ Full detail in `docs/module-activation.md`. Summary of controls:
 | Efficient lookup | one memoised read of `school_modules` per request (`SchoolModules`, request-scoped), verified by a query-count test |
 | CSRF | on every toggle form; `@method('PATCH')` spoofing |
 
+## Implemented in Milestone 8 (Academic Foundation)
+
+Full detail in `docs/academic-foundation.md`. Summary of controls:
+
+| Control | State |
+|---------|-------|
+| Two gates on every academic route | `module:academics` (feature on for the school? else 404) **and** `->can('academics.view'|'.manage')`; the Form Requests re-check `academics.manage` in `authorize()` |
+| Enforced permissions | `academics.view` (School Admin, Principal, Teacher, Staff) / `academics.manage` (School Admin, Principal); Bursar / Parent / Student / role-less → 403 (tested per entity) |
+| Activation ≠ authorization | Teacher passes the module gate but cannot manage config (tested) |
+| Tenant isolation | every model `BelongsToSchool`; children (`AcademicPeriod`, `LevelArm`) also carry `school_id` so queries are tenant-safe without the parent in the join; explicit cross-school "cannot read/create/edit/delete/promote" tests for sessions, periods, levels, arms, subjects and the level↔subject link |
+| `school_id` protection | never in `$fillable`, never read from input, stamped from `TenantContext`, immutable (`updating` hook → `TenantMismatchException`, tested per model); a `school_id` in a payload is ignored |
+| Route-model binding | tenant-owned ids are **not** route-model-bound; resolved by tenant-scoped `findOrFail` in the controller *after* the `tenant` middleware — another school's id 404s |
+| Validation-query leakage | Form Requests resolve parent ids (`academic_session_id` / `academic_level_id`) **tenant-scoped**, so a cross-school id yields a clean 404, not a "position taken" validation error |
+| Cross-school links | `level_subject` sync validates every `subject_id` with `Rule::exists('subjects','id')->where('school_id', <tenant>)`; the `belongsToMany` read applies `Subject`'s scope (tested) |
+| Uniqueness | per school / session / level, never global; edit forms `->ignore()` the row's own id |
+| CSRF | every form; `@method('PATCH'|'PUT')` spoofing |
+
 ## Deferred (with the milestone that owns them)
 
 - **Auth follow-ups:** 2FA, "log out other devices" on password change, session
   listing, auth-event audit logging, templated transactional emails.
 - **Authz follow-ups:** multi-role per school, custom/runtime roles, invitations
   / brand-new-account onboarding, admin UI for `status` / `is_platform_admin`,
-  audit logging of role & membership changes, enforcing the currently-dormant
-  domain permissions (each in its module).
+  audit logging of role & membership changes, enforcing the remaining dormant
+  domain permissions (each in its module — `academics.*` enforced in M8).
 - **Tenancy follow-ups:** queue-job tenant propagation, per-tenant rate limiting,
   per-tenant cache keys, audit logging of context switches.
 - **Later:** audit logging (who did what, per school), virus scanning of

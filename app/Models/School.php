@@ -73,6 +73,22 @@ class School extends Model
         return $this->hasMany(AcademicSession::class);
     }
 
+    /**
+     * @return HasMany<AcademicLevel, $this>
+     */
+    public function academicLevels(): HasMany
+    {
+        return $this->hasMany(AcademicLevel::class);
+    }
+
+    /**
+     * @return HasMany<Subject, $this>
+     */
+    public function subjects(): HasMany
+    {
+        return $this->hasMany(Subject::class);
+    }
+
     public function isActive(): bool
     {
         return $this->status === SchoolStatus::Active;

@@ -4,7 +4,6 @@
         ['route' => 'settings.school.branding.edit', 'label' => __('Branding'), 'active' => 'settings.school.branding.*'],
         ['route' => 'settings.school.regional.edit', 'label' => __('Regional'), 'active' => 'settings.school.regional.*'],
         ['route' => 'settings.school.modules.edit', 'label' => __('Modules'), 'active' => 'settings.school.modules.*'],
-        ['route' => 'academic-sessions.index', 'label' => __('Academic sessions'), 'active' => 'academic-sessions.*'],
     ];
 @endphp
 

@@ -1,10 +1,11 @@
 # Database Design
 
-Status: Milestone 7. Tenant + roles + onboarding + school settings + module
-activation. School-owned tables so far: `school_settings` (full config record —
-M6), `academic_sessions`, `school_modules` (per-school feature toggles — M7). No
-domain tables (students, staff, classes …) yet. This document records the
-conventions every future migration follows.
+Status: Milestone 8. Tenant + roles + onboarding + school settings + module
+activation + academic foundation. School-owned tables: `school_settings` (M6),
+`school_modules` (M7), and the academic structure — `academic_sessions`,
+`academic_periods`, `academic_levels`, `level_arms`, `subjects`, `level_subject`
+(M8). No student / guardian / staff / timetable / attendance / results tables
+yet. This document records the conventions every future migration follows.
 
 ## Current schema
 
@@ -14,7 +15,12 @@ conventions every future migration follows.
 | `schools` | tenant root. `id, name, slug (unique), status, timestamps` |
 | `school_user` | User↔School membership + per-school `role`. PK `(school_id, user_id)`, index `(school_id, role)`, cascade both ways |
 | `school_settings` | per-school config (1:1). `school_id` unique. School-owned. Profile (contact + address), branding (`logo_path`, `brand_color`), regional (`timezone, locale, currency, date_format, week_starts_on, academic_year_start_month`). |
-| `academic_sessions` | a school's academic years. School-owned. `unique(school_id, name)`, `index(school_id, starts_on)` |
+| `academic_sessions` | a school's academic years. School-owned. `unique(school_id, name)`, `index(school_id, starts_on)`. One `is_current` per school. |
+| `academic_periods` | terms / semesters within a session. School-owned **+** `academic_session_id`. `unique(session_id, name)`, `unique(session_id, position)`. One `is_current` per session. |
+| `academic_levels` | classes / year groups. School-owned. `unique(school_id, name/code/position)`. |
+| `level_arms` | streams within a level. School-owned **+** `academic_level_id`. `unique(level_id, name/code/position)`. |
+| `subjects` | school subjects. School-owned. `unique(school_id, name)`, `unique(school_id, code)`. |
+| `level_subject` | which subjects a level offers. School-owned. `unique(academic_level_id, subject_id)`, `index(school_id, academic_level_id)`. |
 | `school_modules` | per-school feature-module on/off overrides. School-owned. `unique(school_id, module)`. Override-only — a row exists only where a school departs from the `App\Enums\Module` default. |
 | `password_reset_tokens`, `sessions` | auth/session plumbing |
 | `cache`, `cache_locks` | `CACHE_STORE=database` |
@@ -66,8 +72,28 @@ tinyint` default `9`. Column defaults, the model `$attributes`, and
 ### `2026_09_13_100010_create_academic_sessions_table`
 `name` (`unique(school_id, name)`), `starts_on` / `ends_on` (dates), `is_current`
 (bool, at most one per school — enforced in `AcademicSession::makeCurrent()`).
-`index(school_id, starts_on)` for the list. School-owned. **Structure-agnostic**:
-no terms / calendar — that is the Academic Management milestone.
+`index(school_id, starts_on)` for the list. School-owned. M8 builds the term /
+level / subject structure on top (below); the sessions table itself is unchanged.
+
+### `2026_09_16_100000_*` — Academic Foundation (Milestone 8)
+Five migrations, all school-owned (`BelongsToSchool`), all indexes leading with
+`school_id` (or a tenant-scoped parent id). See `docs/academic-foundation.md` §3.
+
+- **`academic_periods`** — `academic_session_id` FK (cascade), `name`,
+  `starts_on`/`ends_on`, `position`, `is_active`, `is_current`.
+  `unique(academic_session_id, name)`, `unique(academic_session_id, position)`,
+  `index(school_id, academic_session_id, position)`. Any number per session.
+- **`academic_levels`** — `name`, `code`, `position`, `is_active`.
+  `unique(school_id, name)` / `(school_id, code)` / `(school_id, position)`.
+- **`level_arms`** — `academic_level_id` FK (cascade), `name`, `code`,
+  `position`, `is_active`. `unique(academic_level_id, name/code/position)`,
+  `index(school_id, academic_level_id, position)`.
+- **`subjects`** — `name`, `code`, `description` (nullable), `position`
+  (non-unique), `is_active`. `unique(school_id, name)` / `(school_id, code)`.
+- **`level_subject`** — `academic_level_id` + `subject_id` FKs (cascade),
+  `school_id` (written from `TenantContext` during the sync).
+  `unique(academic_level_id, subject_id)`, `index(school_id, academic_level_id)`,
+  `index(school_id, subject_id)`. The only cross-model link M8 ships.
 
 ### `2026_09_15_100000_create_school_modules_table`
 Milestone 7 — per-school feature/module activation. `module` (`string(40)`, an
@@ -122,8 +148,9 @@ written only via `App\Support\Modules\SchoolModules`. See `docs/module-activatio
 
 ## Not yet designed (later milestones, will be added here)
 
-`school_user.is_default`, academic terms / calendar, students, guardians, staff,
-classes/sections, subjects, enrolment, attendance, assessments/results,
-fees/invoices/payments, CBT, audit log. Each gets an entry here when built.
+`school_user.is_default`, holiday / calendar events, students, guardians, staff,
+class/arm membership, teacher assignment, enrolment, attendance,
+assessments/results, fees/invoices/payments, CBT, audit log. Each gets an entry
+here when built.
 
 Permissions and roles are **not** in the database — they are code (`App\Enums`).

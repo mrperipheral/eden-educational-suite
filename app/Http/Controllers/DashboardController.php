@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\Module;
 use App\Enums\Permission;
 use App\Models\School;
+use App\Support\Modules\SchoolModules;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -43,16 +45,21 @@ class DashboardController extends Controller
                 'route' => route('members.create'),
             ],
             [
-                'label' => __('Create the first academic session'),
-                'done' => $school->academicSessions()->exists(),
-                'route' => route('academic-sessions.index'),
-            ],
-            [
                 'label' => __('Review school settings'),
                 'done' => $school->settings()->whereNotNull('completed_at')->exists(),
                 'route' => route('settings.school.edit'),
             ],
         ];
+
+        // The academic session step only applies when the Academic module is on
+        // for this school (it lives behind `module:academics`).
+        if (app(SchoolModules::class)->enabled(Module::Academics)) {
+            $steps[] = [
+                'label' => __('Create the first academic session'),
+                'done' => $school->academicSessions()->exists(),
+                'route' => route('academic.sessions.index'),
+            ];
+        }
 
         return [
             'steps' => $steps,

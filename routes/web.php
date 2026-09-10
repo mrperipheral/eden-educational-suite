@@ -1,6 +1,10 @@
 <?php
 
-use App\Http\Controllers\AcademicSessionController;
+use App\Http\Controllers\Academic\ArmController;
+use App\Http\Controllers\Academic\LevelController;
+use App\Http\Controllers\Academic\PeriodController;
+use App\Http\Controllers\Academic\SessionController as AcademicSessionController;
+use App\Http\Controllers\Academic\SubjectController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\HealthController;
 use App\Http\Controllers\MemberController;
@@ -103,16 +107,72 @@ Route::middleware(['auth', 'verified', 'active'])->group(function () {
                 ->can('school.settings.update')->name('modules.update');
         });
 
-        Route::get('settings/academic-sessions', [AcademicSessionController::class, 'index'])
-            ->can('school.settings.view')
-            ->name('academic-sessions.index');
-        Route::post('settings/academic-sessions', [AcademicSessionController::class, 'store'])
-            ->can('school.settings.update')
-            ->name('academic-sessions.store');
-        Route::patch('settings/academic-sessions/{session}', [AcademicSessionController::class, 'update'])
-            ->whereNumber('session')
-            ->can('school.settings.update')
-            ->name('academic-sessions.update');
+        /*
+        | Academic foundation — sessions, periods, levels, arms, subjects
+        | (see docs/academic-foundation.md). Two gates, both required:
+        |   module:academics  — is the feature switched on for this school?
+        |   ->can('academics.view' | 'academics.manage')  — may this user?
+        | Tenant-owned models are resolved by id in the controller (after the
+        | `tenant` middleware) so `SchoolScope` scopes the lookup and another
+        | school's id 404s.
+        */
+        Route::middleware('module:academics')->prefix('academic')->name('academic.')->group(function () {
+            // Sessions (years)
+            Route::get('sessions', [AcademicSessionController::class, 'index'])
+                ->can('academics.view')->name('sessions.index');
+            Route::post('sessions', [AcademicSessionController::class, 'store'])
+                ->can('academics.manage')->name('sessions.store');
+            Route::get('sessions/{session}', [AcademicSessionController::class, 'show'])
+                ->whereNumber('session')->can('academics.view')->name('sessions.show');
+            Route::get('sessions/{session}/edit', [AcademicSessionController::class, 'edit'])
+                ->whereNumber('session')->can('academics.manage')->name('sessions.edit');
+            Route::patch('sessions/{session}', [AcademicSessionController::class, 'update'])
+                ->whereNumber('session')->can('academics.manage')->name('sessions.update');
+            Route::put('sessions/{session}/current', [AcademicSessionController::class, 'makeCurrent'])
+                ->whereNumber('session')->can('academics.manage')->name('sessions.current');
+
+            // Periods (terms) within a session
+            Route::post('sessions/{session}/periods', [PeriodController::class, 'store'])
+                ->whereNumber('session')->can('academics.manage')->name('periods.store');
+            Route::get('periods/{period}/edit', [PeriodController::class, 'edit'])
+                ->whereNumber('period')->can('academics.manage')->name('periods.edit');
+            Route::patch('periods/{period}', [PeriodController::class, 'update'])
+                ->whereNumber('period')->can('academics.manage')->name('periods.update');
+            Route::put('periods/{period}/current', [PeriodController::class, 'makeCurrent'])
+                ->whereNumber('period')->can('academics.manage')->name('periods.current');
+
+            // Levels / classes
+            Route::get('levels', [LevelController::class, 'index'])
+                ->can('academics.view')->name('levels.index');
+            Route::post('levels', [LevelController::class, 'store'])
+                ->can('academics.manage')->name('levels.store');
+            Route::get('levels/{level}', [LevelController::class, 'show'])
+                ->whereNumber('level')->can('academics.view')->name('levels.show');
+            Route::get('levels/{level}/edit', [LevelController::class, 'edit'])
+                ->whereNumber('level')->can('academics.manage')->name('levels.edit');
+            Route::patch('levels/{level}', [LevelController::class, 'update'])
+                ->whereNumber('level')->can('academics.manage')->name('levels.update');
+            Route::put('levels/{level}/subjects', [LevelController::class, 'syncSubjects'])
+                ->whereNumber('level')->can('academics.manage')->name('levels.subjects');
+
+            // Arms / streams within a level
+            Route::post('levels/{level}/arms', [ArmController::class, 'store'])
+                ->whereNumber('level')->can('academics.manage')->name('arms.store');
+            Route::get('arms/{arm}/edit', [ArmController::class, 'edit'])
+                ->whereNumber('arm')->can('academics.manage')->name('arms.edit');
+            Route::patch('arms/{arm}', [ArmController::class, 'update'])
+                ->whereNumber('arm')->can('academics.manage')->name('arms.update');
+
+            // Subjects
+            Route::get('subjects', [SubjectController::class, 'index'])
+                ->can('academics.view')->name('subjects.index');
+            Route::post('subjects', [SubjectController::class, 'store'])
+                ->can('academics.manage')->name('subjects.store');
+            Route::get('subjects/{subject}/edit', [SubjectController::class, 'edit'])
+                ->whereNumber('subject')->can('academics.manage')->name('subjects.edit');
+            Route::patch('subjects/{subject}', [SubjectController::class, 'update'])
+                ->whereNumber('subject')->can('academics.manage')->name('subjects.update');
+        });
     });
 });
 

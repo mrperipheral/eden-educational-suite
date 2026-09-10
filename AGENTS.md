@@ -25,13 +25,17 @@ The full development guide is **[CLAUDE.md](CLAUDE.md)** and the documents under
   (`app/Http/Controllers/Platform/`) is platform-admin only and not
   tenant-scoped; school-owned data is created/edited only inside a tenant context.
 - **Scope discipline:** work the current milestone only. `PROJECT_STATUS.md` and
-  `docs/roadmap.md` say where we are. Milestones 1–7 (Platform Foundation,
+  `docs/roadmap.md` say where we are. Milestones 1–8 (Platform Foundation,
   Authentication, Multi-School Tenant Isolation, Roles & Permissions, School
-  Onboarding, School Settings & Configuration — `docs/school-settings.md`,
-  Feature / Module Activation — `docs/module-activation.md`) are done.
+  Onboarding, School Settings — `docs/school-settings.md`, Feature / Module
+  Activation — `docs/module-activation.md`, Academic Foundation —
+  `docs/academic-foundation.md`) are done.
 - **Module activation ≠ authorization:** a domain route checks both its
   `App\Enums\Module` flag (`module:` middleware / `@module`) and its permission;
   enabling a module grants nothing.
+- **Tenant-owned route ids:** resolve by `Model::query()->findOrFail($id)` in the
+  controller (tenant-scoped, 404s cross-school), not route-model binding — it
+  runs before the `tenant` middleware.
 - **Before finishing:** `php artisan test`, `vendor/bin/pint`, `npm run build`.
 - This file and `docs/` are development-only and must never become a runtime
   dependency of the application.

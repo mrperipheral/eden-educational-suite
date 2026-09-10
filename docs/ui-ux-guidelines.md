@@ -77,6 +77,16 @@ are badged **Planned** and the card intro states plainly that the toggle is a
 saved preference — no control implies a module is already implemented (no
 "open"/"configure" links). View-only roles see the list with no buttons.
 
+The **Academic** area (`resources/views/academic/`, `docs/academic-foundation.md`,
+gated `academics.*` + `module:academics`) is a top-level nav item with its own
+`_nav.blade.php` sub-nav — **Sessions & terms · Levels & arms · Subjects**. Each
+entity has an index page with an inline "add" card (shown only to
+`academics.manage`) and a list below; children (periods, arms, offered subjects)
+are managed on their parent's `show` page; every entity has a dedicated `edit`
+page. Lists use `<x-empty-state>`, pagination, `is_current` / `Inactive` badges,
+and inline validation. Read-only roles (`academics.view`) see the lists and
+detail pages without any create / edit / toggle controls.
+
 Flash messages (`session('success' | 'error' | 'status')`) are rendered
 automatically by `<x-layouts.app>` as alerts.
 
@@ -106,5 +116,6 @@ automatically by `<x-layouts.app>` as alerts.
 ## Not yet defined
 
 Dark mode, dense/table layouts, data-grid, charts, iconography system,
-role-specific navigation (the current nav is a fixed two-item placeholder),
-notification/toast system. Add here when built.
+notification/toast system. The primary nav is permission- and
+module-filtered (Dashboard · Members · Academic · School settings · Schools ·
+Account) but not yet role-specific / collapsible. Add here when built.

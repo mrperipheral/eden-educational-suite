@@ -1,32 +1,30 @@
 <?php
 
-namespace App\Http\Requests;
+namespace App\Http\Requests\Academic;
 
-use App\Enums\Permission;
-use App\Support\Tenancy\TenantContext;
 use Illuminate\Contracts\Validation\ValidationRule;
-use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
-class StoreAcademicSessionRequest extends FormRequest
+/**
+ * Create or edit an academic session (year). `name` is unique per school; the
+ * end date must be after the start. `is_current` is applied through
+ * `AcademicSession::makeCurrent()`, never mass-assigned.
+ */
+class SessionRequest extends AcademicRequest
 {
-    public function authorize(): bool
-    {
-        return $this->user()?->hasPermission(Permission::SchoolSettingsUpdate) ?? false;
-    }
-
     /**
-     * @return array<string, ValidationRule|array<mixed>|string>
+     * @return array<string, list<ValidationRule|string>>
      */
     public function rules(): array
     {
+        $sessionId = $this->route('session');
+
         return [
             'name' => [
                 'required', 'string', 'max:60',
-                // Uniqueness is per school; the school id comes from the tenant
-                // context, never from request input.
                 Rule::unique('academic_sessions', 'name')
-                    ->where('school_id', app(TenantContext::class)->idOrFail()),
+                    ->where('school_id', $this->schoolId())
+                    ->ignore($sessionId),
             ],
             'starts_on' => ['required', 'date'],
             'ends_on' => ['required', 'date', 'after:starts_on'],
@@ -34,6 +32,9 @@ class StoreAcademicSessionRequest extends FormRequest
         ];
     }
 
+    /**
+     * @return array<string, string>
+     */
     public function messages(): array
     {
         return [

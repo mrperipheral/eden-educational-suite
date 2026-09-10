@@ -4,9 +4,11 @@ namespace Database\Seeders;
 
 use App\Enums\Module;
 use App\Enums\Role;
+use App\Models\AcademicLevel;
 use App\Models\AcademicSession;
 use App\Models\School;
 use App\Models\SchoolModule;
+use App\Models\Subject;
 use App\Models\User;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Database\Seeder;
@@ -68,16 +70,56 @@ class DatabaseSeeder extends Seeder
             'brand_color' => '#1d4ed8',
         ])->save();
         $settings->markReviewed();
-        AcademicSession::create([
-            'name' => '2025/2026',
-            'starts_on' => '2025-09-01',
-            'ends_on' => '2026-07-31',
-        ])->makeCurrent();
 
         // Alpha has tweaked two modules away from the catalogue defaults; every
         // other module (and all of Beta) simply uses the default.
         SchoolModule::create(['module' => Module::Timetable->value, 'enabled' => true]);
         SchoolModule::create(['module' => Module::Fees->value, 'enabled' => false]);
+
+        // Academic foundation — a current session with three terms, a handful of
+        // levels + arms, and a starter subject list. All school-configured;
+        // nothing here is baked into the code.
+        $session = AcademicSession::create([
+            'name' => '2025/2026',
+            'starts_on' => '2025-09-01',
+            'ends_on' => '2026-07-31',
+        ]);
+        $session->makeCurrent();
+
+        foreach ([
+            ['First Term', '2025-09-15', '2025-12-12', 1],
+            ['Second Term', '2026-01-06', '2026-04-03', 2],
+            ['Third Term', '2026-04-27', '2026-07-24', 3],
+        ] as [$name, $from, $to, $pos]) {
+            $period = $session->periods()->create([
+                'name' => $name, 'starts_on' => $from, 'ends_on' => $to, 'position' => $pos,
+            ]);
+
+            if ($pos === 1) {
+                $period->makeCurrent();
+            }
+        }
+
+        $subjects = collect([
+            'Mathematics' => 'MTH', 'English Language' => 'ENG', 'Basic Science' => 'BSC',
+            'Social Studies' => 'SOS', 'Computer Studies' => 'CMP', 'Civic Education' => 'CIV',
+        ])->map(fn ($code, $name) => Subject::create([
+            'name' => $name, 'code' => $code, 'position' => 0,
+        ]));
+
+        foreach ([
+            ['Primary 1', 'PRI1', 1], ['Primary 2', 'PRI2', 2], ['Primary 3', 'PRI3', 3],
+            ['JSS 1', 'JSS1', 4], ['JSS 2', 'JSS2', 5],
+        ] as [$name, $code, $pos]) {
+            $level = AcademicLevel::create(['name' => $name, 'code' => $code, 'position' => $pos]);
+
+            $level->arms()->create(['name' => 'Gold', 'code' => 'G', 'position' => 1]);
+            $level->arms()->create(['name' => 'Silver', 'code' => 'S', 'position' => 2]);
+
+            $level->subjects()->sync(
+                $subjects->pluck('id')->mapWithKeys(fn ($id) => [$id => ['school_id' => $alpha->id]])->all()
+            );
+        }
 
         $tenant->forget();
     }

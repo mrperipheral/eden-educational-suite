@@ -14,7 +14,7 @@ role set, composed with the strict `TenantContext` from Milestone 3.
 | Runtime check | `User::hasPermission()` / `roleIn()` / `permissionsIn()` / `canGrantRole()` |
 | Gate wiring | `App\Providers\AuthServiceProvider` — one `Gate::define()` per permission |
 | Fine-grained rules | `App\Policies\MembershipPolicy` (self / escalation guards) |
-| Features that use it | Members management (`/members*`), school settings + academic sessions (`school.settings.*`), school provisioning (`SchoolPolicy`) |
+| Features that use it | Members (`/members*`), school settings + module activation (`school.settings.*`), academic structure (`/academic/*`, `academics.*` — M8), school provisioning (`SchoolPolicy`) |
 
 ```
 Request → auth · verified · active · tenant  (TenantContext::set(School))
@@ -52,15 +52,16 @@ and `hasPermission()` are the only things that would change.
 
 - **School config (enforced — M5/M6):** `school.settings.view`,
   `school.settings.update` — gate all school settings sections (profile,
-  branding, regional — M6) *and* the academic sessions. School Admin holds
-  `.update`; Principal and Bursar hold only `.view` (read-only settings). No
-  finer-grained settings permission was added in M6 — editing school-wide
-  configuration is a School Admin function; revisit if a school needs a
-  Principal who can edit (see `docs/school-settings.md` §5).
+  branding, regional — M6) and module activation (M7). School Admin holds
+  `.update`; Principal and Bursar hold only `.view`.
+- **Academic structure (enforced — M8):** `academics.view`, `academics.manage` —
+  gate `/academic/*` (sessions, periods, levels, arms, subjects — moved here
+  from `school.settings.*`). School Admin + Principal manage; Teacher + Staff
+  read; Bursar / Parent / Student get 403. See `docs/academic-foundation.md`.
 - **People & access (enforced):** `member.view`, `member.assign-role`
   (also gates *adding* an existing user — M5), `member.remove`
 - **Declared for later domain milestones** (not yet enforced — the modules that
-  check them don't exist): `student.*`, `guardian.*`, `staff.*`, `academics.*`,
+  check them don't exist): `student.*`, `guardian.*`, `staff.*`,
   `attendance.*`, `result.*`, `finance.*`, `portal.parent`, `portal.student`
 
 They exist now so the role bundles are meaningful and testable. A domain
@@ -184,14 +185,16 @@ school, so a cross-school membership can never reach the policy.
 | One role per (user, school), nullable | matches "roles are bundles"; multi-role is a rare need, deferred |
 | Tier-based escalation guard (`target.tier ≤ granter.tier`) | models org hierarchy; the hard invariant "never grant a role above your own" is simple and testable |
 | Platform admin = all permissions *within an entered school* | "retain platform-wide administration" without weakening row-level isolation (`SchoolScope` still applies) |
-| `member.*` permissions enforced; the rest declared but dormant | the vocabulary the role bundles need, without starting domain modules |
+| `member.*` + `academics.*` enforced (M8); the rest declared but dormant | the vocabulary the role bundles need, activated module by module |
 | Module activation (M7) reuses `school.settings.*`, stays orthogonal to permissions | it is configuration ("is the feature on for this school?"), not "may this user…"; a domain route checks both |
+| `academics.*` (M8) reused as-is, no finer split; sessions re-gated from `school.settings.*` | coarse-on-purpose; the academic structure is one thing under one permission (see `docs/academic-foundation.md`) |
 
 ## 11. Deferred
 
 - Multi-role per school; custom/per-school roles; runtime-editable permissions.
 - Invitation / brand-new-account flow (M5 adds *existing* users only).
 - Admin UI for `users.status` and `users.is_platform_admin`.
-- Enforcing the dormant permissions — happens in each domain module's milestone.
+- Enforcing the remaining dormant permissions — happens in each domain module's
+  milestone (`academics.*` enforced in M8).
 - Audit logging of role changes.
 - `@role` / permission Blade directives beyond the built-in `@can`.

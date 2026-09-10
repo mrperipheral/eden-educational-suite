@@ -95,11 +95,28 @@ Deferred: the modules themselves (each domain milestone), preset bundles,
 disable-with-cascade, per-module config pages, activation audit trail,
 plan-based entitlements.
 
-## Milestone 8+ — Domain Modules
+## ✅ Milestone 8 — Academic Foundation (complete, 2026-09-16)
 
-Staff · Students & Guardians · Classes/Sections/Subjects · Enrolment ·
-Attendance · Assessments & Results · Fees / Invoices / Payments (Paystack) ·
-CBT · Role-specific portals & dashboards · Notifications · Reporting.
+The configurable academic structure the later modules build on: academic
+sessions (M5, extended) + `AcademicPeriod` (terms/semesters, any number),
+`AcademicLevel` + `LevelArm` (classes and streams), `Subject`, and the
+`level_subject` "which level offers which subject" link. All `BelongsToSchool`;
+`/academic/*` gated by `academics.view` / `academics.manage` (M4 permissions,
+previously dormant) **and** `module:academics`. `Module::Academics->isAvailable()`
+is now `true`. Structure only — no students, teachers, timetable, attendance,
+assessments or results. Full detail in `docs/academic-foundation.md`.
+
+Deferred: students / guardians / staff, class & arm membership, teacher
+assignment, timetable, attendance, assessments, results, grading, promotion,
+CBT, per-subject assessment metadata, bulk import / year cloning, hard delete /
+archival.
+
+## Milestone 9+ — Domain Modules
+
+Students & Guardians · Staff · Enrolment & class membership · Teacher assignment
+· Timetable · Attendance · Assessments & Results · Fees / Invoices / Payments
+(Paystack) · CBT · Role-specific portals & dashboards · Notifications ·
+Reporting.
 
 Each domain module checks its `App\Enums\Module` flag (`module:` middleware /
 `@module`) **and** its M4 permissions — the two stay orthogonal.
