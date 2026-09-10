@@ -7,19 +7,33 @@
     @fonts
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
-<body class="flex min-h-full flex-col items-center justify-center bg-gray-50 px-4 py-12 text-gray-900 antialiased">
-    <div class="w-full max-w-lg text-center">
-        <p class="text-sm font-medium uppercase tracking-wide text-brand-600">School Management Platform</p>
-        <h1 class="mt-2 text-2xl font-semibold text-gray-900">Platform foundation is ready</h1>
-        <p class="mt-3 text-sm text-gray-500">
-            Multi-school SaaS for nursery, primary and secondary schools. Domain modules
-            (users, schools, students, portals) are delivered in later milestones.
-        </p>
+<body class="flex min-h-full flex-col bg-gray-50 text-gray-900 antialiased">
+    <header class="flex items-center justify-between px-6 py-4">
+        <span class="text-sm font-semibold text-brand-700">{{ config('app.name') }}</span>
+        <nav class="flex items-center gap-2">
+            @auth
+                <x-button :href="url('/dashboard')" size="sm">{{ __('Go to dashboard') }}</x-button>
+            @else
+                <x-button :href="route('login')" variant="ghost" size="sm">{{ __('Sign in') }}</x-button>
+                <x-button :href="route('register')" size="sm">{{ __('Create account') }}</x-button>
+            @endauth
+        </nav>
+    </header>
 
-        <div class="mt-6 flex items-center justify-center gap-3">
-            <x-button href="{{ url('/health') }}" variant="secondary" size="sm">Health check</x-button>
-            <x-button href="{{ url('/up') }}" variant="ghost" size="sm">Framework status</x-button>
+    <main class="flex flex-1 items-center justify-center px-4 py-16">
+        <div class="w-full max-w-lg text-center">
+            <p class="text-sm font-medium uppercase tracking-wide text-brand-600">School Management Platform</p>
+            <h1 class="mt-2 text-2xl font-semibold text-gray-900">One platform for running your school</h1>
+            <p class="mt-3 text-sm text-gray-500">
+                A multi-school management system for nursery, primary and secondary schools.
+                Sign in to your account, or create one to get started. School setup and the
+                management modules arrive in upcoming releases.
+            </p>
         </div>
-    </div>
+    </main>
+
+    <footer class="px-6 py-4 text-center text-xs text-gray-400">
+        &copy; {{ date('Y') }} {{ config('app.name') }}
+    </footer>
 </body>
 </html>

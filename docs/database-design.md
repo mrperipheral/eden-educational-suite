@@ -1,21 +1,29 @@
 # Database Design
 
-Status: Milestone 1. **No domain tables exist yet.** This document records the
-conventions every future migration follows.
+Status: Milestone 2. **No school-domain tables exist yet.** This document
+records the conventions every future migration follows.
 
 ## Current schema
 
-Only the Laravel framework tables, from the default migrations:
+Laravel framework tables plus one authentication column:
 
 | Table | Purpose |
 |-------|---------|
-| `users` | authentication identities (domain profile fields come later) |
+| `users` | authentication identities. `id, name, email (unique), email_verified_at, password, status, remember_token, timestamps` |
 | `password_reset_tokens`, `sessions` | auth/session plumbing |
 | `cache`, `cache_locks` | `CACHE_STORE=database` |
 | `jobs`, `job_batches`, `failed_jobs` | `QUEUE_CONNECTION=database` |
 | `migrations` | Laravel bookkeeping |
 
 Engine: MySQL 8 / MariaDB, InnoDB, `utf8mb4`.
+
+### Migration `2026_09_10_120000_add_status_to_users_table`
+
+Adds `users.status` — `string(20)`, default `'active'`, **indexed**. Backed by
+`App\Enums\UserStatus` (`active` / `suspended` / `disabled`); gates
+authentication. Indexed because admin user lists will filter on it once the
+staff / multi-school modules exist. No `school_id` on `users` — the user↔school
+relationship is Milestone 3.
 
 ## Multi-tenant conventions (to apply from the next milestone on)
 

@@ -13,12 +13,14 @@ is started in `resources/js/app.js`.
 
 | Component | Use for |
 |-----------|---------|
-| `<x-layouts.app>` | authenticated application pages (sidebar + header + main) |
-| `<x-layouts.guest>` | login, password reset, and other pre-auth screens |
+| `<x-layouts.app>` | low-level app shell (sidebar + header + main) — rarely used directly |
+| `<x-layouts.authenticated>` | **default for signed-in pages** — composes `layouts.app` with the primary nav and the user menu; `:title` renders a page header |
+| `<x-layouts.guest>` | login, register, password reset, verification, password confirm |
 
 `<x-layouts.app>` slots: `$navigation` (sidebar links), `$header` (page title area
 in the top bar), `$headerActions` (top-right controls). The default `$slot` is the
-main content.
+main content. `<x-layouts.authenticated>` fills `navigation` and `headerActions`
+for you; pass `:title` and an optional `actions` slot.
 
 ### Responsive behaviour
 - Breakpoint for the desktop layout is Tailwind `lg` (1024px).
@@ -41,6 +43,22 @@ main content.
 | `x-spinner` | `size`: sm / md / lg · accessible `label` · optional inline text |
 | `x-modal` | generic Alpine dialog, opened via `$dispatch('open-modal', 'name')` |
 | `x-confirm` | destructive-action guard: trigger button → confirm dialog → posts a spoofed-method form |
+| `x-checkbox` | labelled checkbox, keeps `old()` state (used for "remember me") |
+| `x-dropdown` | Alpine menu (`trigger` slot + menu items); closes on outside-click / Escape. Used for the header user menu |
+| `x-auth-heading` | title + optional description block at the top of an auth card |
+
+### Authentication pages
+
+All under `resources/views/auth/` using `<x-layouts.guest>`: `login`, `register`,
+`forgot-password`, `reset-password`, `verify-email`, `confirm-password`. Each is a
+single centred card, one clear primary action, inline server-side validation via
+`x-input`, `autocomplete` hints (`username` / `current-password` / `new-password`),
+`autofocus` on the first field, and a visible focus ring on every control. No
+illustrations, no animation beyond the drawer/menu transitions, minimal JS.
+
+Account settings (`resources/views/settings/profile.blade.php`) uses
+`<x-layouts.authenticated>` with three stacked `<x-card>` sections (profile,
+password, delete) — restrained card use, one concern per card.
 
 Flash messages (`session('success' | 'error' | 'status')`) are rendered
 automatically by `<x-layouts.app>` as alerts.
@@ -71,4 +89,5 @@ automatically by `<x-layouts.app>` as alerts.
 ## Not yet defined
 
 Dark mode, dense/table layouts, data-grid, charts, iconography system,
-role-specific navigation, notification/toast system. Add here when built.
+role-specific navigation (the current nav is a fixed two-item placeholder),
+notification/toast system. Add here when built.

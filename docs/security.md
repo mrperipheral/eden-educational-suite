@@ -16,8 +16,9 @@ column.
    mutate School B data. This is guaranteed by `TenantContext` + the (upcoming)
    `BelongsToSchool` global scope + tenant-scoped validation, and proven by
    dedicated cross-tenant tests.
-4. **Least privilege.** Roles/permissions (Milestone 2) grant the minimum;
-   platform-admin capability is separate from any school role.
+4. **Least privilege.** Roles/permissions (a later milestone) grant the minimum;
+   platform-admin capability is separate from any school role. Code checks
+   permissions, never role names.
 5. **Fail safe.** Missing tenant context throws (`idOrFail`), it does not fall
    back to "all schools".
 
@@ -35,11 +36,32 @@ column.
 | Strict models | `Model::shouldBeStrict()` / `preventLazyLoading()` outside production — catches accidental data exposure early |
 | Tenant seam | `TenantContext` request-scoped; raw `school_id` from input is forbidden by convention |
 
+## Implemented in Milestone 2 (Authentication)
+
+Full detail in `docs/authentication.md`. Summary of controls:
+
+| Control | State |
+|---------|-------|
+| Session fixation | `session()->regenerate()` after successful login |
+| Secure logout | `logout()` + `session()->invalidate()` + `regenerateToken()` |
+| Login throttling | 5 failures per `lower(email)\|ip` → `Lockout`; `throttle:6,1` on register / reset / verify / confirm POSTs |
+| Account enumeration | login returns generic `auth.failed`; `forgot-password` returns a neutral message for any address |
+| Account status gate | `UserStatus` enum, checked in `LoginRequest` **and** `EnsureAccountIsActive` middleware on every authenticated request |
+| Password policy | single `Password::defaults()` — stricter in production (`min(10)`, mixed case, `uncompromised()`) |
+| Password hashing | bcrypt via `Hash::make` / `hashed` cast (idempotent) |
+| Password reset | 60-min token expiry, single-use, `remember_token` rotated on reset |
+| Email verification | `MustVerifyEmail`; signed + throttled verify route; `verified` on the app route group |
+| Re-auth for sensitive actions | `password.confirm` on account deletion; plumbing ready for future admin/financial actions |
+| Mass assignment | `status` excluded from `User::$fillable`; registration/profile use Form Requests + `validated()` |
+| Credential logging | none — no `Log::` in the auth path, requests not dumped |
+| Transport / cookies | `session.secure` forced true in production by `AppServiceProvider`; `http_only` + `same_site=lax` defaults |
+| Authorization direction | documented (User → Permission → School → Policy → Action); roles/permissions not yet implemented |
+
 ## Deferred (with the milestone that owns them)
 
-- **M2:** authentication flows, login throttling / lockout, password-reset token
-  expiry, "remember me" scope, re-auth for sensitive actions, role/permission
-  enforcement, session fixation handling on login.
+- **Auth follow-ups:** role/permission enforcement, 2FA, "log out other devices"
+  on password change, session listing, auth-event audit logging, templated
+  transactional emails.
 - **M3:** `EnforceTenant` middleware, `BelongsToSchool` scope, cross-tenant test
   suite, per-tenant rate limiting considerations.
 - **Later:** audit logging (who did what, per school), secure file upload

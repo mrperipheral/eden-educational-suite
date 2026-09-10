@@ -13,17 +13,33 @@ foundation; config & `.gitignore` safety review; documentation structure.
 
 No domain modules, no website features, no artificial school limit.
 
-## ▶ Milestone 2 — Authentication & User Foundation
+## ✅ Milestone 2 — Authentication & User Foundation (complete, 2026-09-10)
 
-Login / logout / password reset, session hardening, the `users` domain profile,
-**role & permission model** (evaluate Spatie Permission here), platform-admin vs
-school-user separation, auth feature tests.
+Registration, login, logout, password reset, email verification, password
+confirmation, account status (`active`/`suspended`/`disabled`) enforced
+server-side, account/profile settings (name, email, password, delete),
+authenticated shell + placeholder dashboard, polished auth UI on the Milestone 1
+component kit, security baseline (throttling, session fixation, generic errors,
+password policy), authorization *direction* documented. Native Laravel — no auth
+package. Full detail in `docs/authentication.md`.
+
+Deferred to their own milestone: **role & permission model** (evaluate Spatie
+Permission then), 2FA, auth audit logging.
 
 ## Milestone 3 — Multi-School Core
 
 `schools` table and model, `EnforceTenant` middleware, `BelongsToSchool` trait +
 global scope + `creating` hook, tenant-scoped validation helpers, cross-tenant
 isolation test suite, school switching for multi-school users.
+
+## Milestone 3.x — Roles & Permissions
+
+Permission-based authorization (roles = permission bundles), the planned role
+set (Super Admin · School Admin · Principal · Teacher · Accountant/Bursar ·
+Staff · Parent · Student), Policy/Gate wiring, admin UI for `users.status`.
+Evaluate Spatie Permission vs. a small in-house model at that point. Composed
+with the tenant context so a permission only applies within the acting school.
+Sequenced with Milestone 3 since most permissions are per-school.
 
 ## Milestone 4 — School Onboarding
 

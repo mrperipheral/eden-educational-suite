@@ -13,8 +13,11 @@ The full development guide is **[CLAUDE.md](CLAUDE.md)** and the documents under
   `App\Support\Tenancy\TenantContext`; never trust a `school_id` from user input.
 - **Security:** server-side authorization (Policies), Form Request validation,
   CSRF on every write. Frontend hiding is not authorization.
+- **Auth:** native Laravel, no starter package. See `docs/authentication.md`.
+  Check permissions, never role names.
 - **Scope discipline:** work the current milestone only. `PROJECT_STATUS.md` and
-  `docs/roadmap.md` say where we are. Milestone 1 (Platform Foundation) is done.
+  `docs/roadmap.md` say where we are. Milestones 1 (Platform Foundation) and 2
+  (Authentication & User Foundation) are done.
 - **Before finishing:** `php artisan test`, `vendor/bin/pint`, `npm run build`.
 - This file and `docs/` are development-only and must never become a runtime
   dependency of the application.

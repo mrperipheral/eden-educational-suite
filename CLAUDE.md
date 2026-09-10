@@ -67,12 +67,20 @@ See `docs/architecture.md` for the full rationale. In short:
 - **Tenancy** — `App\Support\Tenancy\TenantContext` (request-scoped singleton) is
   the single source of truth for "which school are we acting as". Resolve it from
   the container; never read a raw `school_id` from user input.
+- **Enums** (`app/Enums`) — closed value sets backed by string columns
+  (`UserStatus`). Add behaviour to the enum, not `match` ladders in callers.
+- **Middleware** (`app/Http/Middleware`) — cross-cutting request guards; register
+  aliases in `bootstrap/app.php`.
 - **Views** — pages in `resources/views/<area>/`, layouts and reusable UI as Blade
-  components in `resources/views/components/`. Use `<x-layouts.app>` /
-  `<x-layouts.guest>`.
+  components in `resources/views/components/`. Signed-in pages use
+  `<x-layouts.authenticated>`; pre-auth pages use `<x-layouts.guest>`.
+- **Auth** — native Laravel, no starter package. Flow routes in `routes/auth.php`;
+  see `docs/authentication.md`. Passwords via `Password::defaults()`. Check
+  **permissions**, never role names (roles/permissions not built yet).
 - **Tests** — feature tests for every route and each authorization boundary; unit
-  tests for services and value objects. Tenant isolation gets explicit
-  cross-tenant "cannot see / cannot touch" tests once schools exist.
+  tests for services, enums and value objects. Tenant isolation gets explicit
+  cross-tenant "cannot see / cannot touch" tests once schools exist. Tests that
+  render views call `$this->withoutVite()`.
 
 ## Guardrails
 
@@ -85,6 +93,7 @@ See `docs/architecture.md` for the full rationale. In short:
 
 ## Milestones
 
-Tracked in `PROJECT_STATUS.md` and `docs/roadmap.md`. **Milestone 1 (Platform
-Foundation) is complete.** Do not start Authentication, Multi-School, Onboarding
-or any domain module without picking up the next milestone explicitly.
+Tracked in `PROJECT_STATUS.md` and `docs/roadmap.md`. **Milestones 1 (Platform
+Foundation) and 2 (Authentication & User Foundation) are complete.** Do not start
+Multi-School Core, Roles & Permissions, Onboarding or any domain module without
+picking up the next milestone explicitly.

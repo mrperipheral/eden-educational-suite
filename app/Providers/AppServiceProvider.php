@@ -6,6 +6,7 @@ use App\Support\Tenancy\TenantContext;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Validation\Rules\Password;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -33,6 +34,20 @@ class AppServiceProvider extends ServiceProvider
 
         if ($this->app->isProduction()) {
             URL::forceScheme('https');
+
+            // Session/CSRF cookies must never travel over plain HTTP in prod,
+            // regardless of what the environment file says.
+            config(['session.secure' => true]);
         }
+
+        // Single definition of "an acceptable password", used by every
+        // registration / reset / change form via Password::defaults().
+        Password::defaults(function () {
+            $rule = Password::min(8)->letters()->numbers();
+
+            return $this->app->isProduction()
+                ? $rule->min(10)->mixedCase()->uncompromised()
+                : $rule;
+        });
     }
 }

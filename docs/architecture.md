@@ -1,7 +1,7 @@
 # Architecture
 
-Status: Milestone 1 (Platform Foundation). This describes the intended shape of
-the system and what exists today.
+Status: Milestone 2 (Authentication & User Foundation) complete. This describes
+the intended shape of the system and what exists today.
 
 ## 1. High-level model
 
@@ -64,15 +64,19 @@ every developer remembering a `where()` clause.
 
 | Layer | Directory | Responsibility |
 |-------|-----------|----------------|
-| Routing | `routes/web.php` | thin; names every route |
-| Controllers | `app/Http/Controllers` | HTTP orchestration only; resourceful naming |
-| Form Requests | `app/Http/Requests` | validation + request-scoped authorization |
+| Routing | `routes/web.php`, `routes/auth.php` | thin; names every route; auth flow split into its own file |
+| Controllers | `app/Http/Controllers` (`Auth/`, `Settings/`) | HTTP orchestration only; resourceful naming |
+| Form Requests | `app/Http/Requests` (`Auth/`, `Settings/`) | validation + request-scoped authorization |
 | Policies | `app/Policies` | model authorization, invoked server-side |
 | Services | `app/Services` | multi-step / cross-model business operations |
 | Models | `app/Models` | persistence, casts, mass-assignment guards, scopes |
+| Enums | `app/Enums` | closed value sets (`UserStatus`), backed by string columns |
+| Middleware | `app/Http/Middleware` | cross-cutting request guards (`EnsureAccountIsActive`) |
 | Support | `app/Support` | framework-agnostic helpers, value objects, tenancy |
 | Views | `resources/views/<area>` | pages |
 | UI components | `resources/views/components` | layouts + design-system primitives |
+
+Authentication is documented in full in `docs/authentication.md`.
 
 Deliberately **not** adopted now: repository pattern, a DTO for every payload,
 a generic "BaseService", event sourcing. Introduce an abstraction when a second concrete
@@ -118,3 +122,7 @@ pre-auth screens.
 | 2026-09-10 | Alpine.js added; no SPA framework | shell needs minimal interactivity only |
 | 2026-09-10 | UI primitives as anonymous Blade components | simple, no build-time component registry |
 | 2026-09-10 | No Spatie Permission / Paystack / Redis yet | not needed by the foundation; belong to later milestones |
+| 2026-09-10 | Auth hand-rolled on Laravel primitives; no Breeze/Fortify/Jetstream | a starter package brings a conflicting UI/Tailwind layer for controllers we own anyway (see `docs/authentication.md` §13) |
+| 2026-09-10 | Account status = `users.status` string enum, gated at login + per-request middleware | three fixed states; login-only checks leave suspended sessions live |
+| 2026-09-10 | `verified` middleware on the app group only; `password.confirm` on account deletion only | users must be able to verify / leave; avoid unnecessary password prompts |
+| 2026-09-10 | Role/permission system still deferred | belongs to its own milestone; direction documented in `docs/authentication.md` §11 |
