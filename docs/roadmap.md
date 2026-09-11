@@ -339,10 +339,53 @@ no upload workflow yet — this milestone only ever views assignment/
 submission status), a generic "portal" abstraction shared with the Parent
 Portal (kept deliberately separate).
 
-## Milestone 18+ — Domain Modules
+## ✅ Milestone 18 — Communication & Notification Foundation (complete, 2026-09-26)
 
-Fees / Invoices / Payments (Paystack) · CBT · Notifications · Reporting ·
-Promotion.
+The school's Communication Hub as the system of record for school
+communication, plus a shared in-app notification centre. `App\Models\
+CommunicationThread` (school-owned; optional `student_id` / `guardian_id`
+link; `status` open → resolved/escalated, reopenable, not mass-assignable) +
+`App\Models\CommunicationMessage` (one reply; `sender_id` set from the
+authenticated user, never request input) — staff-facing in this milestone
+(a shared inbox, like the rest of the app's staff lists), never hard-deleted.
+`App\Models\Announcement` (school-owned; `status` draft → published, not
+mass-assignable; `audience` a coarse role-shaped bucket — everyone / all
+staff / teachers / parents / students) — `AnnouncementController@index`/
+`@show` are mounted at three route names (`announcements.*`,
+`parent.announcements.*`, `student.announcements.*`), one controller, no
+duplication, the M16/M17 shared-renderer pattern; visibility is a query
+scope (`Announcement::scopeVisibleToRole()`), not just a route gate.
+`App\Models\Notification` (its own `user_notifications` table —
+deliberately **not** Laravel's conventional polymorphic `notifications`
+table, which has no `school_id` and would bypass `SchoolScope`) + `App\
+Services\Notifications\NotificationDispatcher` (bulk-inserts, one query per
+fan-out regardless of audience size) is the single seam any module can use
+to raise a notification without knowing about delivery channels
+(`App\Enums\NotificationChannel`: only `in_app` implemented — `whatsapp` /
+`sms` / `email` are declared, no provider code). Three domain events
+(`AnnouncementPublished`, `CommunicationMessageAdded`,
+`CommunicationThreadEscalated`), auto-discovered listeners, dispatched
+synchronously (no queue introduced). New permissions `communication.view` /
+`.create` / `.manage` / `.resolve` / `.escalate`, `announcement.view` /
+`.manage`, slotted into the existing role tiers. Reuses `App\Enums\
+Module::Notifications` (declared since M7) for the whole surface — now
+`isAvailable()`. The notification centre itself needs no extra permission
+(self-scoped to `auth()->user()`, tenant-scoped for free) and is shared
+verbatim by staff, the Parent Portal and the Student Portal via three route
+names pointing at one `NotificationController`. Full detail in
+`docs/communication.md`.
+
+Deferred: WhatsApp / SMS / email provider integration, two-way portal
+messaging (guardians/students can view announcements & notifications but do
+not reply into a thread — the Communication Hub stays staff-facing), level/
+arm-scoped ("selected school groups") announcement targeting, wiring
+assignment/result/attendance events into the notification foundation (the
+mechanism is established; only M18's own events use it), a full audit trail
+of communication access, push notifications, message attachments.
+
+## Milestone 19+ — Domain Modules
+
+Fees / Invoices / Payments (Paystack) · CBT · Reporting · Promotion.
 
 Each domain module checks its `App\Enums\Module` flag (`module:` middleware /
 `@module`) **and** its M4 permissions — the two stay orthogonal.

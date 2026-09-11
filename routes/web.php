@@ -11,11 +11,16 @@ use App\Http\Controllers\Assessment\AssessmentScoreController;
 use App\Http\Controllers\Assessment\AssignmentController;
 use App\Http\Controllers\Assessment\AssignmentSubmissionController;
 use App\Http\Controllers\Attendance\AttendanceRegisterController;
+use App\Http\Controllers\Communication\AnnouncementController;
+use App\Http\Controllers\Communication\CommunicationMessageController;
+use App\Http\Controllers\Communication\CommunicationStatusController;
+use App\Http\Controllers\Communication\CommunicationThreadController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Guardian\GuardianController;
 use App\Http\Controllers\Guardian\GuardianLinkController;
 use App\Http\Controllers\HealthController;
 use App\Http\Controllers\MemberController;
+use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\Platform\SchoolController as PlatformSchoolController;
 use App\Http\Controllers\Portal\ParentAssignmentController;
 use App\Http\Controllers\Portal\ParentAttendanceController;
@@ -576,6 +581,68 @@ Route::middleware(['auth', 'verified', 'active'])->group(function () {
         });
 
         /*
+        | Communication Hub, Announcements & Notifications (see
+        | docs/communication.md). module:notifications gates all of it.
+        |   ->can('communication.view' | '.create' | '.manage' | '.resolve' |
+        |     '.escalate')  — threads/messages, staff-only in this milestone.
+        |   ->can('announcement.view' | '.manage')  — announcements (a viewer
+        |     without .manage only ever sees published announcements targeted
+        |     at their own role — see Announcement::scopeVisibleToRole()).
+        |   /notifications needs no extra permission: it only ever shows the
+        |     signed-in user's own notifications, tenant-scoped for free.
+        | Tenant-owned ids ({thread}, {announcement}, {notification}) are
+        | resolved by tenant-scoped `findOrFail`, so another school's id 404s.
+        */
+        Route::middleware('module:notifications')->group(function () {
+            Route::prefix('communication')->name('communication.')->group(function () {
+                Route::get('threads', [CommunicationThreadController::class, 'index'])
+                    ->can('communication.view')->name('threads.index');
+                Route::get('threads/create', [CommunicationThreadController::class, 'create'])
+                    ->can('communication.create')->name('threads.create');
+                Route::post('threads', [CommunicationThreadController::class, 'store'])
+                    ->can('communication.create')->name('threads.store');
+                Route::get('threads/{thread}', [CommunicationThreadController::class, 'show'])
+                    ->whereNumber('thread')->can('communication.view')->name('threads.show');
+                Route::patch('threads/{thread}', [CommunicationThreadController::class, 'update'])
+                    ->whereNumber('thread')->can('communication.manage')->name('threads.update');
+                Route::post('threads/{thread}/messages', [CommunicationMessageController::class, 'store'])
+                    ->whereNumber('thread')->can('communication.create')->name('threads.messages.store');
+                Route::post('threads/{thread}/resolve', [CommunicationStatusController::class, 'resolve'])
+                    ->whereNumber('thread')->can('communication.resolve')->name('threads.resolve');
+                Route::post('threads/{thread}/escalate', [CommunicationStatusController::class, 'escalate'])
+                    ->whereNumber('thread')->can('communication.escalate')->name('threads.escalate');
+                Route::post('threads/{thread}/reopen', [CommunicationStatusController::class, 'reopen'])
+                    ->whereNumber('thread')->can('communication.resolve')->name('threads.reopen');
+            });
+
+            Route::prefix('announcements')->name('announcements.')->group(function () {
+                Route::get('/', [AnnouncementController::class, 'index'])
+                    ->can('announcement.view')->name('index');
+                Route::get('create', [AnnouncementController::class, 'create'])
+                    ->can('announcement.manage')->name('create');
+                Route::post('/', [AnnouncementController::class, 'store'])
+                    ->can('announcement.manage')->name('store');
+                Route::get('{announcement}', [AnnouncementController::class, 'show'])
+                    ->whereNumber('announcement')->can('announcement.view')->name('show');
+                Route::get('{announcement}/edit', [AnnouncementController::class, 'edit'])
+                    ->whereNumber('announcement')->can('announcement.manage')->name('edit');
+                Route::patch('{announcement}', [AnnouncementController::class, 'update'])
+                    ->whereNumber('announcement')->can('announcement.manage')->name('update');
+                Route::post('{announcement}/publish', [AnnouncementController::class, 'publish'])
+                    ->whereNumber('announcement')->can('announcement.manage')->name('publish');
+                Route::post('{announcement}/unpublish', [AnnouncementController::class, 'unpublish'])
+                    ->whereNumber('announcement')->can('announcement.manage')->name('unpublish');
+            });
+
+            Route::prefix('notifications')->name('notifications.')->group(function () {
+                Route::get('/', [NotificationController::class, 'index'])->name('index');
+                Route::post('{notification}/read', [NotificationController::class, 'read'])
+                    ->whereNumber('notification')->name('read');
+                Route::post('read-all', [NotificationController::class, 'readAll'])->name('read-all');
+            });
+        });
+
+        /*
         | Parent Portal (see docs/parent-portal.md). Two gates:
         |   module:parent-portal  — is the feature on? (depends on guardians)
         |   ->can('portal.parent')  — may this user?
@@ -616,6 +683,23 @@ Route::middleware(['auth', 'verified', 'active'])->group(function () {
 
             Route::get('profile', [ParentProfileController::class, 'edit'])
                 ->can('portal.parent')->name('profile.edit');
+
+            // Announcements & notifications (M18, docs/communication.md) —
+            // AnnouncementController/NotificationController shared with staff
+            // and the Student Portal; nested here so both module gates apply.
+            Route::middleware('module:notifications')->group(function () {
+                Route::get('announcements', [AnnouncementController::class, 'index'])
+                    ->can('portal.parent')->name('announcements.index');
+                Route::get('announcements/{announcement}', [AnnouncementController::class, 'show'])
+                    ->whereNumber('announcement')->can('portal.parent')->name('announcements.show');
+
+                Route::get('notifications', [NotificationController::class, 'index'])
+                    ->can('portal.parent')->name('notifications.index');
+                Route::post('notifications/{notification}/read', [NotificationController::class, 'read'])
+                    ->whereNumber('notification')->can('portal.parent')->name('notifications.read');
+                Route::post('notifications/read-all', [NotificationController::class, 'readAll'])
+                    ->can('portal.parent')->name('notifications.read-all');
+            });
         });
 
         /*
@@ -652,6 +736,23 @@ Route::middleware(['auth', 'verified', 'active'])->group(function () {
 
             Route::get('timetable', [StudentTimetableController::class, 'index'])
                 ->can('portal.student')->name('timetable.index');
+
+            // Announcements & notifications (M18, docs/communication.md) —
+            // AnnouncementController/NotificationController shared with staff
+            // and the Parent Portal; nested here so both module gates apply.
+            Route::middleware('module:notifications')->group(function () {
+                Route::get('announcements', [AnnouncementController::class, 'index'])
+                    ->can('portal.student')->name('announcements.index');
+                Route::get('announcements/{announcement}', [AnnouncementController::class, 'show'])
+                    ->whereNumber('announcement')->can('portal.student')->name('announcements.show');
+
+                Route::get('notifications', [NotificationController::class, 'index'])
+                    ->can('portal.student')->name('notifications.index');
+                Route::post('notifications/{notification}/read', [NotificationController::class, 'read'])
+                    ->whereNumber('notification')->can('portal.student')->name('notifications.read');
+                Route::post('notifications/read-all', [NotificationController::class, 'readAll'])
+                    ->can('portal.student')->name('notifications.read-all');
+            });
         });
     });
 });

@@ -70,7 +70,7 @@ enum Module: string
             self::Fees => __('Fee structures, invoices and payment tracking.'),
             self::LearningMaterials => __('Notes, documents and resources shared with classes.'),
             self::Cbt => __('Computer-based tests sat online by students.'),
-            self::Notifications => __('Email and in-app notices to staff, parents and students.'),
+            self::Notifications => __('Communication threads, announcements and in-app notices to staff, parents and students.'),
             self::ParentPortal => __('The portal parents sign in to for their children.'),
             self::StudentPortal => __('The portal students sign in to for their own records.'),
         };
@@ -156,11 +156,18 @@ enum Module: string
      *   - `student-portal` — Student Portal (M17): the same shape as the
      *     Parent Portal, but for the student's own record directly — see
      *     `docs/student-portal.md`. Depends on `students` only.
+     *   - `notifications` — Communication & Notification Foundation (M18): a
+     *     staff-facing Communication Hub (school-scoped threads/messages with
+     *     an open → resolved/escalated lifecycle), school-scoped announcements
+     *     with audience targeting, and an in-app notification centre shared by
+     *     staff and the Parent/Student portals (`docs/communication.md`).
+     *     Depends on nothing else — it reads across modules but does not
+     *     require any of them to be on.
      */
     public function isAvailable(): bool
     {
         return match ($this) {
-            self::Academics, self::Students, self::Guardians, self::Staff, self::Timetable, self::Attendance, self::Assessments, self::Results, self::ParentPortal, self::StudentPortal => true,
+            self::Academics, self::Students, self::Guardians, self::Staff, self::Timetable, self::Attendance, self::Assessments, self::Results, self::Notifications, self::ParentPortal, self::StudentPortal => true,
             default => false,
         };
     }

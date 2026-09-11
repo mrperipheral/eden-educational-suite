@@ -2,20 +2,26 @@
 
 namespace Database\Seeders;
 
+use App\Enums\AnnouncementAudience;
 use App\Enums\AssignmentSubmissionStatus;
 use App\Enums\AttendanceStatus;
+use App\Enums\CommunicationCategory;
 use App\Enums\EnrollmentStatus;
 use App\Enums\GuardianRelationship;
 use App\Enums\Module;
 use App\Enums\Role;
 use App\Enums\StudentStatus;
 use App\Enums\TeacherStatus;
+use App\Events\CommunicationMessageAdded;
 use App\Models\AcademicLevel;
 use App\Models\AcademicSession;
+use App\Models\Announcement;
 use App\Models\Assessment;
 use App\Models\AssessmentCategory;
 use App\Models\Assignment;
 use App\Models\AttendanceRegister;
+use App\Models\CommunicationMessage;
+use App\Models\CommunicationThread;
 use App\Models\GradingScheme;
 use App\Models\Guardian;
 use App\Models\ReportCardConfiguration;
@@ -53,8 +59,8 @@ class DatabaseSeeder extends Seeder
         $admin = User::factory()->create(['name' => 'Test User', 'email' => 'test@example.com']);
         $admin->joinSchool($alpha, Role::SchoolAdmin);
 
-        User::factory()->create(['name' => 'Priya Principal', 'email' => 'principal@example.com'])
-            ->joinSchool($alpha, Role::Principal);
+        $principal = User::factory()->create(['name' => 'Priya Principal', 'email' => 'principal@example.com']);
+        $principal->joinSchool($alpha, Role::Principal);
 
         $tomiwa = User::factory()->create(['name' => 'Tomiwa Teacher', 'email' => 'teacher@example.com']);
         $tomiwa->joinSchool($alpha, Role::Teacher);
@@ -560,6 +566,48 @@ class DatabaseSeeder extends Seeder
             'started_on' => '2024-09-15',
             'ended_on' => '2025-07-24',
         ]);
+
+        // Communication & Notification Foundation (M18) — a published
+        // announcement (fans a notification out to every role, including the
+        // Parent/Student Portal demo logins) and an escalated communication
+        // thread about the Student Portal demo child (notifies the
+        // Principal, both on the reply and on escalation).
+        $announcement = new Announcement([
+            'title' => 'Mid-term break dates confirmed',
+            'body' => 'The mid-term break runs from Monday 13th to Friday 17th October. Classes resume Monday 20th October.',
+            'audience' => AnnouncementAudience::Everyone->value,
+        ]);
+        $announcement->created_by = $admin->id;
+        $announcement->save();
+        $announcement->publish();
+
+        $staffAnnouncement = new Announcement([
+            'title' => 'Staff briefing — Friday 3pm',
+            'body' => 'All teaching staff please attend the staff room briefing this Friday at 3pm.',
+            'audience' => AnnouncementAudience::Teachers->value,
+        ]);
+        $staffAnnouncement->created_by = $principal->id;
+        $staffAnnouncement->save();
+
+        $demoStudent = $p1GoldRoster->first();
+        $thread = new CommunicationThread([
+            'assigned_to' => $principal->id,
+            'category' => CommunicationCategory::Attendance->value,
+            'subject' => 'Repeated late arrivals — '.$demoStudent->displayName(),
+            'student_id' => $demoStudent->id,
+            'guardian_id' => $sharedGuardian->id,
+        ]);
+        $thread->created_by = $tomiwa->id;
+        $thread->save();
+
+        $firstMessage = new CommunicationMessage([
+            'body' => $demoStudent->displayName().' has arrived late three times this week. Flagging for follow-up with the guardian.',
+        ]);
+        $firstMessage->sender_id = $tomiwa->id;
+        $thread->messages()->save($firstMessage);
+        $thread->forceFill(['last_message_at' => $firstMessage->created_at])->save();
+        event(new CommunicationMessageAdded($thread, $firstMessage));
+        $thread->escalate();
 
         $tenant->forget();
     }

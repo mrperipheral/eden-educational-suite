@@ -89,6 +89,13 @@ enum Role: string
                 Permission::ResultPublish,
                 Permission::ResultAdjust,
                 Permission::FinanceView,
+                Permission::CommunicationView,
+                Permission::CommunicationCreate,
+                Permission::CommunicationManage,
+                Permission::CommunicationResolve,
+                Permission::CommunicationEscalate,
+                Permission::AnnouncementView,
+                Permission::AnnouncementManage,
             ],
 
             self::Bursar => [
@@ -98,6 +105,9 @@ enum Role: string
                 Permission::StaffView,
                 Permission::FinanceView,
                 Permission::FinanceManage,
+                Permission::CommunicationView,
+                Permission::CommunicationCreate,
+                Permission::AnnouncementView,
             ],
 
             self::Teacher => [
@@ -112,6 +122,11 @@ enum Role: string
                 Permission::AssessmentRecord,
                 Permission::ResultView,
                 Permission::ResultEnter,
+                Permission::CommunicationView,
+                Permission::CommunicationCreate,
+                Permission::CommunicationResolve,
+                Permission::CommunicationEscalate,
+                Permission::AnnouncementView,
             ],
 
             self::Staff => [
@@ -123,6 +138,9 @@ enum Role: string
                 Permission::AttendanceView,
                 Permission::AssessmentView,
                 Permission::ResultView,
+                Permission::CommunicationView,
+                Permission::CommunicationCreate,
+                Permission::AnnouncementView,
             ],
 
             self::Parent => [

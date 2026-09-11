@@ -1,14 +1,13 @@
 # Project Status
 
-_Last updated: 2026-09-25_
+_Last updated: 2026-09-26_
 
 ## Current milestone
 
-**Milestone 17 — Student Portal: COMPLETE.**
+**Milestone 18 — Communication & Notification Foundation: COMPLETE.**
 
-Next up: further **Domain Modules** — Fees, CBT, Notifications, Promotion.
-Not started — do not begin without picking one up explicitly. See
-`docs/roadmap.md`.
+Next up: further **Domain Modules** — Fees, CBT, Promotion. Not started — do
+not begin without picking one up explicitly. See `docs/roadmap.md`.
 
 ## What the application is
 
@@ -16,7 +15,7 @@ Multi-school School Management SaaS (management + portals only — no website
 features). PHP 8.3 · Laravel 13.31 · MySQL 8 · Blade + Tailwind v4 · Alpine.js ·
 Vite · PHPUnit · Pint.
 
-## Environment (verified 2026-09-24)
+## Environment (verified 2026-09-26)
 
 | Item | Value |
 |------|-------|
@@ -25,7 +24,7 @@ Vite · PHPUnit · Pint.
 | Node / npm | 22.x |
 | Database | MySQL 8 (app) · SQLite `:memory:` (tests) |
 | Local mail | Mailpit (`127.0.0.1:1025`, UI `:8025`) — `.env` only, not committed |
-| Tests | `php artisan test` — 803 passing |
+| Tests | `php artisan test` — 838 passing |
 | Build | `npm run build` — passing |
 | Formatting | `vendor/bin/pint --test` — passing |
 
@@ -49,8 +48,74 @@ Vite · PHPUnit · Pint.
 - **M15 — Results & Report Cards** (`results-report-cards-complete`) —
   `docs/results-report-cards.md`.
 - **M16 — Parent Portal** (`parent-portal-complete`) — `docs/parent-portal.md`.
-- **M17 — Student Portal** (this milestone, `student-portal-complete`) —
-  `docs/student-portal.md`; see below.
+- **M17 — Student Portal** (`student-portal-complete`) — `docs/student-portal.md`.
+- **M18 — Communication & Notification Foundation** (this milestone,
+  `communication-notifications-complete`) — `docs/communication.md`; see below.
+
+## Delivered in Milestone 18
+
+The school's Communication Hub as the system of record for school
+communication, plus a shared in-app notification centre used by staff, the
+Parent Portal and the Student Portal alike. Delivery channels are a small,
+honest abstraction — only in-app notifications are actually delivered; no
+WhatsApp/SMS/email provider code exists yet. Full detail in
+`docs/communication.md`.
+
+- **`App\Models\CommunicationThread` + `CommunicationMessage`** (school-owned;
+  staff-facing shared inbox in this milestone) — optional `student_id` /
+  `guardian_id` link, `category` (`App\Enums\CommunicationCategory`),
+  `status` (`App\Enums\CommunicationStatus`: open → resolved/escalated,
+  reopenable), not mass-assignable, never hard-deleted.
+  `/communication/threads/*` gated `module:notifications` +
+  `communication.view`/`.create`/`.manage`/`.resolve`/`.escalate`.
+- **`App\Models\Announcement`** (school-owned) — `status`
+  (`App\Enums\AnnouncementStatus`: draft → published, not mass-assignable) +
+  `audience` (`App\Enums\AnnouncementAudience`: everyone/all_staff/teachers/
+  parents/students). `AnnouncementController@index`/`@show` mounted at three
+  route names (`announcements.*` staff, `parent.announcements.*`,
+  `student.announcements.*`) — one controller, no duplication (the M16/M17
+  shared-renderer pattern); visibility is a query scope
+  (`Announcement::scopeVisibleToRole()`), not just a route gate.
+- **`App\Models\Notification`** (school-owned, its own `user_notifications`
+  table — deliberately not Laravel's polymorphic `notifications` table,
+  which has no `school_id`) + **`App\Services\Notifications\
+  NotificationDispatcher`** (bulk-inserts; the single seam any module uses
+  to raise a notification without knowing about delivery channels). The
+  notification centre (`NotificationController`) needs no extra permission —
+  self-scoped to `auth()->user()`, tenant-scoped for free — and is shared
+  verbatim by staff/Parent Portal/Student Portal via three route names.
+- **Event-driven foundation** — three domain events (`AnnouncementPublished`,
+  `CommunicationMessageAdded`, `CommunicationThreadEscalated`),
+  auto-discovered listeners under `App\Listeners\Notifications`, dispatched
+  synchronously (no queue introduced). Only M18's own events are wired up —
+  the mechanism is established for future modules to reuse, not every future
+  notification.
+- **`App\Enums\NotificationChannel`** (`in_app`/`whatsapp`/`sms`/`email`) —
+  only `in_app` is implemented (`isImplemented()`); the rest are declared
+  with no provider code.
+- **New permissions** `communication.view`/`.create`/`.manage`/`.resolve`/
+  `.escalate`, `announcement.view`/`.manage`, slotted into the existing role
+  tiers (Principal → manage everything; Bursar/Teacher/Staff → view + create,
+  Teacher also resolve/escalate; Parent/Student reuse `portal.parent`/
+  `portal.student`, no new permission needed for their side).
+- **Reuses `Module::Notifications`** (declared since M7, description
+  updated) for the whole surface — now `isAvailable()`, on by default,
+  depends on nothing.
+- **4 new tables** (migrations `2026_09_26_100000`–`100030`):
+  `communication_threads`, `communication_messages`, `announcements`,
+  `user_notifications` — every one school_id-leading-indexed.
+- **Seeder** — two announcements (one published to everyone, one draft to
+  teachers) and one escalated communication thread about the Student Portal
+  demo child, demonstrating both notification events end-to-end.
+- **Docs** — new `docs/communication.md`; `PROJECT_STATUS.md`,
+  `docs/roadmap.md` updated.
+- **35 new tests** under `tests/Feature/Communication/*` (+
+  `CommunicationTestCase` base) — thread CRUD/lifecycle, permission tiers,
+  announcement draft/publish/audience-visibility (staff + both portals),
+  notification read/unread/mark-all, event-driven notification dispatch
+  (message → assignee, escalation → managers, announcement → audience),
+  cross-school isolation, module-off 404s, N+1 regression, hard-delete
+  absence.
 
 ## Delivered in Milestone 17
 
@@ -631,15 +696,20 @@ check, DB duplicate prevention, assessment↔assignment link (same class only). 
 ## Known follow-ups / recommendations
 
 - Production env: `SESSION_SECURE_COOKIE=true`, real `MAIL_MAILER`, `APP_DEBUG=false`.
-- Next milestone: pick a further domain module (Fees, CBT, Notifications,
-  Student Portal, Promotion) — see `docs/roadmap.md`.
-- **Parent Portal follow-ups** — a communication hub (WhatsApp/SMS/email;
-  this milestone is the foundation it will plug into), fee/payment visibility
-  (no finance module exists yet), the Student Portal (kept deliberately
-  separate), a full platform audit trail of parent access events, parent
-  self-service editing of guardian contact details, push notifications, the
-  inherited M15 report-card branding-logo gap (never renders for a Teacher /
-  Staff / Parent viewer — see `docs/parent-portal.md` §5).
+- Next milestone: pick a further domain module (Fees, CBT, Promotion) — see
+  `docs/roadmap.md`.
+- **Communication follow-ups** — WhatsApp/SMS/email provider integration
+  behind `App\Enums\NotificationChannel`, two-way portal messaging (guardians/
+  students can view announcements & their own notifications but do not reply
+  into a Communication Hub thread — it stays staff-facing), level/arm-scoped
+  ("selected school groups") announcement targeting, wiring assignment/
+  result/attendance events into `NotificationDispatcher`, a full audit trail
+  of communication access, push notifications, message attachments.
+- **Parent Portal follow-ups** — fee/payment visibility (no finance module
+  exists yet), a full platform audit trail of parent access events, parent
+  self-service editing of guardian contact details, the inherited M15
+  report-card branding-logo gap (never renders for a Teacher / Staff / Parent
+  viewer — see `docs/parent-portal.md` §5).
 - **Results follow-ups** — PDF export (browser print covers it for now),
   per-level/per-arm report-card configuration overrides, bulk "unlock" of an
   approved/published/locked run, signature-image snapshotting per run,

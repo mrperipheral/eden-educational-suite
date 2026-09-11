@@ -65,6 +65,15 @@ enum Permission: string
     case ResultPublish = 'result.publish';
     case ResultAdjust = 'result.adjust';
 
+    // ---- Communication & notifications (enforced: Communication & Notification Foundation M18) ----
+    case CommunicationView = 'communication.view';
+    case CommunicationCreate = 'communication.create';
+    case CommunicationManage = 'communication.manage';
+    case CommunicationResolve = 'communication.resolve';
+    case CommunicationEscalate = 'communication.escalate';
+    case AnnouncementView = 'announcement.view';
+    case AnnouncementManage = 'announcement.manage';
+
     // ---- Declared for later domain milestones (coarse; not yet enforced) -----
     case FinanceView = 'finance.view';
     case FinanceManage = 'finance.manage';

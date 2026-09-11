@@ -1,9 +1,10 @@
 # Database Design
 
-Status: Milestone 16. Tenant + roles + onboarding + school settings + module
+Status: Milestone 18. Tenant + roles + onboarding + school settings + module
 activation + academic foundation + student management + guardian management +
 teacher management + timetable management + attendance management + assessment &
-assignments + results & report cards + parent portal. School-owned tables:
+assignments + results & report cards + parent portal + student portal +
+communication & notification foundation. School-owned tables:
 `school_settings` (M6), `school_modules` (M7), the academic structure —
 `academic_sessions`, `academic_periods`, `academic_levels`, `level_arms`,
 `subjects`, `level_subject` (M8) — `students` + `enrollments` (M9),
@@ -14,9 +15,11 @@ assignments + results & report cards + parent portal. School-owned tables:
 `grading_schemes`, `grading_scheme_grades`, `result_weighting_schemes`,
 `result_weighting_scheme_items`, `result_runs`, `student_results`,
 `student_subject_results`, `student_subject_result_components`,
-`result_adjustments`, `report_card_configurations` (M15). M16 adds no new
-table — only `guardians.user_id` (additive). No fees tables yet. This
-document records the conventions every future migration follows.
+`result_adjustments`, `report_card_configurations` (M15), `guardians.user_id`
+(M16, additive), `students.user_id` (M17, additive),
+`communication_threads`, `communication_messages`, `announcements`,
+`user_notifications` (M18). No fees tables yet. This document records the
+conventions every future migration follows.
 
 ## Current schema
 
@@ -376,6 +379,38 @@ No new table — the Parent Portal reads M10's own `guardians` +
 `guardian_student` and reuses every other milestone's tables (`students`,
 `result_runs`, `student_results`, `attendance_registers`, `assignments`,
 `timetables`, ...) unchanged.
+
+### `2026_09_26_100000`–`100030` — Communication & Notification Foundation (Milestone 18)
+Four new tables, all school-owned (`school_id` leads every lookup index). See
+`docs/communication.md`.
+
+- **`communication_threads`** — `student_id` / `guardian_id` nullable FKs
+  (`nullOnDelete`), `created_by` / `assigned_to` FKs to `users`, `category`
+  (`string(20)`), `subject`, `status` (`string(15)`, default `open`, not
+  mass-assignable), `resolved_at` / `escalated_at` / `last_message_at`.
+  `index(school_id, status, last_message_at)`, `index(school_id, student_id)`,
+  `index(school_id, guardian_id)`, `index(school_id, assigned_to)`. Never
+  hard-deleted.
+- **`communication_messages`** — its own `school_id` (not just
+  `communication_thread_id`, so lookups never need to join through the
+  thread to stay tenant-safe), `sender_id` FK to `users` (not
+  mass-assignable — set from the authenticated user only), `body`.
+  `index(school_id, communication_thread_id, created_at)` (named
+  `communication_messages_school_thread_created_idx` — the default generated
+  name exceeds MySQL's 64-char identifier limit).
+- **`announcements`** — `created_by` FK to `users`, `title`, `body`,
+  `audience` (`string(20)`, default `everyone`), `status` (`string(15)`,
+  default `draft`, not mass-assignable), `published_at`.
+  `index(school_id, status, published_at)`, `index(school_id, audience)`.
+- **`user_notifications`** — deliberately not named `notifications`: Laravel's
+  conventional polymorphic notifications table has no `school_id` and a
+  `notifiable_type`/`notifiable_id` shape that doesn't fit a single,
+  always-a-`User` recipient. `user_id` FK, `type` (`string(40)`), `channel`
+  (`string(20)`, default `in_app`), `title`, `message`, `url` (nullable),
+  `data` (nullable `json`), `read_at`. `index(school_id, user_id, read_at)`,
+  `index(school_id, user_id, created_at)`. Rows are only ever written by
+  `App\Services\Notifications\NotificationDispatcher`, never from request
+  input.
 
 ### `2026_09_15_100000_create_school_modules_table`
 Milestone 7 — per-school feature/module activation. `module` (`string(40)`, an

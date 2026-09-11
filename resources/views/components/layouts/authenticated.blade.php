@@ -15,10 +15,17 @@
     $isParentPortal = $portalRole === \App\Enums\Role::Parent;
     $isStudentPortal = $portalRole === \App\Enums\Role::Student;
 
+    // The notification centre link itself shows the unread count
+    // (NotificationController@index) — the shared nav does not run an
+    // extra query on every single page load for it (M18, docs/communication.md).
+    $notificationLabel = __('Notifications');
+
     $navLinks = match (true) {
         $isParentPortal => collect([
             ['route' => 'parent.dashboard', 'label' => __('My Children'), 'active' => 'parent.dashboard', 'allowed' => $moduleOn(\App\Enums\Module::ParentPortal) && auth()->user()->can('portal.parent')],
             ['route' => 'parent.profile.edit', 'label' => __('Profile'), 'active' => 'parent.profile.*', 'allowed' => $moduleOn(\App\Enums\Module::ParentPortal) && auth()->user()->can('portal.parent')],
+            ['route' => 'parent.announcements.index', 'label' => __('Announcements'), 'active' => 'parent.announcements.*', 'allowed' => $moduleOn(\App\Enums\Module::Notifications) && auth()->user()->can('portal.parent')],
+            ['route' => 'parent.notifications.index', 'label' => $notificationLabel, 'active' => 'parent.notifications.*', 'allowed' => $moduleOn(\App\Enums\Module::Notifications) && auth()->user()->can('portal.parent')],
             ['route' => 'settings.profile.edit', 'label' => __('Account settings'), 'active' => 'settings.profile.*', 'allowed' => true],
         ]),
         $isStudentPortal => collect([
@@ -29,6 +36,8 @@
             ['route' => 'student.attendance.index', 'label' => __('Attendance'), 'active' => 'student.attendance.*', 'allowed' => $moduleOn(\App\Enums\Module::StudentPortal) && auth()->user()->can('portal.student')],
             ['route' => 'student.assignments.index', 'label' => __('Assignments'), 'active' => 'student.assignments.*', 'allowed' => $moduleOn(\App\Enums\Module::StudentPortal) && auth()->user()->can('portal.student')],
             ['route' => 'student.timetable.index', 'label' => __('Timetable'), 'active' => 'student.timetable.*', 'allowed' => $moduleOn(\App\Enums\Module::StudentPortal) && auth()->user()->can('portal.student')],
+            ['route' => 'student.announcements.index', 'label' => __('Announcements'), 'active' => 'student.announcements.*', 'allowed' => $moduleOn(\App\Enums\Module::Notifications) && auth()->user()->can('portal.student')],
+            ['route' => 'student.notifications.index', 'label' => $notificationLabel, 'active' => 'student.notifications.*', 'allowed' => $moduleOn(\App\Enums\Module::Notifications) && auth()->user()->can('portal.student')],
             ['route' => 'settings.profile.edit', 'label' => __('Account settings'), 'active' => 'settings.profile.*', 'allowed' => true],
         ]),
         default => collect([
@@ -42,6 +51,9 @@
             ['route' => 'assessments.index', 'label' => __('Assessments'), 'active' => 'assessments.*', 'allowed' => $moduleOn(\App\Enums\Module::Assessments) && auth()->user()->can('assessment.view')],
             ['route' => 'results.runs.index', 'label' => __('Results'), 'active' => 'results.*', 'allowed' => $moduleOn(\App\Enums\Module::Results) && auth()->user()->can('result.view')],
             ['route' => 'academic.sessions.index', 'label' => __('Academic'), 'active' => 'academic.*', 'allowed' => $moduleOn(\App\Enums\Module::Academics) && auth()->user()->can('academics.view')],
+            ['route' => 'communication.threads.index', 'label' => __('Communication'), 'active' => 'communication.*', 'allowed' => $moduleOn(\App\Enums\Module::Notifications) && auth()->user()->can('communication.view')],
+            ['route' => 'announcements.index', 'label' => __('Announcements'), 'active' => 'announcements.*', 'allowed' => $moduleOn(\App\Enums\Module::Notifications) && auth()->user()->can('announcement.view')],
+            ['route' => 'notifications.index', 'label' => $notificationLabel, 'active' => 'notifications.*', 'allowed' => $moduleOn(\App\Enums\Module::Notifications)],
             ['route' => 'settings.school.edit', 'label' => __('School settings'), 'active' => 'settings.school.*', 'allowed' => auth()->user()->can('school.settings.view')],
             ['route' => 'admin.schools.index', 'label' => __('Schools'), 'active' => 'admin.schools.*', 'allowed' => auth()->user()->can('viewAny', \App\Models\School::class)],
             ['route' => 'settings.profile.edit', 'label' => __('Account settings'), 'active' => 'settings.profile.*', 'allowed' => true],
