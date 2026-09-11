@@ -68,6 +68,14 @@ class OnboardingChecklistTest extends TestCase
         $this->get('/dashboard')->assertRedirect(route('parent.dashboard'));
     }
 
+    public function test_a_student_role_member_is_sent_to_the_student_portal_instead(): void
+    {
+        $school = $this->newSchool();
+        $this->actingAsMemberOf($school, Role::Student);
+
+        $this->get('/dashboard')->assertRedirect(route('student.dashboard'));
+    }
+
     public function test_admin_step_reflects_membership_not_the_viewer(): void
     {
         $school = $this->newSchool();

@@ -5,9 +5,11 @@ namespace App\Http\Controllers\Student;
 use App\Enums\GuardianRelationship;
 use App\Enums\StudentStatus;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Student\LinkStudentUserRequest;
 use App\Http\Requests\Student\StudentRequest;
 use App\Http\Requests\Student\UpdateStudentStatusRequest;
 use App\Models\Student;
+use App\Support\Tenancy\TenantContext;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -23,6 +25,8 @@ use Illuminate\View\View;
  */
 class StudentController extends Controller
 {
+    public function __construct(private readonly TenantContext $tenant) {}
+
     public function index(Request $request): View
     {
         $this->authorize('student.view');
@@ -68,6 +72,7 @@ class StudentController extends Controller
             ->with([
                 'enrollments' => fn ($q) => $q->with(['session', 'period', 'level', 'arm'])->ordered(),
                 'guardianLinks' => fn ($q) => $q->with('guardian'),
+                'user:id,name,email',
             ])
             ->findOrFail($student);
 
@@ -75,6 +80,9 @@ class StudentController extends Controller
             'student' => $student,
             'statuses' => StudentStatus::all(),
             'relationships' => GuardianRelationship::all(),
+            'members' => $this->tenant->schoolOrFail()->users()
+                ->orderBy('name')
+                ->get(['users.id', 'users.name', 'users.email']),
         ]);
     }
 
@@ -105,5 +113,18 @@ class StudentController extends Controller
 
         return to_route('students.show', $model)
             ->with('status', __('Status set to :status.', ['status' => $request->status()->label()]));
+    }
+
+    public function updateUser(LinkStudentUserRequest $request, int $student): RedirectResponse
+    {
+        $model = Student::query()->findOrFail($student);
+
+        // `user_id` is deliberately not mass-assignable — set it directly.
+        $model->user_id = $request->userId();
+        $model->save();
+
+        return to_route('students.show', $model)->with('status', $model->user_id
+            ? __('Account linked.')
+            : __('Account unlinked.'));
     }
 }

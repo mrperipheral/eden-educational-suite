@@ -153,11 +153,14 @@ enum Module: string
      *     children's published data (results, report cards, attendance,
      *     assignments, timetable) — see `docs/parent-portal.md`. Depends on
      *     `guardians` only.
+     *   - `student-portal` — Student Portal (M17): the same shape as the
+     *     Parent Portal, but for the student's own record directly — see
+     *     `docs/student-portal.md`. Depends on `students` only.
      */
     public function isAvailable(): bool
     {
         return match ($this) {
-            self::Academics, self::Students, self::Guardians, self::Staff, self::Timetable, self::Attendance, self::Assessments, self::Results, self::ParentPortal => true,
+            self::Academics, self::Students, self::Guardians, self::Staff, self::Timetable, self::Attendance, self::Assessments, self::Results, self::ParentPortal, self::StudentPortal => true,
             default => false,
         };
     }

@@ -18,15 +18,21 @@ class DashboardController extends Controller
      * Placeholder authenticated landing page. Tenant-scoped: it only renders
      * once EnforceTenant has resolved the active school. The real, role-aware
      * dashboard is a later milestone — except for a Parent-role member, who is
-     * sent straight to their own Parent Portal (M16, `docs/parent-portal.md`):
-     * the admin dashboard has nothing for them to see.
+     * sent straight to their own Parent Portal (M16, `docs/parent-portal.md`),
+     * and a Student-role member, sent to their own Student Portal (M17,
+     * `docs/student-portal.md`): the admin dashboard has nothing for them.
      */
     public function __invoke(Request $request, TenantContext $tenant, SchoolModules $modules): View|RedirectResponse
     {
         $school = $tenant->schoolOrFail();
+        $role = $request->user()->roleIn($school);
 
-        if ($request->user()->roleIn($school) === Role::Parent && $modules->enabled(Module::ParentPortal)) {
+        if ($role === Role::Parent && $modules->enabled(Module::ParentPortal)) {
             return to_route('parent.dashboard');
+        }
+
+        if ($role === Role::Student && $modules->enabled(Module::StudentPortal)) {
+            return to_route('student.dashboard');
         }
 
         return view('dashboard', [

@@ -62,6 +62,40 @@
             @endif
         </x-card>
 
+        {{-- Application account --}}
+        @can('student.manage')
+            <x-card :title="__('Application account')">
+                @if ($student->user)
+                    <p class="text-sm text-gray-700">
+                        {{ __('Linked to') }} <span class="font-medium">{{ $student->user->name }}</span>
+                        <span class="text-gray-400">({{ $student->user->email }})</span>
+                    </p>
+                @else
+                    <p class="text-sm text-gray-500">{{ __('Not linked to a login. Link an existing member so this student can sign in to the Student Portal.') }}</p>
+                @endif
+
+                <form method="POST" action="{{ route('students.user', $student->id) }}" class="mt-3 flex flex-wrap items-end gap-3">
+                    @csrf
+                    @method('PATCH')
+                    <div class="space-y-1">
+                        <label for="user_id" class="block text-sm font-medium text-gray-700">{{ __('Member') }}</label>
+                        <select id="user_id" name="user_id"
+                            class="block w-64 rounded-md border-0 px-3 py-2 text-sm text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-brand-500">
+                            <option value="">{{ __('— Not linked —') }}</option>
+                            @foreach ($members as $member)
+                                <option value="{{ $member->id }}" @selected((int) old('user_id', $student->user_id) === $member->id)>
+                                    {{ $member->name }} ({{ $member->email }})
+                                </option>
+                            @endforeach
+                        </select>
+                        @error('user_id') <p class="text-xs text-red-600">{{ $message }}</p> @enderror
+                    </div>
+                    <x-button type="submit" variant="secondary" size="sm">{{ __('Save link') }}</x-button>
+                </form>
+                <p class="mt-2 text-xs text-gray-400">{{ __('Only existing members of this school can be linked. M17 does not create accounts or send invitations — the member also needs the Student role to use the portal.') }}</p>
+            </x-card>
+        @endcan
+
         {{-- Guardians --}}
         @module('guardians')
             @can('guardian.view')

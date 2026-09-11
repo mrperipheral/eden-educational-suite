@@ -1,14 +1,14 @@
 # Project Status
 
-_Last updated: 2026-09-24_
+_Last updated: 2026-09-25_
 
 ## Current milestone
 
-**Milestone 16 — Parent Portal: COMPLETE.**
+**Milestone 17 — Student Portal: COMPLETE.**
 
-Next up: further **Domain Modules** — Fees, CBT, Notifications, Student
-Portal, Promotion. Not started — do not begin without picking one up
-explicitly. See `docs/roadmap.md`.
+Next up: further **Domain Modules** — Fees, CBT, Notifications, Promotion.
+Not started — do not begin without picking one up explicitly. See
+`docs/roadmap.md`.
 
 ## What the application is
 
@@ -25,7 +25,7 @@ Vite · PHPUnit · Pint.
 | Node / npm | 22.x |
 | Database | MySQL 8 (app) · SQLite `:memory:` (tests) |
 | Local mail | Mailpit (`127.0.0.1:1025`, UI `:8025`) — `.env` only, not committed |
-| Tests | `php artisan test` — 761 passing |
+| Tests | `php artisan test` — 803 passing |
 | Build | `npm run build` — passing |
 | Formatting | `vendor/bin/pint --test` — passing |
 
@@ -48,8 +48,47 @@ Vite · PHPUnit · Pint.
   `docs/assessment-management.md`.
 - **M15 — Results & Report Cards** (`results-report-cards-complete`) —
   `docs/results-report-cards.md`.
-- **M16 — Parent Portal** (this milestone, `parent-portal-complete`) —
-  `docs/parent-portal.md`; see below.
+- **M16 — Parent Portal** (`parent-portal-complete`) — `docs/parent-portal.md`.
+- **M17 — Student Portal** (this milestone, `student-portal-complete`) —
+  `docs/student-portal.md`; see below.
+
+## Delivered in Milestone 17
+
+A secure, read-only window for a signed-in student onto their own published
+data — mirrors the Parent Portal (M16) but for the student's own record
+directly (no "which child" question). Built on the same seams; no second
+authentication system, no second tenancy mechanism, no second report-card
+generator. Full detail in `docs/student-portal.md`.
+
+- **`Student.user_id`** (new, additive column, migration
+  `2026_09_25_100000_add_user_id_to_students_table.php` — M9's own migration
+  untouched) — nullable, unique per school, **not** mass-assignable, set only
+  through `StudentController::updateUser()` (mirrors `Guardian.user_id` /
+  `Teacher.user_id` exactly).
+- **`App\Support\Portal\StudentPortalAuthorizer`** — resolves the signed-in
+  user's own `Student` record; no `{student}` route parameter exists at all
+  in the Student Portal (unlike the Parent Portal, a student has at most one
+  linked record).
+- **7 thin controllers** under `App\Http\Controllers\Portal\Student*` +
+  `resources/views/student/*` — dashboard, read-only profile, results,
+  report cards (reusing M15/M16's `ReportCardRenderer`), attendance (reusing
+  `AttendanceSummarizer`), assignments (M14, view-only — no submission
+  workflow yet), timetable (M12, published + current class only).
+  `ResultRunStatus::visibleToParents()` / `AssignmentStatus::
+  visibleToParents()` are reused as-is from M16 (identical visibility rule
+  for any non-staff portal viewer).
+- **No new permission** — reuses `Permission::PortalStudent`
+  (`portal.student`), declared since M4. **No new module logic** — flips
+  `Module::StudentPortal->isAvailable()` to `true` (on by default, depends on
+  `Module::Students` only, declared since M7).
+- The shared M15 report-card view's audience-aware back-link gained a third
+  branch for `portal.student`.
+- **Seeder** — a Student-role account (`student@example.com`) linked to the
+  same Primary 1 Gold student already used for the Parent Portal demo (a
+  school can enable both portals for one child); demonstrates the "no linked
+  student record" empty state implicitly via every other seeded student.
+- **Docs** — new `docs/student-portal.md`; `PROJECT_STATUS.md`,
+  `docs/roadmap.md` updated.
 
 ## Delivered in Milestone 16
 

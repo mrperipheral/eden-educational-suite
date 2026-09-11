@@ -25,6 +25,13 @@ use App\Http\Controllers\Portal\ParentReportCardController;
 use App\Http\Controllers\Portal\ParentResultController;
 use App\Http\Controllers\Portal\ParentStudentController;
 use App\Http\Controllers\Portal\ParentTimetableController;
+use App\Http\Controllers\Portal\StudentAssignmentController;
+use App\Http\Controllers\Portal\StudentAttendanceController;
+use App\Http\Controllers\Portal\StudentPortalController;
+use App\Http\Controllers\Portal\StudentProfileController;
+use App\Http\Controllers\Portal\StudentReportCardController;
+use App\Http\Controllers\Portal\StudentResultController;
+use App\Http\Controllers\Portal\StudentTimetableController;
 use App\Http\Controllers\Results\GradingSchemeController;
 use App\Http\Controllers\Results\GradingSchemeGradeController;
 use App\Http\Controllers\Results\ReportCardConfigurationController;
@@ -237,6 +244,8 @@ Route::middleware(['auth', 'verified', 'active'])->group(function () {
                 ->whereNumber('student')->can('student.manage')->name('update');
             Route::patch('{student}/status', [StudentController::class, 'updateStatus'])
                 ->whereNumber('student')->can('student.manage')->name('status');
+            Route::patch('{student}/user', [StudentController::class, 'updateUser'])
+                ->whereNumber('student')->can('student.manage')->name('user');
         });
 
         /*
@@ -607,6 +616,42 @@ Route::middleware(['auth', 'verified', 'active'])->group(function () {
 
             Route::get('profile', [ParentProfileController::class, 'edit'])
                 ->can('portal.parent')->name('profile.edit');
+        });
+
+        /*
+        | Student Portal (see docs/student-portal.md). Two gates:
+        |   module:student-portal  — is the feature on? (depends on students)
+        |   ->can('portal.student')  — may this user?
+        | A student has at most one linked Student record — resolved via
+        | App\Support\Portal\StudentPortalAuthorizer, never trusted from the
+        | URL. {run} is re-checked against ResultRunStatus::visibleToParents()
+        | (shared with the Parent Portal, M16) before any result/report card
+        | is returned.
+        */
+        Route::middleware('module:student-portal')->prefix('student')->name('student.')->group(function () {
+            Route::get('/', [StudentPortalController::class, 'index'])
+                ->can('portal.student')->name('dashboard');
+            Route::get('profile', [StudentProfileController::class, 'edit'])
+                ->can('portal.student')->name('profile.edit');
+
+            Route::get('results', [StudentResultController::class, 'index'])
+                ->can('portal.student')->name('results.index');
+            Route::get('results/{run}', [StudentResultController::class, 'show'])
+                ->whereNumber('run')->can('portal.student')->name('results.show');
+
+            Route::get('report-cards', [StudentReportCardController::class, 'index'])
+                ->can('portal.student')->name('report-cards.index');
+            Route::get('report-cards/{run}', [StudentReportCardController::class, 'show'])
+                ->whereNumber('run')->can('portal.student')->name('report-cards.show');
+
+            Route::get('attendance', [StudentAttendanceController::class, 'index'])
+                ->can('portal.student')->name('attendance.index');
+
+            Route::get('assignments', [StudentAssignmentController::class, 'index'])
+                ->can('portal.student')->name('assignments.index');
+
+            Route::get('timetable', [StudentTimetableController::class, 'index'])
+                ->can('portal.student')->name('timetable.index');
         });
     });
 });

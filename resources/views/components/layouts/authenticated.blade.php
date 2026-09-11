@@ -7,18 +7,31 @@
     $modules = app(\App\Support\Modules\SchoolModules::class);
     $moduleOn = fn (\App\Enums\Module $module) => $currentSchool !== null && $modules->enabled($module);
 
-    // A Parent-role member gets the Parent Portal's own, child-scoped nav
+    // A Parent- or Student-role member gets their own portal-scoped nav
     // instead of the admin/staff one — they hold no other permission, so the
-    // list below would otherwise render almost empty (see docs/parent-portal.md).
-    $isParentPortal = $currentSchool !== null && auth()->user()->roleIn($currentSchool) === \App\Enums\Role::Parent;
+    // list below would otherwise render almost empty (see
+    // docs/parent-portal.md / docs/student-portal.md).
+    $portalRole = $currentSchool !== null ? auth()->user()->roleIn($currentSchool) : null;
+    $isParentPortal = $portalRole === \App\Enums\Role::Parent;
+    $isStudentPortal = $portalRole === \App\Enums\Role::Student;
 
-    $navLinks = $isParentPortal
-        ? collect([
+    $navLinks = match (true) {
+        $isParentPortal => collect([
             ['route' => 'parent.dashboard', 'label' => __('My Children'), 'active' => 'parent.dashboard', 'allowed' => $moduleOn(\App\Enums\Module::ParentPortal) && auth()->user()->can('portal.parent')],
             ['route' => 'parent.profile.edit', 'label' => __('Profile'), 'active' => 'parent.profile.*', 'allowed' => $moduleOn(\App\Enums\Module::ParentPortal) && auth()->user()->can('portal.parent')],
             ['route' => 'settings.profile.edit', 'label' => __('Account settings'), 'active' => 'settings.profile.*', 'allowed' => true],
-        ])
-        : collect([
+        ]),
+        $isStudentPortal => collect([
+            ['route' => 'student.dashboard', 'label' => __('Dashboard'), 'active' => 'student.dashboard', 'allowed' => $moduleOn(\App\Enums\Module::StudentPortal) && auth()->user()->can('portal.student')],
+            ['route' => 'student.profile.edit', 'label' => __('My Profile'), 'active' => 'student.profile.*', 'allowed' => $moduleOn(\App\Enums\Module::StudentPortal) && auth()->user()->can('portal.student')],
+            ['route' => 'student.results.index', 'label' => __('Results'), 'active' => 'student.results.*', 'allowed' => $moduleOn(\App\Enums\Module::StudentPortal) && auth()->user()->can('portal.student')],
+            ['route' => 'student.report-cards.index', 'label' => __('Report cards'), 'active' => 'student.report-cards.*', 'allowed' => $moduleOn(\App\Enums\Module::StudentPortal) && auth()->user()->can('portal.student')],
+            ['route' => 'student.attendance.index', 'label' => __('Attendance'), 'active' => 'student.attendance.*', 'allowed' => $moduleOn(\App\Enums\Module::StudentPortal) && auth()->user()->can('portal.student')],
+            ['route' => 'student.assignments.index', 'label' => __('Assignments'), 'active' => 'student.assignments.*', 'allowed' => $moduleOn(\App\Enums\Module::StudentPortal) && auth()->user()->can('portal.student')],
+            ['route' => 'student.timetable.index', 'label' => __('Timetable'), 'active' => 'student.timetable.*', 'allowed' => $moduleOn(\App\Enums\Module::StudentPortal) && auth()->user()->can('portal.student')],
+            ['route' => 'settings.profile.edit', 'label' => __('Account settings'), 'active' => 'settings.profile.*', 'allowed' => true],
+        ]),
+        default => collect([
             ['route' => 'dashboard', 'label' => __('Dashboard'), 'active' => 'dashboard', 'allowed' => true],
             ['route' => 'members.index', 'label' => __('Members'), 'active' => 'members.*', 'allowed' => auth()->user()->can('member.view')],
             ['route' => 'students.index', 'label' => __('Students'), 'active' => 'students.*', 'allowed' => $moduleOn(\App\Enums\Module::Students) && auth()->user()->can('student.view')],
@@ -32,7 +45,8 @@
             ['route' => 'settings.school.edit', 'label' => __('School settings'), 'active' => 'settings.school.*', 'allowed' => auth()->user()->can('school.settings.view')],
             ['route' => 'admin.schools.index', 'label' => __('Schools'), 'active' => 'admin.schools.*', 'allowed' => auth()->user()->can('viewAny', \App\Models\School::class)],
             ['route' => 'settings.profile.edit', 'label' => __('Account settings'), 'active' => 'settings.profile.*', 'allowed' => true],
-        ]);
+        ]),
+    };
 
     $navLinks = $navLinks->filter(fn ($link) => $link['allowed']);
 

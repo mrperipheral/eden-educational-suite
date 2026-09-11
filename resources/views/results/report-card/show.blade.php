@@ -22,6 +22,9 @@
                 @elseif (auth()->user()->can('portal.parent'))
                     {{-- Parent Portal viewer (M16) — this view is shared, not duplicated; see docs/parent-portal.md §"Report card reuse". --}}
                     <a href="{{ route('parent.report-cards.index', $studentResult->student_id) }}" class="text-brand-600 hover:text-brand-700">{{ __('← Report cards') }}</a>
+                @elseif (auth()->user()->can('portal.student'))
+                    {{-- Student Portal viewer (M17) — same shared view; see docs/student-portal.md §"Report cards". --}}
+                    <a href="{{ route('student.report-cards.index') }}" class="text-brand-600 hover:text-brand-700">{{ __('← Report cards') }}</a>
                 @endif
             </p>
             <x-button type="button" size="sm" x-data x-on:click="window.print()">{{ __('Print') }}</x-button>

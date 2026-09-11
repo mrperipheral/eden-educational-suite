@@ -80,7 +80,7 @@ class ModuleTest extends TestCase
         // Attendance Management (M13), Assessment & Assignments (M14),
         // Results & Report Cards (M15) and Parent Portal (M16); the rest
         // Planned. (Timetable is available but still off by default.)
-        $available = ['academics', 'students', 'guardians', 'staff', 'timetable', 'attendance', 'assessments', 'results', 'parent-portal'];
+        $available = ['academics', 'students', 'guardians', 'staff', 'timetable', 'attendance', 'assessments', 'results', 'parent-portal', 'student-portal'];
 
         foreach (Module::cases() as $module) {
             $this->assertSame(

@@ -313,10 +313,36 @@ the Student Portal (kept deliberately separate), a full platform audit trail
 of parent access events, parent self-service editing of guardian contact
 details, push notifications.
 
-## Milestone 17+ — Domain Modules
+## ✅ Milestone 17 — Student Portal (complete, 2026-09-25)
 
-Fees / Invoices / Payments (Paystack) · CBT · Student Portal ·
-Notifications · Reporting · Promotion.
+A secure, read-only window for a signed-in student onto their own published
+data — mirrors the Parent Portal (M16) exactly but for the student's own
+record directly, with no "which child" question (a student has at most one
+linked record, so the Student Portal's routes carry no `{student}` parameter
+at all). `Student.user_id` (new, additive column — M9's own migration
+untouched) links an *existing* member account via
+`StudentController::updateUser()`, mirroring `Guardian.user_id` / M11's
+`Teacher.user_id`. `App\Support\Portal\StudentPortalAuthorizer` resolves the
+signed-in user's own student record, tenant-scoped for free. Reuses
+`App\Services\Results\ReportCardRenderer`, `AttendanceSummarizer`, and
+`ResultRunStatus::visibleToParents()` / `AssignmentStatus::
+visibleToParents()` from M15/M16 as-is — no domain logic duplicated. 7 thin
+controllers under `App\Http\Controllers\Portal\Student*`, `/student/*`
+routes gated `module:student-portal` (depends on `Students` only, declared
+since M7) **and** `->can('portal.student')` (no new permission — declared
+since M4). A Student-role member is redirected from `/dashboard` straight to
+`/student`; the main nav renders a portal-specific link set. Full detail in
+`docs/student-portal.md`.
+
+Deferred: everything M16 defers, plus online assignment submission (M14 has
+no upload workflow yet — this milestone only ever views assignment/
+submission status), a generic "portal" abstraction shared with the Parent
+Portal (kept deliberately separate).
+
+## Milestone 18+ — Domain Modules
+
+Fees / Invoices / Payments (Paystack) · CBT · Notifications · Reporting ·
+Promotion.
 
 Each domain module checks its `App\Enums\Module` flag (`module:` middleware /
 `@module`) **and** its M4 permissions — the two stay orthogonal.

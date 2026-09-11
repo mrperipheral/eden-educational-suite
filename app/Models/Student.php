@@ -10,6 +10,7 @@ use Database\Factories\StudentFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
@@ -22,6 +23,12 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  * The student's current class is **not** an attribute here — it is the single
  * `Enrollment` with `status = active` ({@see self::currentEnrollment()}).
  * Students are never deleted; leaving is a `status` change.
+ *
+ * `user_id` (M17) is a **nullable** link to an existing application account —
+ * the same pattern as {@see Guardian}/`Teacher`'s `user_id`: set only through
+ * `StudentController::updateUser()`, never mass-assigned. A student is a
+ * person record first; whether they can sign in to the Student Portal is a
+ * separate, later concern. See `docs/student-portal.md`.
  */
 class Student extends Model
 {
@@ -68,6 +75,18 @@ class Student extends Model
             'gender' => Gender::class,
             'status' => StudentStatus::class,
         ];
+    }
+
+    /**
+     * The application account this student record is linked to, if any. Not
+     * automatically a Student Portal login — this stays `null` until an admin
+     * links an existing member.
+     *
+     * @return BelongsTo<User, $this>
+     */
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
     }
 
     /**

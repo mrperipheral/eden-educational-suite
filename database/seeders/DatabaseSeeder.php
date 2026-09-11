@@ -75,6 +75,12 @@ class DatabaseSeeder extends Seeder
         $folakeUser = User::factory()->create(['name' => 'Folake Ade', 'email' => 'parent@example.com']);
         $folakeUser->joinSchool($alpha, Role::Parent);
 
+        // A Student-role account for Alpha, linked (below, once the Primary
+        // 1 Gold roster exists) to one of its own students — the Student
+        // Portal (M17) sign-in.
+        $cecileUser = User::factory()->create(['name' => 'Cecile Student', 'email' => 'student@example.com']);
+        $cecileUser->joinSchool($alpha, Role::Student);
+
         // Alpha's school-owned onboarding data (created inside its tenant context).
         $tenant = app(TenantContext::class);
         $tenant->set($alpha);
@@ -477,6 +483,11 @@ class DatabaseSeeder extends Seeder
             'relationship' => GuardianRelationship::LegalGuardian->value,
             'is_primary' => false,
         ]);
+
+        // The same Primary 1 Gold student also gets her own Student Portal
+        // (M17) login — a school can enable both portals for one child.
+        $p1GoldRoster->first()->user_id = $cecileUser->id;
+        $p1GoldRoster->first()->save();
 
         // A locked "Test" and "Examination" assessment for Mathematics, on top
         // of the already-locked "Classwork" assessment above.
