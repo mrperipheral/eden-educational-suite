@@ -279,7 +279,8 @@ negative-rejected / over-max-rejected / non-numeric-rejected / >2dp-rejected /
 blank-clears / comment length / correction before lock / not-on-roster rejected /
 DB duplicate prevention / full class one request / locked = 403; lifecycle —
 draft→published→locked, unpublish, structure frozen once published, scores while
-published, only manager unlocks, locked/scored can't delete, max-score floor;
+published, only manager unlocks, locked/scored can't delete, max-score frozen
+once any score is recorded (both directions);
 authorization — all 7 roles + role-less, module off → 404, module on without
 permission → 403, only managers touch categories; teacher scope — assigned
 class+subject only, wrong class / wrong subject / no Teacher record / other-school

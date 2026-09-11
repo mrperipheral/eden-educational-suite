@@ -156,4 +156,35 @@ class AssessmentLifecycleTest extends AssessmentTestCase
             'assessment_category_id' => $scaffold['category']->id, 'title' => 'X', 'max_score' => 10,
         ])->assertSessionHasErrors('max_score');
     }
+
+    public function test_max_score_is_frozen_once_a_score_is_recorded_in_either_direction(): void
+    {
+        $school = $this->newSchool();
+        $scaffold = $this->scaffold($school);
+        $student = $this->enrolledStudents($school, $scaffold, 1)->first();
+        $assessment = $this->assessmentFor($school, $scaffold, ['max_score' => 20]);
+        $this->snapshotRoster($school, $assessment);
+        $this->actingAsMemberOf($school, Role::SchoolAdmin);
+        $this->patch("/assessments/{$assessment->id}/scores", ['scores' => [$student->id => ['score' => 12]]]);
+
+        $edit = fn (int|string $max) => $this->from("/assessments/{$assessment->id}/edit")
+            ->patch("/assessments/{$assessment->id}", [
+                'assessment_category_id' => $scaffold['category']->id, 'title' => 'Renamed', 'max_score' => $max,
+            ]);
+
+        // Raising it is rejected — a 12/20 must not silently become 12/50.
+        $edit(50)->assertSessionHasErrors('max_score');
+        // Lowering it (still above the recorded score) is also rejected now.
+        $edit(15)->assertSessionHasErrors('max_score');
+        $this->assertSame('20.00', $assessment->fresh()->max_score);
+
+        // Leaving max unchanged still lets the rest of the structure be edited.
+        $edit(20)->assertSessionHasNoErrors();
+        $this->assertSame('Renamed', $assessment->fresh()->title);
+
+        // Clearing the score frees the maximum again.
+        $this->patch("/assessments/{$assessment->id}/scores", ['scores' => [$student->id => ['score' => '']]]);
+        $edit(50)->assertSessionHasNoErrors();
+        $this->assertSame('50.00', $assessment->fresh()->max_score);
+    }
 }

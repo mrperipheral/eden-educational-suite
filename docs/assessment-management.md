@@ -127,8 +127,10 @@ entered yet". Validation on save (`ScoreRequest`):
 
 A percentage may be **displayed** (score ÷ max_score) in the UI, but M14 stores
 **no** percentage, grade, average, position, GPA or overall result — that is
-M15's to derive. `max_score` on a draft cannot be reduced below a score already
-recorded.
+M15's to derive. `max_score` is editable only while the assessment is a draft
+**and** no score has been recorded — once any score exists it is frozen (raising
+or lowering it would silently rescale every entered score); clear the scores
+first to change it.
 
 ## 6. Assessment lifecycle
 

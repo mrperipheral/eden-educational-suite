@@ -10,8 +10,9 @@ use Illuminate\Validation\Rule;
 /**
  * Edit an assessment. Only allowed while it is a **draft** — the academic
  * context is fixed at creation, so this touches the title / category / maximum
- * score / instructions only. The maximum score cannot be dropped below a score
- * already recorded.
+ * score / instructions only. The maximum score is **frozen** once any score has
+ * been recorded — changing it (up or down) would silently rescale every score
+ * already entered against it.
  */
 class UpdateAssessmentRequest extends AssessmentModuleRequest
 {
@@ -58,9 +59,15 @@ class UpdateAssessmentRequest extends AssessmentModuleRequest
                 return;
             }
 
-            $highest = $this->assessment()?->highestRecordedScore();
-            if ($highest !== null && (float) $this->input('max_score') < $highest) {
-                $validator->errors()->add('max_score', __('A score of :n is already recorded — the maximum cannot be lower.', ['n' => $highest]));
+            $assessment = $this->assessment();
+
+            // Once any score is recorded the maximum is frozen: raising or
+            // lowering it would silently rescale every score already entered
+            // against it. Clear the scores first to change it.
+            if ($assessment !== null
+                && $assessment->highestRecordedScore() !== null
+                && (float) $this->input('max_score') !== (float) $assessment->max_score) {
+                $validator->errors()->add('max_score', __('A score is already recorded — clear the scores before changing the maximum.'));
             }
         });
     }
