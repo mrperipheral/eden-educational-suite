@@ -383,9 +383,46 @@ assignment/result/attendance events into the notification foundation (the
 mechanism is established; only M18's own events use it), a full audit trail
 of communication access, push notifications, message attachments.
 
-## Milestone 19+ — Domain Modules
+## ✅ Milestone 19 — Fees & Fee Management (complete, 2026-09-27)
 
-Fees / Invoices / Payments (Paystack) · CBT · Reporting · Promotion.
+A production-ready, tenant-safe fee management system: school-configured
+`App\Models\FeeCategory` (mirrors `AssessmentCategory`, M14, exactly — not
+hard-coded) + `App\Models\FeeStructure` (category × session × optional
+period × level × optional arm, freely editable — editing it never touches
+a charge already raised from it) + `App\Models\StudentFeeCharge`
+(school-owned + student-scoped; **snapshots** the structure's amount and
+context at creation, the whole answer to "a structure can change later
+without altering history"; `discount_amount`/`waived_*` not
+mass-assignable, changed only through `applyDiscount()`/`waive()`/
+`unwaive()`) + `App\Models\FeePayment` (a manual receipt — cash/bank
+transfer/POS/cheque/other via `App\Enums\PaymentMethod`; `reference`
+unique per school; never edited/deleted, only `void()`-ed) +
+`App\Models\FeePaymentAllocation` (how much of a payment applies to which
+charge). `App\Services\Fees\FeeChargeService` / `FeePaymentService`
+(atomic, row-locked allocation with over-allocation/cross-student guards)
+/ `FeeStatementBuilder` (the single seam staff **and** both portals use for
+a statement — the M16 shared-renderer pattern). Every monetary calculation
+uses `bcmath` on `decimal(12,2)` columns — never native float arithmetic,
+never Eloquent's float-casting `->sum()`. New `fees.view` / `.report` /
+`.manage` / `.record-payment` / `.adjust` permissions (Bursar → all;
+Principal → view + report only, oversight without write access, matching
+the pre-existing `finance.*` precedent; Teacher/Staff → none;
+Parent/Student → their own/linked child's statement via the existing
+`portal.parent`/`portal.student`, read-only, no new permission). Reuses
+`App\Enums\Module::Fees` (declared since M7) — now `isAvailable()`, on by
+default, depends on `students` only. Full detail in `docs/fees.md`.
+
+Deferred: Paystack / online payment (M20 — this milestone is exactly the
+foundation it plugs into: `App\Enums\PaymentMethod` and every balance
+calculation are provider-agnostic), a full discount/waiver audit-log table,
+bulk fee-structure assignment/invoicing runs, fee reminders (the M18
+notification foundation could carry these later), refunds beyond voiding
+an unallocated/newly-allocated payment, receipts/PDF export beyond the
+browser-printable statement, multi-currency.
+
+## Milestone 20+ — Domain Modules
+
+Online Payments (Paystack) · CBT · Reporting · Promotion.
 
 Each domain module checks its `App\Enums\Module` flag (`module:` middleware /
 `@module`) **and** its M4 permissions — the two stay orthogonal.

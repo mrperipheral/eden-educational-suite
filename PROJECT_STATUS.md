@@ -1,13 +1,14 @@
 # Project Status
 
-_Last updated: 2026-09-26_
+_Last updated: 2026-09-27_
 
 ## Current milestone
 
-**Milestone 18 — Communication & Notification Foundation: COMPLETE.**
+**Milestone 19 — Fees & Fee Management: COMPLETE.**
 
-Next up: further **Domain Modules** — Fees, CBT, Promotion. Not started — do
-not begin without picking one up explicitly. See `docs/roadmap.md`.
+Next up: further **Domain Modules** — Online Payments (Paystack), CBT,
+Promotion. Not started — do not begin without picking one up explicitly.
+See `docs/roadmap.md`.
 
 ## What the application is
 
@@ -15,7 +16,7 @@ Multi-school School Management SaaS (management + portals only — no website
 features). PHP 8.3 · Laravel 13.31 · MySQL 8 · Blade + Tailwind v4 · Alpine.js ·
 Vite · PHPUnit · Pint.
 
-## Environment (verified 2026-09-26)
+## Environment (verified 2026-09-27)
 
 | Item | Value |
 |------|-------|
@@ -24,7 +25,7 @@ Vite · PHPUnit · Pint.
 | Node / npm | 22.x |
 | Database | MySQL 8 (app) · SQLite `:memory:` (tests) |
 | Local mail | Mailpit (`127.0.0.1:1025`, UI `:8025`) — `.env` only, not committed |
-| Tests | `php artisan test` — 838 passing |
+| Tests | `php artisan test` — 894 passing |
 | Build | `npm run build` — passing |
 | Formatting | `vendor/bin/pint --test` — passing |
 
@@ -49,8 +50,86 @@ Vite · PHPUnit · Pint.
   `docs/results-report-cards.md`.
 - **M16 — Parent Portal** (`parent-portal-complete`) — `docs/parent-portal.md`.
 - **M17 — Student Portal** (`student-portal-complete`) — `docs/student-portal.md`.
-- **M18 — Communication & Notification Foundation** (this milestone,
-  `communication-notifications-complete`) — `docs/communication.md`; see below.
+- **M18 — Communication & Notification Foundation** (`communication-notifications-complete`) — `docs/communication.md`.
+- **M19 — Fees & Fee Management** (this milestone, `fees-management-complete`) —
+  `docs/fees.md`; see below.
+
+## Delivered in Milestone 19
+
+A production-ready, tenant-safe fee management system: school-configured
+fee categories and structures, student-specific charges snapshotted from a
+structure (immune to a later structure edit), manual payment recording
+with allocation across one or more charges, and a server-calculated fee
+statement shared by staff and the Parent/Student portals. Online payment
+(Paystack) is deliberately **not** built here — M20. Full detail in
+`docs/fees.md`.
+
+- **`App\Models\FeeCategory`** (school-owned, mirrors `AssessmentCategory`
+  from M14 exactly — school-defined, not hard-coded) + **`FeeStructure`**
+  (category × session × optional period × level × optional arm, amount;
+  freely editable) + **`StudentFeeCharge`** (school-owned + student-scoped;
+  **snapshots** the structure's amount/context at creation — a later
+  structure edit never touches an existing charge; `discount_amount` /
+  `waived_at`/`waived_by`/`waiver_reason` not mass-assignable, changed only
+  through `applyDiscount()` / `waive()` / `unwaive()`) + **`FeePayment`**
+  (manual receipt — cash/bank transfer/POS/cheque/other via
+  `App\Enums\PaymentMethod`; `reference` unique per school; never edited or
+  deleted, only `void()`-ed, a reversal that excludes it from balances
+  while keeping the row) + **`FeePaymentAllocation`** (how much of a
+  payment applies to which charge). No hard delete anywhere in the module.
+- **`App\Services\Fees\FeeChargeService`** (raise a charge from a
+  structure or manually; always uses the student's *current* enrollment for
+  class context, never client input) + **`FeePaymentService`** (records a
+  payment and its allocations in one `DB::transaction()` with the target
+  charges `lockForUpdate()`-ed; rejects a non-positive allocation, an
+  allocation against another student's charge, an allocation exceeding a
+  charge's own outstanding balance, and allocations exceeding the payment's
+  own total — all atomically) + **`FeeStatementBuilder`** (the single seam
+  the staff statement page and both portals call — the M16 shared-renderer
+  pattern applied to fees).
+- **No floating-point money.** Every amount column is `decimal(12,2)`
+  (cast `decimal:2`); every calculation uses `bcmath` on those strings —
+  discount limits, allocation totals, statement sums, dashboard-wide totals
+  (via `SELECT SUM(...)`, never Eloquent's float-casting `->sum()`).
+  Outstanding balance is always computed server-side, never trusted from a
+  client total.
+- **New permissions** `fees.view` / `.report` / `.manage` /
+  `.record-payment` / `.adjust`, slotted into the existing role tiers:
+  Bursar → all five (full operational fee management); Principal →
+  `.view` + `.report` only (oversight without write access, matching the
+  pre-existing `finance.view`-only precedent since M4); Teacher/Staff →
+  none; Parent/Student reach their own/linked child's statement through
+  the existing `portal.parent` / `portal.student` (no new permission — the
+  M16/M17/M18 pattern), strictly read-only.
+- **Reuses `Module::Fees`** (declared since M7) — now `isAvailable()`, on
+  by default, depends on `students` only.
+- **5 new tables** (migrations `2026_09_27_100000`–`100040`):
+  `fee_categories`, `fee_structures`, `student_fee_charges`, `fee_payments`,
+  `fee_payment_allocations` — every one school_id-leading-indexed;
+  `fee_payments` additionally unique on `(school_id, reference)`.
+  `Student` gained `feeCharges()` / `feePayments()` relations.
+  `fees/_statement-body.blade.php` is one shared partial rendering the
+  charges/payments lists, included by the staff, Parent Portal and Student
+  Portal statement pages alike — no duplicated markup.
+- **Seeder** — Tuition (mandatory) and Books (optional) categories +
+  structures for Primary 1 Gold's first term, charges raised across the
+  whole roster, a discount and a hardship waiver each on one student, and a
+  partial bank-transfer payment (with allocation) for the Student Portal
+  demo child, so the fee statement has real data in all three audiences on
+  a fresh `migrate:fresh --seed`. Alpha Academy's module override for Fees
+  was removed (it predated this milestone, from the M7 demonstration seed)
+  so the module now simply uses its on-by-default catalogue value.
+- **Docs** — new `docs/fees.md`; `PROJECT_STATUS.md`, `docs/roadmap.md`,
+  `docs/database-design.md`, `CLAUDE.md` updated.
+- **56 new tests** under `tests/Feature/Fees/*` (+ `FeesTestCase` base) —
+  category/structure CRUD + permissions, charge creation (from a structure
+  and manually) + historical-integrity-under-structure-edit, discount/
+  waiver limits, payment recording + allocation + duplicate-reference +
+  over-allocation + invalid-amount rejection + void, statement totals +
+  parent/student visibility, an explicit tenant-isolation checklist
+  (`FeeTenantIsolationTest`) covering every item the spec named by name,
+  module-off 404s, and an N+1 regression test for a student with many
+  transactions.
 
 ## Delivered in Milestone 18
 
@@ -696,8 +775,14 @@ check, DB duplicate prevention, assessment↔assignment link (same class only). 
 ## Known follow-ups / recommendations
 
 - Production env: `SESSION_SECURE_COOKIE=true`, real `MAIL_MAILER`, `APP_DEBUG=false`.
-- Next milestone: pick a further domain module (Fees, CBT, Promotion) — see
-  `docs/roadmap.md`.
+- Next milestone: pick a further domain module (Online Payments/Paystack,
+  CBT, Promotion) — see `docs/roadmap.md`.
+- **Fees follow-ups** — Paystack / online payment integration (M20 — this
+  milestone is exactly the foundation it plugs into), a full discount/
+  waiver audit-log table, bulk fee-structure assignment/invoicing runs, fee
+  reminders (the M18 notification foundation could carry these), refunds
+  beyond voiding an unallocated/newly-allocated payment, receipts/PDF
+  export beyond the browser-printable statement, multi-currency.
 - **Communication follow-ups** — WhatsApp/SMS/email provider integration
   behind `App\Enums\NotificationChannel`, two-way portal messaging (guardians/
   students can view announcements & their own notifications but do not reply
@@ -705,11 +790,10 @@ check, DB duplicate prevention, assessment↔assignment link (same class only). 
   ("selected school groups") announcement targeting, wiring assignment/
   result/attendance events into `NotificationDispatcher`, a full audit trail
   of communication access, push notifications, message attachments.
-- **Parent Portal follow-ups** — fee/payment visibility (no finance module
-  exists yet), a full platform audit trail of parent access events, parent
-  self-service editing of guardian contact details, the inherited M15
-  report-card branding-logo gap (never renders for a Teacher / Staff / Parent
-  viewer — see `docs/parent-portal.md` §5).
+- **Parent Portal follow-ups** — a full platform audit trail of parent
+  access events, parent self-service editing of guardian contact details,
+  the inherited M15 report-card branding-logo gap (never renders for a
+  Teacher / Staff / Parent viewer — see `docs/parent-portal.md` §5).
 - **Results follow-ups** — PDF export (browser print covers it for now),
   per-level/per-arm report-card configuration overrides, bulk "unlock" of an
   approved/published/locked run, signature-image snapshotting per run,

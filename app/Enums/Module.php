@@ -163,11 +163,19 @@ enum Module: string
      *     staff and the Parent/Student portals (`docs/communication.md`).
      *     Depends on nothing else — it reads across modules but does not
      *     require any of them to be on.
+     *   - `fees` — Fees & Fee Management (M19): school-configured fee
+     *     categories + fee structures (session/period/level/optional arm),
+     *     student-specific charges snapshotted from a structure (immune to
+     *     a later structure edit), manual payment recording with
+     *     allocation to one or more charges, and a server-calculated fee
+     *     statement shared by staff and the Parent/Student portals
+     *     (`docs/fees.md`). Online payment (Paystack) is **not** built here
+     *     — M20. Depends on `students` only.
      */
     public function isAvailable(): bool
     {
         return match ($this) {
-            self::Academics, self::Students, self::Guardians, self::Staff, self::Timetable, self::Attendance, self::Assessments, self::Results, self::Notifications, self::ParentPortal, self::StudentPortal => true,
+            self::Academics, self::Students, self::Guardians, self::Staff, self::Timetable, self::Attendance, self::Assessments, self::Results, self::Notifications, self::Fees, self::ParentPortal, self::StudentPortal => true,
             default => false,
         };
     }

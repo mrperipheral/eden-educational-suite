@@ -16,6 +16,12 @@ use App\Http\Controllers\Communication\CommunicationMessageController;
 use App\Http\Controllers\Communication\CommunicationStatusController;
 use App\Http\Controllers\Communication\CommunicationThreadController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\Fees\FeeAdjustmentController;
+use App\Http\Controllers\Fees\FeeCategoryController;
+use App\Http\Controllers\Fees\FeeChargeController;
+use App\Http\Controllers\Fees\FeePaymentController;
+use App\Http\Controllers\Fees\FeeStatementController;
+use App\Http\Controllers\Fees\FeeStructureController;
 use App\Http\Controllers\Guardian\GuardianController;
 use App\Http\Controllers\Guardian\GuardianLinkController;
 use App\Http\Controllers\HealthController;
@@ -24,6 +30,7 @@ use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\Platform\SchoolController as PlatformSchoolController;
 use App\Http\Controllers\Portal\ParentAssignmentController;
 use App\Http\Controllers\Portal\ParentAttendanceController;
+use App\Http\Controllers\Portal\ParentFeeController;
 use App\Http\Controllers\Portal\ParentPortalController;
 use App\Http\Controllers\Portal\ParentProfileController;
 use App\Http\Controllers\Portal\ParentReportCardController;
@@ -32,6 +39,7 @@ use App\Http\Controllers\Portal\ParentStudentController;
 use App\Http\Controllers\Portal\ParentTimetableController;
 use App\Http\Controllers\Portal\StudentAssignmentController;
 use App\Http\Controllers\Portal\StudentAttendanceController;
+use App\Http\Controllers\Portal\StudentFeeController;
 use App\Http\Controllers\Portal\StudentPortalController;
 use App\Http\Controllers\Portal\StudentProfileController;
 use App\Http\Controllers\Portal\StudentReportCardController;
@@ -581,6 +589,70 @@ Route::middleware(['auth', 'verified', 'active'])->group(function () {
         });
 
         /*
+        | Fees & Fee Management (see docs/fees.md). module:fees gates all of
+        | it.
+        |   ->can('fees.manage')  — categories, structures, charges (config
+        |     + raising a charge; never a raw edit of a historical amount).
+        |   ->can('fees.view')  — one student's fee statement.
+        |   ->can('fees.report')  — the school-wide dashboard/summary.
+        |   ->can('fees.record-payment')  — recording a manual payment.
+        |   ->can('fees.adjust')  — discount / waive / unwaive / void (a
+        |     financial correction, never routine configuration).
+        | Tenant-owned ids ({category}, {structure}, {student}, {charge},
+        | {payment}) are resolved by tenant-scoped `findOrFail`, so another
+        | school's id 404s. Online payment (Paystack) is not built here — M20.
+        */
+        Route::middleware('module:fees')->prefix('fees')->name('fees.')->group(function () {
+            Route::get('/', [FeeStatementController::class, 'index'])
+                ->can('fees.report')->name('index');
+
+            Route::prefix('categories')->name('categories.')->group(function () {
+                Route::get('/', [FeeCategoryController::class, 'index'])
+                    ->can('fees.manage')->name('index');
+                Route::post('/', [FeeCategoryController::class, 'store'])
+                    ->can('fees.manage')->name('store');
+                Route::patch('{category}', [FeeCategoryController::class, 'update'])
+                    ->whereNumber('category')->can('fees.manage')->name('update');
+            });
+
+            Route::prefix('structures')->name('structures.')->group(function () {
+                Route::get('/', [FeeStructureController::class, 'index'])
+                    ->can('fees.manage')->name('index');
+                Route::get('create', [FeeStructureController::class, 'create'])
+                    ->can('fees.manage')->name('create');
+                Route::post('/', [FeeStructureController::class, 'store'])
+                    ->can('fees.manage')->name('store');
+                Route::get('{structure}/edit', [FeeStructureController::class, 'edit'])
+                    ->whereNumber('structure')->can('fees.manage')->name('edit');
+                Route::patch('{structure}', [FeeStructureController::class, 'update'])
+                    ->whereNumber('structure')->can('fees.manage')->name('update');
+            });
+
+            Route::post('charges/{charge}/discount', [FeeAdjustmentController::class, 'discount'])
+                ->whereNumber('charge')->can('fees.adjust')->name('charges.discount');
+            Route::post('charges/{charge}/waive', [FeeAdjustmentController::class, 'waive'])
+                ->whereNumber('charge')->can('fees.adjust')->name('charges.waive');
+            Route::post('charges/{charge}/unwaive', [FeeAdjustmentController::class, 'unwaive'])
+                ->whereNumber('charge')->can('fees.adjust')->name('charges.unwaive');
+
+            Route::post('payments/{payment}/void', [FeePaymentController::class, 'void'])
+                ->whereNumber('payment')->can('fees.adjust')->name('payments.void');
+
+            Route::prefix('students/{student}')->name('students.')->whereNumber('student')->group(function () {
+                Route::get('/', [FeeStatementController::class, 'show'])
+                    ->can('fees.view')->name('show');
+                Route::get('charges/create', [FeeChargeController::class, 'create'])
+                    ->can('fees.manage')->name('charges.create');
+                Route::post('charges', [FeeChargeController::class, 'store'])
+                    ->can('fees.manage')->name('charges.store');
+                Route::get('payments/create', [FeePaymentController::class, 'create'])
+                    ->can('fees.record-payment')->name('payments.create');
+                Route::post('payments', [FeePaymentController::class, 'store'])
+                    ->can('fees.record-payment')->name('payments.store');
+            });
+        });
+
+        /*
         | Communication Hub, Announcements & Notifications (see
         | docs/communication.md). module:notifications gates all of it.
         |   ->can('communication.view' | '.create' | '.manage' | '.resolve' |
@@ -684,6 +756,13 @@ Route::middleware(['auth', 'verified', 'active'])->group(function () {
             Route::get('profile', [ParentProfileController::class, 'edit'])
                 ->can('portal.parent')->name('profile.edit');
 
+            // Fee statement (M19, docs/fees.md) — read-only, nested so both
+            // module gates apply. No route to create charges/payments here.
+            Route::middleware('module:fees')->group(function () {
+                Route::get('children/{student}/fees', [ParentFeeController::class, 'show'])
+                    ->whereNumber('student')->can('portal.parent')->name('fees.show');
+            });
+
             // Announcements & notifications (M18, docs/communication.md) —
             // AnnouncementController/NotificationController shared with staff
             // and the Student Portal; nested here so both module gates apply.
@@ -736,6 +815,13 @@ Route::middleware(['auth', 'verified', 'active'])->group(function () {
 
             Route::get('timetable', [StudentTimetableController::class, 'index'])
                 ->can('portal.student')->name('timetable.index');
+
+            // Fee statement (M19, docs/fees.md) — read-only, nested so both
+            // module gates apply. No route to create charges/payments here.
+            Route::middleware('module:fees')->group(function () {
+                Route::get('fees', [StudentFeeController::class, 'show'])
+                    ->can('portal.student')->name('fees.show');
+            });
 
             // Announcements & notifications (M18, docs/communication.md) —
             // AnnouncementController/NotificationController shared with staff

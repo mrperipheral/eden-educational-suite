@@ -130,6 +130,26 @@ class Student extends Model
         return $this->hasMany(GuardianStudent::class);
     }
 
+    /**
+     * This student's fee charges (M19, `docs/fees.md`).
+     *
+     * @return HasMany<StudentFeeCharge, $this>
+     */
+    public function feeCharges(): HasMany
+    {
+        return $this->hasMany(StudentFeeCharge::class);
+    }
+
+    /**
+     * This student's recorded payments (M19, `docs/fees.md`).
+     *
+     * @return HasMany<FeePayment, $this>
+     */
+    public function feePayments(): HasMany
+    {
+        return $this->hasMany(FeePayment::class);
+    }
+
     public function fullName(): string
     {
         return implode(' ', array_filter([$this->first_name, $this->middle_name, $this->last_name]));

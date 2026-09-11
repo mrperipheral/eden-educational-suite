@@ -9,6 +9,7 @@ use App\Enums\CommunicationCategory;
 use App\Enums\EnrollmentStatus;
 use App\Enums\GuardianRelationship;
 use App\Enums\Module;
+use App\Enums\PaymentMethod;
 use App\Enums\Role;
 use App\Enums\StudentStatus;
 use App\Enums\TeacherStatus;
@@ -22,6 +23,10 @@ use App\Models\Assignment;
 use App\Models\AttendanceRegister;
 use App\Models\CommunicationMessage;
 use App\Models\CommunicationThread;
+use App\Models\FeeCategory;
+use App\Models\FeePayment;
+use App\Models\FeePaymentAllocation;
+use App\Models\FeeStructure;
 use App\Models\GradingScheme;
 use App\Models\Guardian;
 use App\Models\ReportCardConfiguration;
@@ -30,6 +35,7 @@ use App\Models\ResultWeightingScheme;
 use App\Models\School;
 use App\Models\SchoolModule;
 use App\Models\Student;
+use App\Models\StudentFeeCharge;
 use App\Models\Subject;
 use App\Models\Teacher;
 use App\Models\Timetable;
@@ -110,10 +116,10 @@ class DatabaseSeeder extends Seeder
         ])->save();
         $settings->markReviewed();
 
-        // Alpha has tweaked two modules away from the catalogue defaults; every
-        // other module (and all of Beta) simply uses the default.
+        // Alpha has tweaked one module away from the catalogue defaults; every
+        // other module (and all of Beta) simply uses the default — including
+        // Fees (M19), on by default, so the fee statement has real data to show.
         SchoolModule::create(['module' => Module::Timetable->value, 'enabled' => true]);
-        SchoolModule::create(['module' => Module::Fees->value, 'enabled' => false]);
 
         // Academic foundation — a current session with three terms, a handful of
         // levels + arms, and a starter subject list. All school-configured;
@@ -608,6 +614,104 @@ class DatabaseSeeder extends Seeder
         $thread->forceFill(['last_message_at' => $firstMessage->created_at])->save();
         event(new CommunicationMessageAdded($thread, $firstMessage));
         $thread->escalate();
+
+        // Fees & Fee Management (M19) — a category + two structures (one
+        // mandatory, one optional) for Primary 1 Gold's first term, charges
+        // raised for the whole roster, a discount on one, a waiver on
+        // another, and a partial payment with allocation for the Student
+        // Portal demo child — so the fee statement (staff, parent and
+        // student) all have real data to show.
+        $tuitionCategory = FeeCategory::create(['name' => 'Tuition', 'code' => 'TUI', 'position' => 1]);
+        $booksCategory = FeeCategory::create(['name' => 'Books', 'code' => 'BKS', 'position' => 2]);
+
+        $tuitionStructure = new FeeStructure([
+            'fee_category_id' => $tuitionCategory->id,
+            'academic_session_id' => $session->id,
+            'academic_period_id' => $firstTerm?->id,
+            'academic_level_id' => $p1->id,
+            'level_arm_id' => $p1Gold->id,
+            'amount' => 45000,
+            'is_mandatory' => true,
+            'description' => 'First Term tuition — Primary 1 Gold',
+        ]);
+        $tuitionStructure->created_by = $admin->id;
+        $tuitionStructure->save();
+
+        $booksStructure = new FeeStructure([
+            'fee_category_id' => $booksCategory->id,
+            'academic_session_id' => $session->id,
+            'academic_period_id' => $firstTerm?->id,
+            'academic_level_id' => $p1->id,
+            'level_arm_id' => $p1Gold->id,
+            'amount' => 7500,
+            'is_mandatory' => false,
+            'description' => 'First Term textbook pack — optional',
+        ]);
+        $booksStructure->created_by = $admin->id;
+        $booksStructure->save();
+
+        $charges = $p1GoldRoster->map(function (Student $student, int $i) use ($tuitionStructure, $admin) {
+            $charge = new StudentFeeCharge([
+                'student_id' => $student->id,
+                'enrollment_id' => $student->enrollments()->active()->value('id'),
+                'fee_structure_id' => $tuitionStructure->id,
+                'fee_category_id' => $tuitionStructure->fee_category_id,
+                'academic_session_id' => $tuitionStructure->academic_session_id,
+                'academic_period_id' => $tuitionStructure->academic_period_id,
+                'academic_level_id' => $tuitionStructure->academic_level_id,
+                'level_arm_id' => $tuitionStructure->level_arm_id,
+                'description' => 'Tuition — First Term',
+                'amount' => (string) $tuitionStructure->amount,
+            ]);
+            $charge->created_by = $admin->id;
+            $charge->save();
+
+            return $charge;
+        });
+
+        // The demo child (Cecile Student's own linked record) also gets the
+        // optional books charge, a discount, and a partial payment.
+        $demoTuitionCharge = $charges->firstWhere('student_id', $demoStudent->id);
+        $demoBooksCharge = new StudentFeeCharge([
+            'student_id' => $demoStudent->id,
+            'enrollment_id' => $demoStudent->enrollments()->active()->value('id'),
+            'fee_structure_id' => $booksStructure->id,
+            'fee_category_id' => $booksStructure->fee_category_id,
+            'academic_session_id' => $booksStructure->academic_session_id,
+            'academic_period_id' => $booksStructure->academic_period_id,
+            'academic_level_id' => $booksStructure->academic_level_id,
+            'level_arm_id' => $booksStructure->level_arm_id,
+            'description' => 'Textbook pack — First Term',
+            'amount' => (string) $booksStructure->amount,
+        ]);
+        $demoBooksCharge->created_by = $admin->id;
+        $demoBooksCharge->save();
+
+        $demoTuitionCharge->applyDiscount($admin, '5000.00', 'Staff ward discount');
+
+        // A sibling on the roster gets a hardship waiver on their tuition.
+        $waivedCharge = $charges->get(1);
+        $waivedCharge?->waive($admin, 'Financial hardship — approved by Principal');
+
+        $payment = new FeePayment([
+            'student_id' => $demoStudent->id,
+            'amount' => 20000,
+            'payment_date' => now()->subDays(3)->toDateString(),
+            'reference' => 'RCPT-2025-0001',
+            'method' => PaymentMethod::BankTransfer->value,
+            'payer_name' => 'Folake Ade',
+            'payer_phone' => '+234 802 000 1000',
+        ]);
+        $payment->recorded_by = $admin->id;
+        $payment->save();
+
+        $allocation = new FeePaymentAllocation([
+            'fee_payment_id' => $payment->id,
+            'student_fee_charge_id' => $demoTuitionCharge->id,
+            'amount' => 20000,
+        ]);
+        $allocation->created_by = $admin->id;
+        $allocation->save();
 
         $tenant->forget();
     }

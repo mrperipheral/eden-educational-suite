@@ -9,6 +9,7 @@
         ['key' => 'attendance', 'label' => __('Attendance'), 'route' => route('parent.attendance.index', $student->id), 'allowed' => $moduleOn(\App\Enums\Module::Attendance)],
         ['key' => 'assignments', 'label' => __('Assignments'), 'route' => route('parent.assignments.index', $student->id), 'allowed' => $moduleOn(\App\Enums\Module::Assessments)],
         ['key' => 'timetable', 'label' => __('Timetable'), 'route' => route('parent.timetable.index', $student->id), 'allowed' => $moduleOn(\App\Enums\Module::Timetable)],
+        ['key' => 'fees', 'label' => __('Fees'), 'route' => route('parent.fees.show', $student->id), 'allowed' => $moduleOn(\App\Enums\Module::Fees)],
     ])->filter(fn ($t) => $t['allowed']);
 @endphp
 

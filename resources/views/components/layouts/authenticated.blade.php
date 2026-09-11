@@ -50,6 +50,7 @@
             ['route' => 'attendance.index', 'label' => __('Attendance'), 'active' => 'attendance.*', 'allowed' => $moduleOn(\App\Enums\Module::Attendance) && auth()->user()->can('attendance.view')],
             ['route' => 'assessments.index', 'label' => __('Assessments'), 'active' => 'assessments.*', 'allowed' => $moduleOn(\App\Enums\Module::Assessments) && auth()->user()->can('assessment.view')],
             ['route' => 'results.runs.index', 'label' => __('Results'), 'active' => 'results.*', 'allowed' => $moduleOn(\App\Enums\Module::Results) && auth()->user()->can('result.view')],
+            ['route' => 'fees.index', 'label' => __('Fees'), 'active' => 'fees.*', 'allowed' => $moduleOn(\App\Enums\Module::Fees) && auth()->user()->can('fees.report')],
             ['route' => 'academic.sessions.index', 'label' => __('Academic'), 'active' => 'academic.*', 'allowed' => $moduleOn(\App\Enums\Module::Academics) && auth()->user()->can('academics.view')],
             ['route' => 'communication.threads.index', 'label' => __('Communication'), 'active' => 'communication.*', 'allowed' => $moduleOn(\App\Enums\Module::Notifications) && auth()->user()->can('communication.view')],
             ['route' => 'announcements.index', 'label' => __('Announcements'), 'active' => 'announcements.*', 'allowed' => $moduleOn(\App\Enums\Module::Notifications) && auth()->user()->can('announcement.view')],

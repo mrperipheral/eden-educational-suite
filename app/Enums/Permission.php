@@ -65,6 +65,13 @@ enum Permission: string
     case ResultPublish = 'result.publish';
     case ResultAdjust = 'result.adjust';
 
+    // ---- Fees & payments (enforced: Fees & Fee Management M19) --------------
+    case FeesView = 'fees.view';
+    case FeesManage = 'fees.manage';
+    case FeesRecordPayment = 'fees.record-payment';
+    case FeesAdjust = 'fees.adjust';
+    case FeesReport = 'fees.report';
+
     // ---- Communication & notifications (enforced: Communication & Notification Foundation M18) ----
     case CommunicationView = 'communication.view';
     case CommunicationCreate = 'communication.create';

@@ -1,11 +1,11 @@
 # Database Design
 
-Status: Milestone 18. Tenant + roles + onboarding + school settings + module
+Status: Milestone 19. Tenant + roles + onboarding + school settings + module
 activation + academic foundation + student management + guardian management +
 teacher management + timetable management + attendance management + assessment &
 assignments + results & report cards + parent portal + student portal +
-communication & notification foundation. School-owned tables:
-`school_settings` (M6), `school_modules` (M7), the academic structure —
+communication & notification foundation + fees & fee management. School-owned
+tables: `school_settings` (M6), `school_modules` (M7), the academic structure —
 `academic_sessions`, `academic_periods`, `academic_levels`, `level_arms`,
 `subjects`, `level_subject` (M8) — `students` + `enrollments` (M9),
 `guardians` + `guardian_student` (M10), `teachers` + `teacher_assignments`
@@ -18,7 +18,9 @@ communication & notification foundation. School-owned tables:
 `result_adjustments`, `report_card_configurations` (M15), `guardians.user_id`
 (M16, additive), `students.user_id` (M17, additive),
 `communication_threads`, `communication_messages`, `announcements`,
-`user_notifications` (M18). No fees tables yet. This document records the
+`user_notifications` (M18), `fee_categories`, `fee_structures`,
+`student_fee_charges`, `fee_payments`, `fee_payment_allocations` (M19). No
+online-payment/gateway tables yet (M20). This document records the
 conventions every future migration follows.
 
 ## Current schema
@@ -411,6 +413,63 @@ Four new tables, all school-owned (`school_id` leads every lookup index). See
   `index(school_id, user_id, created_at)`. Rows are only ever written by
   `App\Services\Notifications\NotificationDispatcher`, never from request
   input.
+
+### `2026_09_27_100000`–`100040` — Fees & Fee Management (Milestone 19)
+Five new tables, all school-owned (`school_id` leads every lookup index).
+See `docs/fees.md`.
+
+- **`fee_categories`** — school-configured, mirrors `assessment_categories`
+  (M14) exactly: `name`, `code` (nullable), `description`, `position`,
+  `is_active`. `unique(school_id, name)`, `unique(school_id, code)`,
+  `index(school_id, is_active, position)`. Deactivated, not deleted.
+- **`fee_structures`** — `fee_category_id` (`restrictOnDelete`),
+  `academic_session_id` (`cascadeOnDelete`), `academic_period_id` (nullable,
+  `nullOnDelete` — session-wide fees), `academic_level_id`
+  (`cascadeOnDelete`), `level_arm_id` (nullable, `nullOnDelete` — whole-level
+  fees), `created_by` FK to `users`, `amount` (`decimal(12,2)`),
+  `is_mandatory` (bool, default `true`), `is_active` (bool, default `true`),
+  `description`. `index(school_id, academic_session_id, academic_level_id)`
+  (named `fee_structures_school_session_level_idx`),
+  `index(school_id, is_active)`, `index(school_id, fee_category_id)`. Freely
+  editable — see `App\Models\FeeStructure` for why an edit never touches a
+  charge already raised from it.
+- **`student_fee_charges`** — school-owned *and* student-scoped (mirrors
+  `enrollments`): `student_id` (`cascadeOnDelete`), `enrollment_id`
+  (nullable, `nullOnDelete`), `fee_structure_id` (nullable, `nullOnDelete`
+  — a breadcrumb only, not authoritative), `fee_category_id`
+  (`restrictOnDelete`), the same session/period/level/arm columns as
+  `fee_structures` (**snapshotted**, not looked up live), `created_by`,
+  `description`, `amount` (`decimal(12,2)`, immutable once set),
+  `discount_amount` (`decimal(12,2)`, default `0`, not mass-assignable),
+  `waived_at` / `waived_by` / `waiver_reason` (not mass-assignable).
+  `index(school_id, student_id)` (named
+  `student_fee_charges_school_student_idx`),
+  `index(school_id, academic_session_id, academic_period_id)` (named
+  `student_fee_charges_school_session_period_idx`),
+  `index(school_id, fee_category_id)`. Never hard-deleted.
+- **`fee_payments`** — school-owned *and* student-scoped: `student_id`
+  (`cascadeOnDelete`), `recorded_by` (not mass-assignable), `amount`
+  (`decimal(12,2)`), `payment_date`, `reference` (`string(60)`), `method`
+  (`string(20)`, an `App\Enums\PaymentMethod` value), `payer_name` /
+  `payer_phone` / `payer_email` (nullable), `notes`, `voided_at` /
+  `voided_by` / `void_reason` (not mass-assignable — see
+  `App\Models\FeePayment::void()`). `unique(school_id, reference)` — the
+  duplicate-reference guard. `index(school_id, student_id)` (named
+  `fee_payments_school_student_idx`), `index(school_id, payment_date)`.
+  Never edited or deleted once made.
+- **`fee_payment_allocations`** — `fee_payment_id` (`cascadeOnDelete`),
+  `student_fee_charge_id` (`restrictOnDelete` — a charge with allocations
+  against it can't be deleted), `created_by`, `amount` (`decimal(12,2)`).
+  `index(school_id, fee_payment_id)` (named
+  `fee_payment_allocations_school_payment_idx`),
+  `index(school_id, student_fee_charge_id)` (named
+  `fee_payment_allocations_school_charge_idx`). Every write goes through
+  `App\Services\Fees\FeePaymentService` inside a DB transaction with row
+  locks — never created directly from request input. Never hard-deleted.
+
+Every amount column across all five tables is `decimal(12,2)`; every
+calculation over them uses `bcmath`, never native float arithmetic — see
+`docs/fees.md` §2.
 
 ### `2026_09_15_100000_create_school_modules_table`
 Milestone 7 — per-school feature/module activation. `module` (`string(40)`, an
