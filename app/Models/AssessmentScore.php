@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\ScoreSource;
 use App\Support\Tenancy\Concerns\BelongsToSchool;
 use Database\Factories\AssessmentScoreFactory;
 use Illuminate\Database\Eloquent\Builder;
@@ -20,6 +21,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * not by a DB constraint. Scores are never deleted for historical reasons.
  *
  * No grade / percentage / rank is stored here — that is M15's to derive.
+ *
+ * `source` ({@see ScoreSource}) defaults to `manual` and is **not**
+ * mass-assignable — the existing M14 entry screen only ever produces a manual
+ * mark. `online_cbt` / `imported` are reserved so a future CBT engine or
+ * bulk-import tool can write into this same column without a second result
+ * pipeline — see `docs/results-report-cards.md`.
  */
 class AssessmentScore extends Model
 {
@@ -40,6 +47,7 @@ class AssessmentScore extends Model
     {
         return [
             'score' => 'decimal:2',
+            'source' => ScoreSource::class,
             'recorded_at' => 'datetime',
         ];
     }

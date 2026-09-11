@@ -17,6 +17,14 @@ use App\Http\Controllers\Guardian\GuardianLinkController;
 use App\Http\Controllers\HealthController;
 use App\Http\Controllers\MemberController;
 use App\Http\Controllers\Platform\SchoolController as PlatformSchoolController;
+use App\Http\Controllers\Results\GradingSchemeController;
+use App\Http\Controllers\Results\GradingSchemeGradeController;
+use App\Http\Controllers\Results\ReportCardConfigurationController;
+use App\Http\Controllers\Results\ReportCardController;
+use App\Http\Controllers\Results\ResultAdjustmentController;
+use App\Http\Controllers\Results\ResultRunController;
+use App\Http\Controllers\Results\ResultWeightingSchemeController;
+use App\Http\Controllers\Results\ResultWeightingSchemeItemController;
 use App\Http\Controllers\SchoolContextController;
 use App\Http\Controllers\SchoolModuleController;
 use App\Http\Controllers\SchoolSettingsController;
@@ -448,6 +456,104 @@ Route::middleware(['auth', 'verified', 'active'])->group(function () {
                 ->whereNumber('assessment')->can('assessment.record')->name('lock');
             Route::post('{assessment}/unlock', [AssessmentController::class, 'unlock'])
                 ->whereNumber('assessment')->can('assessment.manage')->name('unlock');
+        });
+
+        /*
+        | Results & report cards (see docs/results-report-cards.md). Two gates:
+        |   module:results  — is the feature on? (depends on assessments, which
+        |     itself depends on academics + students — NOT timetable / attendance / cbt)
+        |   ->can('result.view' | '.enter' | '.manage' | '.publish' | '.adjust')
+        | Compilation only ever reads **locked** M14 assessment scores —
+        | App\Services\Results\ResultCompiler, called from ResultRunController.
+        | Tenant-owned ids ({scheme}, {grade}, {item}, {run}, {student_result},
+        | {subject_result}, {adjustment}) are resolved by tenant-scoped
+        | `findOrFail` (after `tenant`), so another school's id 404s.
+        */
+        Route::middleware('module:results')->prefix('results')->name('results.')->group(function () {
+            // Grading schemes.
+            Route::get('grading-schemes', [GradingSchemeController::class, 'index'])
+                ->can('result.view')->name('grading-schemes.index');
+            Route::post('grading-schemes', [GradingSchemeController::class, 'store'])
+                ->can('result.manage')->name('grading-schemes.store');
+            Route::get('grading-schemes/{scheme}', [GradingSchemeController::class, 'show'])
+                ->whereNumber('scheme')->can('result.view')->name('grading-schemes.show');
+            Route::patch('grading-schemes/{scheme}', [GradingSchemeController::class, 'update'])
+                ->whereNumber('scheme')->can('result.manage')->name('grading-schemes.update');
+            Route::post('grading-schemes/{scheme}/grades', [GradingSchemeGradeController::class, 'store'])
+                ->whereNumber('scheme')->can('result.manage')->name('grading-schemes.grades.store');
+            Route::patch('grading-schemes/grades/{grade}', [GradingSchemeGradeController::class, 'update'])
+                ->whereNumber('grade')->can('result.manage')->name('grading-schemes.grades.update');
+            Route::delete('grading-schemes/grades/{grade}', [GradingSchemeGradeController::class, 'destroy'])
+                ->whereNumber('grade')->can('result.manage')->name('grading-schemes.grades.destroy');
+
+            // Weighting schemes.
+            Route::get('weighting-schemes', [ResultWeightingSchemeController::class, 'index'])
+                ->can('result.view')->name('weighting-schemes.index');
+            Route::post('weighting-schemes', [ResultWeightingSchemeController::class, 'store'])
+                ->can('result.manage')->name('weighting-schemes.store');
+            Route::get('weighting-schemes/{scheme}', [ResultWeightingSchemeController::class, 'show'])
+                ->whereNumber('scheme')->can('result.view')->name('weighting-schemes.show');
+            Route::patch('weighting-schemes/{scheme}', [ResultWeightingSchemeController::class, 'update'])
+                ->whereNumber('scheme')->can('result.manage')->name('weighting-schemes.update');
+            Route::post('weighting-schemes/{scheme}/items', [ResultWeightingSchemeItemController::class, 'store'])
+                ->whereNumber('scheme')->can('result.manage')->name('weighting-schemes.items.store');
+            Route::patch('weighting-schemes/items/{item}', [ResultWeightingSchemeItemController::class, 'update'])
+                ->whereNumber('item')->can('result.manage')->name('weighting-schemes.items.update');
+            Route::delete('weighting-schemes/items/{item}', [ResultWeightingSchemeItemController::class, 'destroy'])
+                ->whereNumber('item')->can('result.manage')->name('weighting-schemes.items.destroy');
+
+            // Report-card configuration (school-wide, optionally narrowed by
+            // ?session=&period= — see ReportCardConfiguration::forScope()).
+            Route::get('report-card-configuration', [ReportCardConfigurationController::class, 'edit'])
+                ->can('result.view')->name('report-card-configuration.edit');
+            Route::patch('report-card-configuration', [ReportCardConfigurationController::class, 'update'])
+                ->can('result.manage')->name('report-card-configuration.update');
+            Route::post('report-card-configuration/principal-signature', [ReportCardConfigurationController::class, 'updatePrincipalSignature'])
+                ->can('result.manage')->name('report-card-configuration.principal-signature.update');
+            Route::delete('report-card-configuration/principal-signature', [ReportCardConfigurationController::class, 'destroyPrincipalSignature'])
+                ->can('result.manage')->name('report-card-configuration.principal-signature.destroy');
+            Route::get('report-card-configuration/principal-signature', [ReportCardConfigurationController::class, 'showPrincipalSignature'])
+                ->can('result.view')->name('report-card-configuration.principal-signature.show');
+            Route::post('report-card-configuration/class-teacher-signature', [ReportCardConfigurationController::class, 'updateClassTeacherSignature'])
+                ->can('result.manage')->name('report-card-configuration.class-teacher-signature.update');
+            Route::delete('report-card-configuration/class-teacher-signature', [ReportCardConfigurationController::class, 'destroyClassTeacherSignature'])
+                ->can('result.manage')->name('report-card-configuration.class-teacher-signature.destroy');
+            Route::get('report-card-configuration/class-teacher-signature', [ReportCardConfigurationController::class, 'showClassTeacherSignature'])
+                ->can('result.view')->name('report-card-configuration.class-teacher-signature.show');
+
+            // Result runs.
+            Route::get('runs', [ResultRunController::class, 'index'])
+                ->can('result.view')->name('runs.index');
+            Route::get('runs/create', [ResultRunController::class, 'create'])
+                ->can('result.manage')->name('runs.create');
+            Route::post('runs', [ResultRunController::class, 'store'])
+                ->can('result.manage')->name('runs.store');
+            Route::get('runs/{run}', [ResultRunController::class, 'show'])
+                ->whereNumber('run')->can('result.view')->name('runs.show');
+            Route::delete('runs/{run}', [ResultRunController::class, 'destroy'])
+                ->whereNumber('run')->can('result.manage')->name('runs.destroy');
+            Route::post('runs/{run}/compile', [ResultRunController::class, 'compile'])
+                ->whereNumber('run')->can('result.manage')->name('runs.compile');
+            Route::post('runs/{run}/review', [ResultRunController::class, 'review'])
+                ->whereNumber('run')->can('result.manage')->name('runs.review');
+            Route::post('runs/{run}/approve', [ResultRunController::class, 'approve'])
+                ->whereNumber('run')->can('result.publish')->name('runs.approve');
+            Route::post('runs/{run}/publish', [ResultRunController::class, 'publish'])
+                ->whereNumber('run')->can('result.publish')->name('runs.publish');
+            Route::post('runs/{run}/lock', [ResultRunController::class, 'lock'])
+                ->whereNumber('run')->can('result.publish')->name('runs.lock');
+
+            Route::patch('runs/{run}/students/{student_result}/comment', [ResultRunController::class, 'updateComment'])
+                ->whereNumber(['run', 'student_result'])->can('result.enter')->name('runs.students.comment');
+            Route::get('runs/{run}/students/{student_result}/report-card', [ReportCardController::class, 'show'])
+                ->whereNumber(['run', 'student_result'])->can('result.view')->name('runs.students.report-card');
+
+            Route::post('runs/{run}/subject-results/{subject_result}/adjustments', [ResultAdjustmentController::class, 'store'])
+                ->whereNumber(['run', 'subject_result'])->can('result.adjust')->name('adjustments.store');
+            Route::post('runs/{run}/adjustments/{adjustment}/apply', [ResultAdjustmentController::class, 'apply'])
+                ->whereNumber(['run', 'adjustment'])->can('result.adjust')->name('adjustments.apply');
+            Route::post('runs/{run}/adjustments/{adjustment}/reject', [ResultAdjustmentController::class, 'reject'])
+                ->whereNumber(['run', 'adjustment'])->can('result.adjust')->name('adjustments.reject');
         });
     });
 });

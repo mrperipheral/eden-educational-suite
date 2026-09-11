@@ -14,7 +14,7 @@ role set, composed with the strict `TenantContext` from Milestone 3.
 | Runtime check | `User::hasPermission()` / `roleIn()` / `permissionsIn()` / `canGrantRole()` |
 | Gate wiring | `App\Providers\AuthServiceProvider` — one `Gate::define()` per permission |
 | Fine-grained rules | `App\Policies\MembershipPolicy` (self / escalation guards) |
-| Features that use it | Members (`/members*`), school settings + module activation (`school.settings.*`), academic structure (`/academic/*`, `academics.*` — M8), students (`/students/*`, `student.*` — M9), guardians (`/guardians/*`, `guardian.*` — M10), teachers (`/teachers/*`, `staff.*` — M11), timetable (`/timetables/*`, `timetable.*` — M12), attendance (`/attendance/*`, `attendance.*` — M13), assessments (`/assessments/*`, `assessment.*` — M14), school provisioning (`SchoolPolicy`) |
+| Features that use it | Members (`/members*`), school settings + module activation (`school.settings.*`), academic structure (`/academic/*`, `academics.*` — M8), students (`/students/*`, `student.*` — M9), guardians (`/guardians/*`, `guardian.*` — M10), teachers (`/teachers/*`, `staff.*` — M11), timetable (`/timetables/*`, `timetable.*` — M12), attendance (`/attendance/*`, `attendance.*` — M13), assessments (`/assessments/*`, `assessment.*` — M14), results & report cards (`/results/*`, `result.*` — M15), school provisioning (`SchoolPolicy`) |
 
 ```
 Request → auth · verified · active · tenant  (TenantContext::set(School))
@@ -102,11 +102,23 @@ presentational only — nothing depends on it):
   All three were added in M14 — `.manage` to Principal, `.view` + `.record` to
   Teacher, `.view` to Staff. Assessments do **not** depend on the Timetable,
   Attendance, Results or CBT modules. See `docs/assessment-management.md`.
+- **Results & report cards (enforced — M15):** `result.view`, `result.enter`,
+  `result.manage`, `result.publish`, `result.adjust` — gate `/results/*`
+  (grading/weighting schemes, a result run's compile→review→approve→publish→
+  lock lifecycle, a per-subject adjustment workflow, and report-card
+  configuration + generation). School Admin + Principal hold all five;
+  Teacher holds `.view` + `.enter` (a class-teacher comment, scoped to a
+  class they hold an active M11 assignment for, via `ResultAuthorizer` — the
+  same shape as `AttendanceAuthorizer`, but with no subject dimension since a
+  class-teacher comment is class-wide); Staff holds `.view`; **Bursar /
+  Parent / Student get 403**. Only `result.manage` and `result.adjust` are
+  new this milestone — `.view` / `.enter` / `.publish` were already declared
+  from M4's scaffolding. Results depend on the **Assessments module only**
+  (not Timetable/Attendance/CBT). See `docs/results-report-cards.md`.
 - **People & access (enforced):** `member.view`, `member.assign-role`
   (also gates *adding* an existing user — M5), `member.remove`
 - **Declared for later domain milestones** (not yet enforced — the modules that
-  check them don't exist): `result.*`, `finance.*`,
-  `portal.parent`, `portal.student`
+  check them don't exist): `finance.*`, `portal.parent`, `portal.student`
 
 They exist now so the role bundles are meaningful and testable. A domain
 milestone that needs finer control adds a case and slots it into the relevant
@@ -138,7 +150,7 @@ Seven per-school roles, each a static bundle of permissions plus a `tier`:
 | `principal` | 80 | school settings (view), member view + assign-role, all student/guardian/staff/academics/timetable/attendance/assessment/result permissions, finance (view) |
 | `bursar` | 50 | school settings (view), student/guardian/staff (view), finance (view + manage) |
 | `teacher` | 50 | student/guardian/staff/academics/timetable (view), attendance (view + record), assessment (view + record), result (view + enter) |
-| `staff` | 30 | student (view), guardian (view), staff (view), academics (view), timetable (view), attendance (view), assessment (view) |
+| `staff` | 30 | student (view), guardian (view), staff (view), academics (view), timetable (view), attendance (view), assessment (view), result (view) |
 | `parent` | 10 | `portal.parent` |
 | `student` | 10 | `portal.student` |
 
@@ -229,10 +241,11 @@ school, so a cross-school membership can never reach the policy.
 | One role per (user, school), nullable | matches "roles are bundles"; multi-role is a rare need, deferred |
 | Tier-based escalation guard (`target.tier ≤ granter.tier`) | models org hierarchy; the hard invariant "never grant a role above your own" is simple and testable |
 | Platform admin = all permissions *within an entered school* | "retain platform-wide administration" without weakening row-level isolation (`SchoolScope` still applies) |
-| `member.*` + `academics.*` (M8) + `student.*` (M9) + `guardian.*` (M10) + `staff.*` (M11) + `timetable.*` (M12) + `attendance.*` (M13) + `assessment.*` (M14) enforced; the rest declared but dormant | the vocabulary the role bundles need, activated module by module |
+| `member.*` + `academics.*` (M8) + `student.*` (M9) + `guardian.*` (M10) + `staff.*` (M11) + `timetable.*` (M12) + `attendance.*` (M13) + `assessment.*` (M14) + `result.*` (M15) enforced; the rest declared but dormant | the vocabulary the role bundles need, activated module by module |
 | `guardian.view` added to Staff in M10, `staff.*` widened in M11, `timetable.*` added in M12 (Principal → manage; Teacher/Staff → view; Bursar → none) | `timetable.*` follows `academics.*` exactly — the roles with academic access get it; Bursar has no academic access, so no timetable access |
 | `attendance.manage` added in M13 (Principal); `attendance.view` / `attendance.record` kept on Teacher/Staff from M7; a third ability, not a role check, scopes a teacher to their assigned classes (`AttendanceAuthorizer`) | "record for any class" vs "record for my class" is a real distinction the two-ability `view`/`manage` shape can't carry; expressing it as a permission + a tenant-scoped assignment check keeps role names out of the logic |
 | `assessment.{view,record,manage}` added in M14 (Principal → all; Teacher → view + record; Staff → view; Bursar → none); `AssessmentAuthorizer` scopes a teacher to their assigned `(level, subject)` | mirrors `attendance.*` — the roles with academic access get it; a teacher records for the subject they teach that class, not any class; `.manage` also gates category config + unlocking a locked assessment |
+| `result.manage` + `result.adjust` added in M15 (Principal, joining the already-declared `.view`/`.enter`/`.publish`); `result.view` added to Staff; `ResultAuthorizer` scopes a teacher's comment to their assigned class, with **no subject dimension** | 9 originally-sketched permissions (including a separate `report.*` set) were consolidated to 5 by reusing M4's scaffolding and folding report-card viewing/configuring into `result.view`/`result.manage` — a report card is just another view of a result run, not a separate resource; a class-teacher comment is class-wide, unlike a per-subject score, so its authorizer carries no subject check |
 | Module activation (M7) reuses `school.settings.*`, stays orthogonal to permissions | it is configuration ("is the feature on for this school?"), not "may this user…"; a domain route checks both |
 | `academics.*` (M8) reused as-is, no finer split; sessions re-gated from `school.settings.*` | coarse-on-purpose; the academic structure is one thing under one permission (see `docs/academic-foundation.md`) |
 

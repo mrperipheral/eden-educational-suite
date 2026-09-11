@@ -142,11 +142,17 @@ enum Module: string
      *     lifecycle and bulk score entry, plus class assignments with
      *     completion tracking (`docs/assessment-management.md`). Depends on
      *     Academics + Students only — not Timetable, Attendance, Results or CBT.
+     *   - `results` — Results & Report Cards (M15): configurable grading and
+     *     weighting schemes, a draft → compiled → reviewed → approved →
+     *     published → locked result run compiled from **locked** M14
+     *     assessment scores, class position, and a configurable, printable
+     *     report card (`docs/results-report-cards.md`). Depends on
+     *     `assessments` only — not Timetable, Attendance or CBT.
      */
     public function isAvailable(): bool
     {
         return match ($this) {
-            self::Academics, self::Students, self::Guardians, self::Staff, self::Timetable, self::Attendance, self::Assessments => true,
+            self::Academics, self::Students, self::Guardians, self::Staff, self::Timetable, self::Attendance, self::Assessments, self::Results => true,
             default => false,
         };
     }

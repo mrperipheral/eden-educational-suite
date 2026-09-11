@@ -1,6 +1,6 @@
 # Architecture
 
-Status: Milestone 14 (Assessment & Assignments) complete. This describes the intended
+Status: Milestone 15 (Results & Report Cards) complete. This describes the intended
 shape of the system and what exists today.
 
 ## 1. High-level model
@@ -380,10 +380,67 @@ promotion, CBT, portal views, or a full audit trail.
   `docs/tenancy.md` §7).
 - Invitations / brand-new-account onboarding, school suspension / subscription,
   notification & payment config, the remaining domain modules behind the M7
-  catalogue (results & report cards, fees, CBT, portals, promotion workflow, bulk
-  import), a rooms/facilities module + timetable templates, the Parent Portal
-  (guardian sign-in) and Teacher Portal (teacher sign-in), non-teaching staff
-  records, admin UI for `status` / `is_platform_admin`, subdomain routing.
+  catalogue (fees, CBT, portals, promotion workflow, bulk import), a
+  rooms/facilities module + timetable templates, the Parent Portal (guardian
+  sign-in) and Teacher Portal (teacher sign-in), non-teaching staff records,
+  admin UI for `status` / `is_platform_admin`, subdomain routing.
+
+## 2m. Results & report cards (implemented — Milestone 15)
+
+Full reference: **`docs/results-report-cards.md`**. Turns M14's locked
+assessment scores into configurable student results and printable report
+cards. No CBT/Question Bank, no student/parent portal views, no promotion,
+no PDF library, no full audit-trail platform.
+
+- **`App\Models\GradingScheme` + `GradingSchemeGrade`** — school-configured
+  percentage bands (non-overlapping among active bands, unique code per
+  scheme). `gradeFor(float): ?GradingSchemeGrade` is the **only** place a
+  percentage becomes a grade — never typed directly into a result row.
+- **`App\Models\ResultWeightingScheme` + `ResultWeightingSchemeItem`** — ties
+  an M14 `AssessmentCategory` to a `weight_percentage`; must sum to exactly
+  100% (checked server-side before a run can use the scheme).
+- **`App\Models\ResultRun`** — one class, one term (`unique(session, period,
+  level, arm)`, never spans terms). `status`
+  (`draft`→`compiled`→`reviewed`→`approved`→`published`→`locked`) and every
+  `*_by`/`*_at` pair **not** mass-assignable — only the lifecycle methods
+  (`review()`/`approve()`/`publish()`/`lock()`) change them.
+- **`App\Models\StudentResult` / `StudentSubjectResult` /
+  `StudentSubjectResultComponent`** — compiled results, computed once by
+  `App\Services\Results\ResultCompiler` and **snapshotted** (percentage,
+  grade, raw score, weight) so they survive a later grading/weighting-scheme
+  edit or assessment-category rename unchanged.
+- **`App\Services\Results\ResultCompiler`** — all-or-nothing: computes fully
+  in memory first, collects every missing-score issue, and writes **nothing**
+  if any exist (never manufactures a missing score as zero). Bulk `insert`s
+  and a `CASE id WHEN ... END` bulk-update helper — never a query per
+  student.
+- **`App\Support\Results\RankingCalculator`** — pure-PHP competition ranking
+  (`1,2,2,4`), scoped to the run's own roster, never the whole school.
+- **`App\Models\ResultAdjustment`** — a controlled propose → apply/reject
+  correction workflow for an approved-or-later run; a proposal alone changes
+  nothing; applying re-derives the grade via `gradeFor()` and triggers a full
+  ranking recompute. No bulk "unlock" of an approved+ run.
+- **`App\Models\ReportCardConfiguration`** — 24 independent typed `show_*`
+  booleans (not a JSON blob); school-wide/session/term scope with documented
+  precedence; a second `result_run_id`-tagged row is the frozen snapshot a
+  **locked** run's report card renders from (an unlocked, even published,
+  run always reflects the *live* configuration). The same Blade view renders
+  both the live preview and the final output.
+- **`App\Http\Controllers\Results\*`** (8 controllers), `/results/*` routes
+  behind `['tenant', 'module:results']`, gated `result.view` / `.enter` /
+  `.manage` / `.publish` / `.adjust`. `Module::Results->isAvailable()` is now
+  `true` (**on by default**); it **depends on `Module::Assessments` only** —
+  not Timetable / Attendance / CBT. `result.manage` + `result.adjust` are new;
+  `result.view` / `.enter` / `.publish` reuse M4's original scaffolding.
+
+### Deferred
+
+Question Bank / CBT engine, Entry/Placement Assessment admin UI, student &
+parent portal result views, promotion & graduation, advanced transcripts,
+automatic report-card comments, a full drag-and-drop report-card designer,
+PDF export (browser print for now), per-level report-card overrides, bulk
+unlock of an approved+ run, per-run signature-image snapshotting, student
+photo capture, a full audit-trail / retention workflow.
 
 ## 3. Application layers & conventions
 
@@ -489,3 +546,10 @@ pre-auth screens.
 | 2026-09-22 | Assessment lifecycle `draft → published → locked`; `unlock` is `assessment.manage` only | draft = still configuring, published = definition settled + scores flowing, locked = finalized; an authorized unlock (not an approval workflow) is the controlled correction path |
 | 2026-09-22 | `Assignment` is separate from `Assessment` — it carries no score, tracks completion via `AssignmentSubmission`, and only *optionally* links to an assessment (`assessments.assignment_id`) | an assignment is set work; grading it is a distinct act; keeping them separate lets M15 decide if/how an assignment contributes to a result without reworking M14 |
 | 2026-09-22 | Assignment file attachments deferred — no `attachment_path` in M14 | the only file handling today is the M6 private-disk logo; safe uploads need a private disk + gated per-file download route + retention, which is its own piece of work |
+| 2026-09-23 | `AssessmentPurpose` / `ScoreSource` added to M14's tables via **new, additive migrations** rather than editing the original M14 migrations | keeps "don't reopen completed milestones" while letting the schema grow forward-compatibly for a future CBT/import pipeline (see `docs/results-report-cards.md` §13) |
+| 2026-09-23 | Subjects entering a `ResultRun` are derived from which subjects actually have a **locked, academic-purpose** M14 assessment in the run's exact class/term — never the full `level_subject` catalogue | a subject nobody has assessed yet this term should not appear at all, let alone as a missing-score error |
+| 2026-09-23 | Compilation computes everything in memory first and writes nothing if any score is missing anywhere | "never manufacture a missing score as zero" is a correctness requirement, not just a UX nicety — a partial write would be worse than no write |
+| 2026-09-23 | Class position is a pure-PHP competition-ranking helper, not a SQL `RANK()` window function | portable across the app's MySQL and the test suite's SQLite |
+| 2026-09-23 | A result correction is a `ResultAdjustment` propose→apply/reject workflow, not a direct field edit, and there is no bulk "unlock" of an approved+ run | keeps `result.adjust` from becoming a general editing bypass once numbers are meant to be frozen; a wholesale re-mark stays a deliberate, visible, per-subject act |
+| 2026-09-23 | `ReportCardConfiguration` is 24 independent typed boolean columns, not a JSON blob; a **second row** (`result_run_id` set) is the frozen per-run snapshot, taken at publish, used only once the run is **locked** | typed/relational stays queryable and matches every other model in the app; distinguishing "live" from "historical" by an extra row (not a duplicated column set on `ResultRun`) keeps one schema doing both jobs, at the cost of every live-scope query needing an explicit `whereNull('result_run_id')` guard |
+| 2026-09-23 | Signature *images* are not copied into the per-run snapshot — only the show/hide toggle freezes | re-signing after a staff change is expected to be more common than needing a pixel-identical historical signature; documented as a reviewable trade-off |

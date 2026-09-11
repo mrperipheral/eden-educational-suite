@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\AssessmentPurpose;
 use App\Enums\AssessmentStatus;
 use App\Models\Concerns\HasClassRoster;
 use App\Support\Tenancy\Concerns\BelongsToSchool;
@@ -27,6 +28,11 @@ use Illuminate\Support\Facades\DB;
  * {@see self::lock()} / {@see self::unlock()}.
  *
  * M14 stores source scores only. Final grades / averages / positions are M15's.
+ *
+ * `purpose` ({@see AssessmentPurpose}) defaults to `academic` and is **not**
+ * mass-assignable — M14 never creates anything else. M15's result compiler
+ * only considers `academic` assessments; `practice` / `entry_placement` are
+ * reserved for a later milestone and are deliberately unreachable today.
  */
 class Assessment extends Model
 {
@@ -64,6 +70,7 @@ class Assessment extends Model
             'assessment_date' => 'date',
             'max_score' => 'decimal:2',
             'status' => AssessmentStatus::class,
+            'purpose' => AssessmentPurpose::class,
             'published_at' => 'datetime',
             'locked_at' => 'datetime',
         ];
@@ -72,6 +79,12 @@ class Assessment extends Model
     public function rosterDate(): string
     {
         return $this->assessment_date->toDateString();
+    }
+
+    /** Whether this assessment is eligible to ever enter a result run. */
+    public function countsTowardResults(): bool
+    {
+        return $this->purpose->countsTowardResults();
     }
 
     /**

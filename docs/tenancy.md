@@ -100,7 +100,7 @@ Applied in `routes/web.php` to the tenant-scoped group: `/dashboard`,
 `/students/*` (also `module:students`), `/guardians/*` (also `module:guardians`),
 `/teachers/*` (also `module:staff`), `/timetables/*` (also `module:timetable`),
 `/attendance/*` (also `module:attendance`), `/assessments/*` (also
-`module:assessments`).
+`module:assessments`), `/results/*` (also `module:results`).
 Account-level routes (`/settings/profile`, `/settings/password`, `/school`) and
 platform routes (`/admin/schools*`) do **not** use it.
 
@@ -117,15 +117,22 @@ The first real school-owned models ship with Milestone 5
 `App\Models\AttendanceRegister` and `App\Models\AttendanceRecord`; Milestone 14
 `App\Models\AssessmentCategory`, `App\Models\Assessment`,
 `App\Models\AssessmentScore`, `App\Models\Assignment` and
-`App\Models\AssignmentSubmission`. Child / link models (`AcademicPeriod`,
+`App\Models\AssignmentSubmission`; Milestone 15 `App\Models\GradingScheme`,
+`App\Models\GradingSchemeGrade`, `App\Models\ResultWeightingScheme`,
+`App\Models\ResultWeightingSchemeItem`, `App\Models\ResultRun`,
+`App\Models\StudentResult`, `App\Models\StudentSubjectResult`,
+`App\Models\StudentSubjectResultComponent`, `App\Models\ResultAdjustment` and
+`App\Models\ReportCardConfiguration`. Child / link models (`AcademicPeriod`,
 `LevelArm`, `Enrollment`, `GuardianStudent`, `TeacherAssignment`,
-`TimetableEntry`, `AttendanceRecord`, `AssessmentScore`, `AssignmentSubmission`)
+`TimetableEntry`, `AttendanceRecord`, `AssessmentScore`, `AssignmentSubmission`,
+`GradingSchemeGrade`, `ResultWeightingSchemeItem`, `StudentResult`,
+`StudentSubjectResult`, `StudentSubjectResultComponent`, `ResultAdjustment`)
 carry `school_id` *and* their parent FK(s) so a query is tenant-safe without the
 parent in the join (see `docs/academic-foundation.md`,
 `docs/student-management.md`, `docs/guardian-management.md`,
 `docs/teacher-management.md`, `docs/timetable-management.md`,
-`docs/attendance-management.md`, `docs/assessment-management.md`). All follow the
-pattern:
+`docs/attendance-management.md`, `docs/assessment-management.md`,
+`docs/results-report-cards.md`). All follow the pattern:
 
 ```php
 use App\Support\Tenancy\Concerns\BelongsToSchool;

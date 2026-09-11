@@ -180,6 +180,30 @@ list / create / detail / a **completion sheet** with a status select + date +
 remark per student and a "set all" bar — plus a draft → published → closed
 lifecycle. Read-only roles (`assessment.view`) see lists and detail only.
 
+The **Results** area (`resources/views/results/`, `docs/results-report-cards.md`,
+gated `result.*` + `module:results`) is a top-level nav item, split into
+**Result runs / Grading schemes / Weighting schemes / Report card
+configuration** — no giant single-page form. **Run list** — filterable by
+session / level / class / status, paginated, each badged by lifecycle status.
+**Run detail** is the core view: a header with the run's lifecycle-action
+buttons (compile / review / approve / publish / lock), a compilation-blocked
+state that lists every missing-score issue by name
+(`$errors->get('compilation')`), and a per-student table whose rows expand
+(Alpine `x-data="{open:false}"`) into a subject breakdown with an inline
+adjustment disclosure (`<details>`) and comment forms gated by
+`$canComment`/`$canManage`. **Grading/weighting scheme** screens use
+Alpine-toggled inline edit-in-place rows for their grades/items, with a
+running total-weight badge (success/warning) on the weighting scheme. **Report
+card configuration** groups its 24 toggles into labelled sections (student
+info / academic results / overall performance / attendance / comments /
+signatures), a scope switcher (school-wide / session / session+term), and
+signature upload/remove/preview widgets. The **report card** itself
+(`results/report-card/show.blade.php`) is print-styled (`@media print` hides
+everything but the card; a "Print" button calls `window.print()`) — the
+**same** view serves the live preview and the final locked output. Read-only
+roles (`result.view`) see runs, schemes and report cards with no create /
+compile / lifecycle / adjust controls.
+
 Flash messages (`session('success' | 'error' | 'status')`) are rendered
 automatically by `<x-layouts.app>` as alerts.
 
@@ -211,6 +235,6 @@ automatically by `<x-layouts.app>` as alerts.
 Dark mode, dense/table layouts, data-grid, charts, iconography system,
 notification/toast system. The primary nav is permission- and
 module-filtered (Dashboard · Members · Students · Guardians · Teachers ·
-Timetable · Attendance · Assessments · Academic · School settings · Schools ·
-Account) but not
+Timetable · Attendance · Assessments · Results · Academic · School settings ·
+Schools · Account) but not
 yet role-specific / collapsible. Add here when built.

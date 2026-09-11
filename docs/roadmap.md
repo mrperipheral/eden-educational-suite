@@ -244,10 +244,44 @@ assessment views, assignment file attachments & online submission, automated
 grading / plagiarism, assessment weighting, notifications, a full audit-trail /
 retention workflow.
 
-## Milestone 15+ — Domain Modules
+## ✅ Milestone 15 — Results & Report Cards (complete, 2026-09-23)
 
-Results & Report Cards · Fees / Invoices / Payments (Paystack) ·
-CBT · Role-specific portals & dashboards · Notifications · Reporting · Promotion.
+Turns M14's locked assessment scores into configurable student results and
+printable report cards. `App\Models\GradingScheme` + `GradingSchemeGrade`
+(school-configured percentage bands, `gradeFor()` the one place a percentage
+becomes a grade) + `App\Models\ResultWeightingScheme` +
+`ResultWeightingSchemeItem` (ties an M14 category to a weight, must sum to
+100%) + `App\Models\ResultRun` (one class/one term, `status`
+draft→compiled→reviewed→approved→published→locked, not mass-assignable) +
+`App\Models\StudentResult` / `StudentSubjectResult` /
+`StudentSubjectResultComponent` (compiled and **snapshotted** — immune to a
+later grading/weighting-scheme edit) + `App\Models\ResultAdjustment` (a
+controlled propose → apply/reject correction workflow, never a free edit) +
+`App\Models\ReportCardConfiguration` (24 typed `show_*` booleans, school-wide/
+session/term scope, a second `result_run_id`-tagged row as the frozen per-run
+snapshot). `App\Services\Results\ResultCompiler` computes fully in memory and
+writes nothing if any score is missing — never manufactures a zero;
+`App\Support\Results\RankingCalculator` gives competition class-position
+ranking. Migrations `2026_09_23_100000`–`100110` (2 additive columns onto
+M14's tables + 10 new tables). New `result.manage` / `result.adjust`
+permissions, reusing `result.view`/`.enter`/`.publish` already declared in M4
+(Principal → all 5; Teacher → view + enter, class-scoped; Staff → view).
+`Module::Results->isAvailable()` is `true`, on by default, depends on
+`module:assessments` only. `AssessmentPurpose` / `ScoreSource` enums (added to
+M14's tables) keep the door open for a future CBT pipeline without
+redesigning this milestone. Full detail in `docs/results-report-cards.md`.
+
+Deferred: Question Bank / CBT engine, Entry/Placement Assessment admin UI,
+student & parent portal result views, promotion & graduation, advanced
+transcripts, automatic report-card comments, a full drag-and-drop report-card
+designer, PDF export (browser print for now), per-level report-card overrides,
+bulk unlock of an approved+ run, per-run signature snapshotting, student photo
+capture, notifications, a full audit-trail / retention workflow.
+
+## Milestone 16+ — Domain Modules
+
+Fees / Invoices / Payments (Paystack) · CBT · Role-specific portals &
+dashboards · Notifications · Reporting · Promotion.
 
 Each domain module checks its `App\Enums\Module` flag (`module:` middleware /
 `@module`) **and** its M4 permissions — the two stay orthogonal.

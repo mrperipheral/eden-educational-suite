@@ -58,10 +58,14 @@ enum Permission: string
     case AssessmentRecord = 'assessment.record';
     case AssessmentManage = 'assessment.manage';
 
-    // ---- Declared for later domain milestones (coarse; not yet enforced) -----
+    // ---- Results & report cards (enforced: Results & Report Cards M15) ------
     case ResultView = 'result.view';
     case ResultEnter = 'result.enter';
+    case ResultManage = 'result.manage';
     case ResultPublish = 'result.publish';
+    case ResultAdjust = 'result.adjust';
+
+    // ---- Declared for later domain milestones (coarse; not yet enforced) -----
     case FinanceView = 'finance.view';
     case FinanceManage = 'finance.manage';
     case PortalParent = 'portal.parent';

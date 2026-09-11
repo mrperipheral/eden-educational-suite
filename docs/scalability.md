@@ -39,6 +39,17 @@ below, not a rewrite.
   query count for a 40-student score sheet, the assessment / assignment lists and
   a 40-student bulk save. A class of 100+ costs one snapshot insert, one roster
   read and at most one write per changed student.
+- Results (M15) push this further: `ResultCompiler` reads every locked score,
+  assessment and weighting item **once** each (never per student) and writes
+  via chunked bulk `insert`s; class-position ranking and the overall-totals
+  refresh after an adjustment use a single `UPDATE ... CASE id WHEN ... END`
+  statement per 500-row chunk (`bulkUpdateById()`) instead of one `UPDATE` per
+  student. A regression test proves a 12-student compile issues the **exact
+  same** query count as a 2-student compile. The run index/show pages and the
+  report-card view eager-load their relations and group results once per
+  student in PHP rather than re-querying per row. Attendance roll-up for a
+  report card is exactly 2 queries regardless of class size (reused from the
+  M13 pattern above).
 
 ### Caching
 - Cache expensive, read-mostly, tenant-scoped computations with a

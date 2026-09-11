@@ -1,17 +1,21 @@
 # Database Design
 
-Status: Milestone 14. Tenant + roles + onboarding + school settings + module
+Status: Milestone 15. Tenant + roles + onboarding + school settings + module
 activation + academic foundation + student management + guardian management +
 teacher management + timetable management + attendance management + assessment &
-assignments. School-owned tables: `school_settings` (M6), `school_modules` (M7),
-the academic structure — `academic_sessions`, `academic_periods`,
-`academic_levels`, `level_arms`, `subjects`, `level_subject` (M8) — `students` +
-`enrollments` (M9), `guardians` + `guardian_student` (M10), `teachers` +
-`teacher_assignments` (M11), `timetables` + `timetable_entries` (M12),
-`attendance_registers` + `attendance_records` (M13), and `assessment_categories`,
-`assignments`, `assessments`, `assessment_scores`, `assignment_submissions`
-(M14). No results / fees tables yet. This document records the conventions every
-future migration follows.
+assignments + results & report cards. School-owned tables: `school_settings`
+(M6), `school_modules` (M7), the academic structure — `academic_sessions`,
+`academic_periods`, `academic_levels`, `level_arms`, `subjects`,
+`level_subject` (M8) — `students` + `enrollments` (M9), `guardians` +
+`guardian_student` (M10), `teachers` + `teacher_assignments` (M11),
+`timetables` + `timetable_entries` (M12), `attendance_registers` +
+`attendance_records` (M13), `assessment_categories`, `assignments`,
+`assessments`, `assessment_scores`, `assignment_submissions` (M14), and
+`grading_schemes`, `grading_scheme_grades`, `result_weighting_schemes`,
+`result_weighting_scheme_items`, `result_runs`, `student_results`,
+`student_subject_results`, `student_subject_result_components`,
+`result_adjustments`, `report_card_configurations` (M15). No fees tables yet.
+This document records the conventions every future migration follows.
 
 ## Current schema
 
@@ -42,6 +46,16 @@ future migration follows.
 | `assessment_scores` | one student's score in an assessment. School-owned **+** `assessment_id`. `student_id` FK; `score` (`decimal(6,2)`, nullable — null = not entered), `comment`, `recorded_at`, `recorded_by`. `unique(assessment_id, student_id)`, `index(school_id, student_id)`, `index(school_id, assessment_id)`. Bounds (`0..max_score`, 2 dp) enforced in the Form Request. Never hard-deleted. |
 | `assignments` | a piece of set work for a class + subject. School-owned. FKs session / period / level / arm / subject (all required), optional `teacher_id` (owner, `nullOnDelete`). `title`, `instructions`, `assigned_on`, `due_on`, optional `max_score`, `status` (`draft`/`published`/`closed`, not mass-assignable), `published_at`, `created_by`. Indexes `(school_id, session, period)`, `(school_id, level, arm)`, `(school_id, subject_id)`, `(school_id, teacher_id)`, `(school_id, status)`, `(school_id, due_on)`. Holds no scores. |
 | `assignment_submissions` | whether one student turned an assignment in. School-owned **+** `assignment_id`. `student_id` FK; `status` (`pending`/`submitted`/`late`/`exempt`, default `pending`), `submitted_on`, `remark`, `recorded_at`, `recorded_by`. `unique(assignment_id, student_id)`, `index(school_id, student_id)`, `index(school_id, assignment_id, status)`. Completion only — no score column. Never hard-deleted. |
+| `grading_schemes` | a school-configured percentage-band scale. School-owned. `unique(school_id, name)`, `index(school_id, is_active)`. |
+| `grading_scheme_grades` | one band of a grading scheme. School-owned **+** `grading_scheme_id`. `code`, `min_percentage`/`max_percentage` (`decimal(5,2)`), `remark`, `position`, `is_active`. `unique(grading_scheme_id, code)`, `index(school_id, grading_scheme_id, position)`. Non-overlapping among active bands (Form Request), not a DB constraint. |
+| `result_weighting_schemes` | a school-configured category-weighting scale. School-owned. `unique(school_id, name)`, `index(school_id, is_active)`. |
+| `result_weighting_scheme_items` | one category's weight. School-owned **+** `result_weighting_scheme_id`. `assessment_category_id` FK, `weight_percentage` (`decimal(5,2)`), `position`. `unique(result_weighting_scheme_id, assessment_category_id)` (short FK index name — see the migration), `index(school_id, result_weighting_scheme_id)`. Must sum to 100% per scheme (Form Request, not a DB constraint). |
+| `result_runs` | one class's compiled results for one term. School-owned. FKs session / period / level / arm (all required) + grading/weighting scheme (`restrictOnDelete`). `ranking_enabled`, `status` (`draft`→`locked`, not mass-assignable), 5 `*_by`/`*_at` lifecycle pairs. `unique(school_id, session, period, level, arm)` — never spans terms. `index(school_id, status)`. |
+| `student_results` | a student's overall result within a run. School-owned **+** `result_run_id`. `student_id` FK; totals/average/position/class_size, overall grade snapshot, `class_teacher_comment`/`principal_comment`, attendance rollup — all computed/snapshotted, not editable except the two comment columns. `unique(result_run_id, student_id)`, `index(school_id, student_id)`, ranking index `(school_id, result_run_id, position)`. |
+| `student_subject_results` | a student's per-subject result within a run. School-owned **+** `result_run_id`. `student_id`/`subject_id` FKs; `percentage`, grade snapshot, `subject_position`, `is_adjusted` + `adjusted_by`/`adjusted_at`. `unique(result_run_id, student_id, subject_id)`, `index(school_id, student_id)`, `index(school_id, result_run_id, subject_id)`. |
+| `student_subject_result_components` | one weighted category's contribution to a subject result. School-owned **+** `student_subject_result_id` (short FK index name — see the migration). `assessment_category_id` (`nullOnDelete`), `category_name_snapshot`, `weight_percentage_snapshot`, `raw_score`/`raw_max_score`, `score_percentage`, `weighted_contribution`, `position` — every value snapshotted at compile time. `index(school_id, student_subject_result_id)`. |
+| `result_adjustments` | a proposed correction to a subject result. School-owned **+** `student_subject_result_id`. `field` (default `percentage`), `original_value`/`adjusted_value`, `reason`, `status` (`pending`/`applied`/`rejected`), `requested_by`/`requested_at` (required, not nullable), `decided_by`/`decided_at`. `index(school_id, student_subject_result_id)`, `index(school_id, status)`. A row alone changes nothing — only `apply()` does. |
+| `report_card_configurations` | which report-card fields are visible. School-owned. Nullable `academic_session_id`/`academic_period_id` (scope) + nullable, unique `result_run_id` (a per-run frozen snapshot, distinguished from the live scope rows sharing the same null/null scope only by this column). 24 `show_*` booleans (default all true), `principal_signature_path`/`class_teacher_signature_path` (M6 private-disk pattern). `unique(school_id, academic_session_id, academic_period_id)` — backstops only the fully-specific case; "at most one per exact scope" is enforced at the application layer (`ReportCardConfiguration::exactScopeRow()`), like M8's `AcademicSession::makeCurrent()`, since MySQL/SQLite treat two `NULL`s as distinct in a composite unique index. |
 | `school_modules` | per-school feature-module on/off overrides. School-owned. `unique(school_id, module)`. Override-only — a row exists only where a school departs from the `App\Enums\Module` default. |
 | `password_reset_tokens`, `sessions` | auth/session plumbing |
 | `cache`, `cache_locks` | `CACHE_STORE=database` |
@@ -274,6 +288,78 @@ The eligibility rule for both roster snapshots (an active `enrollments` row for
 the exact session/level/arm whose date range contains the assessment /
 assigned-on date) lives in `App\Models\Concerns\HasClassRoster`, not a DB
 constraint.
+
+### `2026_09_23_100000_*` — Results & Report Cards (Milestone 15)
+Twelve migrations, all school-owned (`BelongsToSchool`). See
+`docs/results-report-cards.md`.
+
+- **`add_purpose_to_assessments_table`** / **`add_source_to_assessment_scores_table`**
+  — two **additive** migrations onto M14's tables (the original M14 migrations
+  are untouched): `assessments.purpose` (`string(20)`, default `academic`,
+  `App\Enums\AssessmentPurpose`), `assessment_scores.source` (`string(15)`,
+  default `manual`, `App\Enums\ScoreSource`). Both indexed `(school_id, ...)`.
+- **`grading_schemes`** / **`grading_scheme_grades`** — `name`/`description`/
+  `is_default`/`is_active` on the scheme; `code`/`min_percentage`/
+  `max_percentage` (`decimal(5,2)`)/`remark`/`position`/`is_active` on each
+  grade. `unique(school_id, name)` on the scheme, `unique(grading_scheme_id,
+  code)` on grades. Non-overlapping active bands enforced in the Form
+  Request, not a DB constraint.
+- **`result_weighting_schemes`** / **`result_weighting_scheme_items`** — same
+  scheme shape; each item ties one `assessment_category_id` to a
+  `weight_percentage` (`decimal(5,2)`). `unique(result_weighting_scheme_id,
+  assessment_category_id)` — FK given a short explicit index name
+  (`weighting_scheme_items_scheme_fk`) to stay under MySQL's 64-character
+  identifier limit. Must sum to 100% (Form Request).
+- **`result_runs`** — context FKs session / period / level / arm (all
+  required) + `grading_scheme_id`/`result_weighting_scheme_id`
+  (`restrictOnDelete` — a scheme in use can't be deleted out from under a
+  run), `ranking_enabled` (default true), `status` (`App\Enums\ResultRunStatus`,
+  default `draft`, **not** mass-assignable), 5 nullable `*_by`(FK)/`*_at`
+  lifecycle pairs. `unique(school_id, session, period, level, arm)` — one run
+  per class per term. `index(school_id, status)`.
+- **`student_results`** — `result_run_id` FK (cascade), `student_id` FK
+  (cascade), `total_percentage`/`average_percentage` (`decimal`),
+  `class_teacher_comment`/`principal_comment` (`text`, nullable — the only
+  human-editable columns), `subject_count`, overall grade snapshot columns,
+  `position` (nullable), `class_size`, attendance rollup columns (all
+  nullable — null when the class has no submitted attendance data).
+  `unique(result_run_id, student_id)`, `index(school_id, student_id)`,
+  ranking index `(school_id, result_run_id, position)`.
+- **`student_subject_results`** — `result_run_id`/`student_id`/`subject_id`
+  FKs (cascade), `percentage`, `grading_scheme_grade_id` (`nullOnDelete`) +
+  grade snapshot columns, `subject_position` (nullable), `is_adjusted`
+  (default false) + `adjusted_by`/`adjusted_at`. `unique(result_run_id,
+  student_id, subject_id)`, `index(school_id, student_id)`,
+  `index(school_id, result_run_id, subject_id)`.
+- **`student_subject_result_components`** — `student_subject_result_id` FK
+  (cascade, short explicit index name `ssr_components_result_fk` for the same
+  64-character reason as above), `assessment_category_id` (`nullOnDelete`,
+  nullable), `category_name_snapshot`, `weight_percentage_snapshot`,
+  `raw_score`/`raw_max_score` (`decimal(6,2)`, nullable), `score_percentage`,
+  `weighted_contribution`, `position`. Every value is a **snapshot** taken at
+  compile time — none of it is re-derived from the category/scheme at render
+  time. `index(school_id, student_subject_result_id)`.
+- **`result_adjustments`** — `student_subject_result_id` FK (cascade),
+  `field` (default `percentage`), `original_value`/`adjusted_value`
+  (`decimal(5,2)`), `reason` (`text`, required), `status`
+  (`App\Enums\ResultAdjustmentStatus`, default `pending`), `requested_by` FK
+  (cascade, **required**, not nullable) + `requested_at` (**required**),
+  `decided_by`/`decided_at` (nullable). `index(school_id,
+  student_subject_result_id)`, `index(school_id, status)`.
+- **`report_card_configurations`** — nullable `academic_session_id`/
+  `academic_period_id` (the live scope) + nullable, **unique**
+  `result_run_id` (`constrained`, `cascadeOnDelete` — the per-run frozen
+  snapshot), `name` (default `'Default'`), 24 `show_*` booleans (all default
+  true), `principal_signature_path`/`class_teacher_signature_path` (nullable
+  string — M6 private-disk pattern). `unique(school_id,
+  academic_session_id, academic_period_id)` backstops only the fully-specific
+  (non-null) case — see the model note in the table listing above for why
+  "one row per scope" is an application-layer rule, not solely a DB one.
+
+The eligible-student rule for a run (an active `enrollments` row for the
+exact session/level/arm as of the term's `ends_on`) reuses
+`App\Models\Concerns\HasClassRoster` (M13/M14's trait) via
+`ResultRun::rosterDate()`.
 
 ### `2026_09_15_100000_create_school_modules_table`
 Milestone 7 — per-school feature/module activation. `module` (`string(40)`, an

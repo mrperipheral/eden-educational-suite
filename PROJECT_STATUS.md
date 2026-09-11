@@ -1,14 +1,14 @@
 # Project Status
 
-_Last updated: 2026-09-22_
+_Last updated: 2026-09-23_
 
 ## Current milestone
 
-**Milestone 14 — Assessment & Assignments: COMPLETE.**
+**Milestone 15 — Results & Report Cards: COMPLETE.**
 
-Next up: **Domain Modules** (Milestone 15+) — Results & Report Cards, Fees, CBT,
-Notifications, Portals, Promotion. Not started — do not begin without picking it
-up explicitly. See `docs/roadmap.md`.
+Next up: further **Domain Modules** — Fees, CBT, Notifications, Portals,
+Promotion. Not started — do not begin without picking one up explicitly. See
+`docs/roadmap.md`.
 
 ## What the application is
 
@@ -16,7 +16,7 @@ Multi-school School Management SaaS (management + portals only — no website
 features). PHP 8.3 · Laravel 13.31 · MySQL 8 · Blade + Tailwind v4 · Alpine.js ·
 Vite · PHPUnit · Pint.
 
-## Environment (verified 2026-09-22)
+## Environment (verified 2026-09-23)
 
 | Item | Value |
 |------|-------|
@@ -25,7 +25,7 @@ Vite · PHPUnit · Pint.
 | Node / npm | 22.x |
 | Database | MySQL 8 (app) · SQLite `:memory:` (tests) |
 | Local mail | Mailpit (`127.0.0.1:1025`, UI `:8025`) — `.env` only, not committed |
-| Tests | `php artisan test` — 615 passing |
+| Tests | `php artisan test` — 699 passing |
 | Build | `npm run build` — passing |
 | Formatting | `vendor/bin/pint --test` — passing |
 
@@ -44,8 +44,85 @@ Vite · PHPUnit · Pint.
 - **M11 — Teacher Management** (`teacher-management-complete`) — `docs/teacher-management.md`.
 - **M12 — Timetable Management** (`timetable-management-complete`) — `docs/timetable-management.md`.
 - **M13 — Attendance Management** (`attendance-management-complete`) — `docs/attendance-management.md`.
-- **M14 — Assessment & Assignments** (this milestone, `assessment-assignments-complete`) —
-  `docs/assessment-management.md`; see below.
+- **M14 — Assessment & Assignments** (`assessment-assignments-complete`) —
+  `docs/assessment-management.md`.
+- **M15 — Results & Report Cards** (this milestone, `results-report-cards-complete`) —
+  `docs/results-report-cards.md`; see below.
+
+## Delivered in Milestone 15
+
+Turns M14's locked assessment scores into configurable student results and
+printable report cards: school-defined grading + weighting schemes, a
+compile → review → approve → publish → lock lifecycle, class-position
+ranking, a controlled per-subject adjustment workflow, and a report card whose
+visible fields the school configures. Built on the existing `TenantContext` +
+`BelongsToSchool` + `Permission` + `module:results` seams, M8's
+`AcademicSession`/`AcademicPeriod` and M14's `Assessment`/`AssessmentScore` —
+no new mechanism, no new packages, no Redis/queues, no PDF library. Full
+detail in `docs/results-report-cards.md`.
+
+- **Enums** — `App\Enums\ResultRunStatus` (`draft`/`compiled`/`reviewed`/
+  `approved`/`published`/`locked`), `App\Enums\ResultAdjustmentStatus`
+  (`pending`/`applied`/`rejected`), `App\Enums\AssessmentPurpose`
+  (`academic`/`practice`/`entry_placement` — added to M14's `Assessment` via
+  an additive migration), `App\Enums\ScoreSource`
+  (`manual`/`online_cbt`/`imported` — added to M14's `AssessmentScore`).
+- **`App\Models\GradingScheme` + `GradingSchemeGrade`** — school-configured
+  percentage bands; `gradeFor(float): ?GradingSchemeGrade` is the one place a
+  percentage becomes a grade. Overlap/ordering validated server-side.
+- **`App\Models\ResultWeightingScheme` + `ResultWeightingSchemeItem`** — ties
+  an M14 `AssessmentCategory` to a weight; must sum to exactly 100%.
+- **`App\Models\ResultRun`** — one class, one term (`unique` per
+  session+period+level+arm); `status` / lifecycle timestamps **not**
+  mass-assignable — `review()`/`approve()`/`publish()`/`lock()` only.
+  `reportCardSnapshot(): HasOne` for the frozen per-run config.
+- **`App\Models\StudentResult` / `StudentSubjectResult` /
+  `StudentSubjectResultComponent`** — compiled results, **snapshotted** at
+  compile time (percentage, grade, raw score, weight) so they never change
+  when the grading/weighting scheme changes later.
+- **`App\Models\ResultAdjustment`** — a controlled propose → apply/reject
+  correction workflow; a proposal alone changes nothing; `apply()` re-derives
+  the grade via `GradingScheme::gradeFor()` and triggers a full ranking
+  recompute.
+- **`App\Models\ReportCardConfiguration`** — 24 independent `show_*`
+  booleans (typed/relational, not a JSON blob); school-wide/session/term
+  scope with documented precedence; a second, `result_run_id`-tagged row is
+  the immutable snapshot a locked run's report card renders from.
+- **Migrations** `2026_09_23_100000`–`100110` — 2 additive columns onto
+  M14's tables (`assessments.purpose`, `assessment_scores.source`) plus 10
+  new tables, all `BelongsToSchool`, `school_id`-leading indexes.
+- **`App\Services\Results\ResultCompiler`** — all-or-nothing compilation
+  (computes fully in memory, collects every missing-score issue, writes
+  nothing if any exist); bulk `insert`s (chunked 500); ranking + overall
+  totals refreshed via a single `UPDATE ... CASE id WHEN ... END` per chunk,
+  never one query per student.
+- **`App\Support\Results\{RankingCalculator,AttendanceSummarizer,
+  ResultAuthorizer}`** — pure-PHP competition ranking (portable across
+  MySQL/SQLite); a 2-query attendance rollup from M13 data (no duplication);
+  class-scoped teacher comment authorization (M13-pattern, no subject
+  dimension).
+- **`App\Http\Controllers\Results\*`** (8 controllers) +
+  `App\Http\Requests\Results\*` (10 requests) + `resources/views/results/*`
+  — grading/weighting scheme management, result run lifecycle with itemized
+  blocking-issue display, per-student adjustment UI, report-card
+  configuration (scope switcher, signature upload), and the report card
+  itself (same view for preview and final output).
+- **`Module::Results->isAvailable()`** flipped to `true` (on by default);
+  depends on **`Module::Assessments` only** — not Timetable/Attendance/CBT.
+  "Results" is a top-level nav item.
+- **Permissions** — new `result.manage` / `result.adjust`, reusing
+  `result.view`/`.enter`/`.publish` already declared in M4 (30 → 32).
+  `result.manage` + `.adjust` added to **Principal** (joining the existing
+  `.view`/`.enter`/`.publish`); `result.view` added to **Staff**. School
+  Admin auto.
+- **Seeder** — Alpha gets a Standard Grading scheme, a Standard Weighting
+  scheme, extra locked Mathematics/English assessments, and a fully
+  compiled → reviewed → approved → published → **locked** result run with a
+  snapshotted report-card configuration.
+- **Docs** — new `docs/results-report-cards.md`; updated `architecture.md`,
+  `authorization.md`, `database-design.md`, `security.md`, `scalability.md`,
+  `tenancy.md`, `roadmap.md`, `PROJECT_STATUS.md`, `ui-ux-guidelines.md`,
+  `CLAUDE.md`, `AGENTS.md`.
 
 ## Delivered in Milestone 14
 
@@ -225,6 +302,32 @@ auto-optimisation or student/parent views. Built on the existing `TenantContext`
   `tenancy.md`, `module-activation.md`, `roadmap.md`, `ui-ux-guidelines.md`,
   `CLAUDE.md`, `AGENTS.md`.
 
+## Authorization & tenant controls (M15)
+
+- **Two gates on every `/results/*` route:** `module:results` (404 when off)
+  **and** `->can('result.view'|'.enter'|'.manage'|'.publish'|'.adjust')`.
+  Module gate ≠ permission (a Bursar with the module on still gets 403 —
+  tested).
+- `ResultRun` / `StudentResult` / `StudentSubjectResult` /
+  `StudentSubjectResultComponent` / `ResultAdjustment` /
+  `ReportCardConfiguration` / `GradingScheme(Grade)` /
+  `ResultWeightingScheme(Item)` are all `BelongsToSchool`; child rows also
+  carry their parent FK. `school_id` never from input, immutable. Bulk
+  `insert`s in `ResultCompiler` set `school_id` from `TenantContext`
+  explicitly (raw `insert` bypasses the `creating` hook).
+- Every id in a run/adjustment/config payload uses
+  `Rule::exists(...)->where('school_id', <tenant>)` → generic "invalid", no
+  leak. Route ids resolved by tenant-scoped `findOrFail`. A
+  `ReportCardConfiguration` write always goes through
+  `exactScopeRow()`/`whereNull('result_run_id')` — never a raw
+  `updateOrCreate` on scope columns alone, which could otherwise match and
+  silently corrupt a locked run's frozen snapshot (the same (session=null,
+  period=null) scope columns are shared by the school-wide default and every
+  per-run snapshot; only `result_run_id` tells them apart). Explicit HTTP +
+  model cross-school isolation tests (view / compile / review / approve /
+  publish / lock / adjust / comment / configure-report-card / view-report-card
+  / view-signature — all 404 or 403 for School B).
+
 ## Authorization & tenant controls (M14)
 
 - **Two gates on every `/assessments/*` route:** `module:assessments` (404 when
@@ -250,8 +353,27 @@ auto-optimisation or student/parent views. Built on the existing `TenantContext`
 
 ## Database
 
+M15 adds two columns to M14's tables (`assessments.purpose`,
+`assessment_scores.source`, via additive migrations — the original M14
+migrations are untouched) and 10 new tables: `grading_schemes`,
+`grading_scheme_grades`, `result_weighting_schemes`,
+`result_weighting_scheme_items`, `result_runs`, `student_results`,
+`student_subject_results`, `student_subject_result_components`,
+`result_adjustments`, `report_card_configurations`.
+
 M14 adds `assessment_categories`, `assignments`, `assessments`,
 `assessment_scores` and `assignment_submissions`. No other schema changes.
+
+## Routes (application, additions in M15)
+
+Tenant-scoped + `module:results`, gated `result.view` / `.enter` / `.manage` /
+`.publish` / `.adjust`. ~30 routes under `/results/` (`results.grading-
+schemes.*`, `.grading-schemes.grades.*`, `.weighting-schemes.*`,
+`.weighting-schemes.items.*`, `.report-card-configuration.*` +
+`.principal-signature.*` + `.class-teacher-signature.*`, `.runs.*` —
+index/create/store/show/destroy/compile/review/approve/publish/lock/
+students.comment/students.report-card, `.adjustments.*` —
+store/apply/reject).
 
 ## Routes (application, additions in M14)
 
@@ -263,6 +385,39 @@ scores.update/scores.sync/publish/unpublish/lock/unlock; `assessments.categories
 submissions.edit/submissions.update/publish/unpublish/close/reopen).
 
 ## Tests
+
+699 passing (was 615 at M14; +84 in M15, M1–M14 intact). New
+`tests/Feature/Results/*` (+ `ResultsTestCase` base) — `GradingSchemeTest`,
+`WeightingSchemeTest`, `ResultRunTest`, `ResultCompilationTest`,
+`ResultLifecycleTest`, `ResultAdjustmentTest`, `ResultAuthorizationTest`,
+`ReportCardTest`, `ResultStructureTest`: grading scheme create/edit,
+overlap/ordering/duplicate-code rejection, `gradeFor()` calculation; weighting
+scheme create/edit, duplicate-category rejection, cross-school category
+rejection; run creation, cross-context rejection, incomplete-weighting
+rejection, one-run-per-class-per-term uniqueness, list filters, tenant
+isolation; compilation — only-locked-included, draft/unlocked doesn't
+count/block, missing-score blocks with itemized issues, no-students/no-subjects
+block, weighted percentage + grade math, competition ranking with ties,
+position scoped to the run not the school, ranking-disabled means no position,
+recompiling replaces stale rows, no cross-school leakage; lifecycle — full
+draft→locked path, out-of-order transitions rejected, role restrictions,
+locked run rejects recompilation, run-with-results can't be deleted;
+adjustment — proposal inert until applied, applying updates value + re-derives
+grade + recomputes whole-run ranking, rejection inert, decided can't
+re-decide, unavailable before approval, value-must-differ, teacher forbidden,
+tenant isolation; authorization — all 7 roles + role-less, module off → 404,
+module on without permission → 403, class-scoped teacher comment (own class
+only, principal comment blocked); report card — fields-shown-per-config, scope
+precedence, branding/comments/position, unavailable before compilation, tenant
+isolation, publish snapshots the config, a later config change never alters a
+**locked** run's report card, an unlocked run's preview reflects the *live*
+config; structure — column allow-lists (no premature derived fields), raw
+score/max populated from the locked assessment, compiling/index/show/report-
+card query counts stay flat as class size and subject count grow, a locked
+run's grade/weights/category-name/results survive a later grading-scheme
+edit / weighting-scheme edit / category rename / student status change. New
+`tests/Unit/Enums/ResultsEnumsTest`. `Unit/Enums/ModuleTest` updated
+(available list).
 
 615 passing (was 526 at M13; +89 in M14, M1–M13 intact). New
 `tests/Feature/Assessment/*` (+ `AssessmentTestCase` base) — `AssessmentTest`,
@@ -301,11 +456,16 @@ check, DB duplicate prevention, assessment↔assignment link (same class only). 
 ## Known follow-ups / recommendations
 
 - Production env: `SESSION_SECURE_COOKIE=true`, real `MAIL_MAILER`, `APP_DEBUG=false`.
-- Next milestone: Results & Report Cards (compile from M14 assessment scores).
-- **Assessment follow-ups** — grading schemes, report cards, subject/term/session
-  averages, positions/ranking, GPA, assignment file attachments + online
-  submission, automated grading, assessment weighting, per-student submission on
-  the portal.
+- Next milestone: pick a further domain module (Fees, CBT, Notifications,
+  Portals, Promotion) — see `docs/roadmap.md`.
+- **Results follow-ups** — PDF export (browser print covers it for now),
+  per-level/per-arm report-card configuration overrides, bulk "unlock" of an
+  approved/published/locked run, signature-image snapshotting per run,
+  student photo capture (M9), CBT/Question Bank (the `AssessmentPurpose` /
+  `ScoreSource` enums are ready for it), advanced result analytics, automatic
+  report-card comments, a full drag-and-drop report-card designer.
+- **Assessment follow-ups** — assignment file attachments + online
+  submission, automated grading, per-student submission on the portal.
 - **Attendance follow-ups** — attendance rate / percentage analytics, term &
   monthly reports, per-lesson (timetable-driven) registers, portal attendance
   views, absence notifications, an attendance-reason taxonomy, half-day records.

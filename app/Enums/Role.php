@@ -85,7 +85,9 @@ enum Role: string
                 Permission::AssessmentManage,
                 Permission::ResultView,
                 Permission::ResultEnter,
+                Permission::ResultManage,
                 Permission::ResultPublish,
+                Permission::ResultAdjust,
                 Permission::FinanceView,
             ],
 
@@ -120,6 +122,7 @@ enum Role: string
                 Permission::TimetableView,
                 Permission::AttendanceView,
                 Permission::AssessmentView,
+                Permission::ResultView,
             ],
 
             self::Parent => [

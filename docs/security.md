@@ -282,6 +282,26 @@ Full detail in `docs/assessment-management.md`. Summary of controls:
 | No premature derived data | column allow-list tests assert `assessments` / `assessment_scores` have no `final_grade` / `percentage` / `subject_average` / `position` / `gpa` / `grade` |
 | CSRF | every form; `@method('PATCH'|'DELETE')` spoofing |
 
+## Implemented in Milestone 15 (Results & Report Cards)
+
+Full detail in `docs/results-report-cards.md`. Summary of controls:
+
+| Control | How |
+|---------|-----|
+| Two gates on every results route | `module:results` (feature on? else 404) **and** `->can('result.view'|'.enter'|'.manage'|'.publish'|'.adjust')` |
+| Enforced permissions | `result.view` (+ Staff) / `result.enter` (+ Teacher, class-scoped) / `result.manage` / `result.publish` / `result.adjust` (School Admin, Principal); **Bursar / Parent / Student / role-less → 403** (tested) |
+| Activation ≠ authorization | Results module on does not give a Bursar `result.view` (tested) |
+| Teacher scoping | `ResultAuthorizer` — a `.enter`-only teacher may comment only on a run for a `(level, arm)` they hold an **active** M11 assignment for; the principal comment can only ever be set by a `.manage` holder, even in the same request (`ResultCommentRequest::payload()` conditionally includes it) |
+| Tenant isolation | every result model is `BelongsToSchool`; child rows carry their parent FK. School A cannot view / compile / review / approve / publish / lock / adjust / comment-on / configure-report-card-for School B's run (404/403), cannot create a run referencing School B's session/level/scheme ("invalid") |
+| Lifecycle protection | `status` and every `*_by`/`*_at` pair **not mass-assignable** — only `review()`/`approve()`/`publish()`/`lock()`; an approved-or-later run's numbers change only through the `ResultAdjustment` workflow, never a direct edit |
+| Locked-result mutation | a `locked` run rejects recompilation (403-equivalent redirect with an error); an adjustment is only accepted once the run `requiresAdjustment()` (approved/published/locked) |
+| Report-card / signature access | gated `result.view`; signatures are streamed through the M6 private-disk pattern, never web-served directly; the branding logo is hidden from a viewer who lacks `school.settings.view` (no broken-image icon) |
+| Historical-snapshot integrity | every live-scope read/write of `ReportCardConfiguration` filters `whereNull('result_run_id')` explicitly (`exactScopeRow()`), because a per-run frozen snapshot shares the same (session=null, period=null) scope columns as the school-wide default — an unguarded `updateOrCreate` on scope columns alone could otherwise find and silently overwrite a locked run's snapshot; this was caught and fixed during M15's own test-driven development |
+| No missing-score manufacturing | compilation collects every gap as an itemized, named issue and writes **nothing** if any exist — never a silent zero |
+| Cross-school id leakage | every session / period / level / arm / scheme id validated with `Rule::exists(...)->where('school_id', <tenant>)` → plain "invalid" |
+| No premature derived data | column allow-list tests assert the compiled tables carry only the designed columns — no extra derived fields beyond what M15 stores |
+| CSRF | every form; `@method('PATCH'|'DELETE')` spoofing |
+
 ## Deferred (with the milestone that owns them)
 
 - **Auth follow-ups:** 2FA, "log out other devices" on password change, session
@@ -291,7 +311,7 @@ Full detail in `docs/assessment-management.md`. Summary of controls:
   audit logging of role & membership changes, enforcing the remaining dormant
   domain permissions (each in its module — `academics.*` in M8, `student.*` in
   M9, `guardian.*` in M10, `staff.*` in M11, `timetable.*` in M12,
-  `attendance.*` in M13, `assessment.*` in M14).
+  `attendance.*` in M13, `assessment.*` in M14, `result.*` in M15).
 - **Tenancy follow-ups:** queue-job tenant propagation, per-tenant rate limiting,
   per-tenant cache keys, audit logging of context switches.
 - **Later:** audit logging (who did what, per school — incl. student record /

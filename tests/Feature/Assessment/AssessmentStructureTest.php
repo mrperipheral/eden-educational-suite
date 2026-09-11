@@ -45,7 +45,7 @@ class AssessmentStructureTest extends AssessmentTestCase
         $this->assertSame([
             'academic_level_id', 'academic_period_id', 'academic_session_id', 'assessment_category_id',
             'assessment_date', 'assignment_id', 'created_at', 'created_by', 'id', 'instructions',
-            'level_arm_id', 'locked_at', 'locked_by', 'max_score', 'published_at', 'school_id',
+            'level_arm_id', 'locked_at', 'locked_by', 'max_score', 'published_at', 'purpose', 'school_id',
             'status', 'subject_id', 'title', 'updated_at',
         ], $columns);
 
@@ -61,7 +61,7 @@ class AssessmentStructureTest extends AssessmentTestCase
 
         $this->assertSame([
             'assessment_id', 'comment', 'created_at', 'id', 'recorded_at', 'recorded_by',
-            'school_id', 'score', 'student_id', 'updated_at',
+            'school_id', 'score', 'source', 'student_id', 'updated_at',
         ], $columns);
 
         foreach (['grade', 'percentage', 'remark_grade', 'position'] as $forbidden) {

@@ -16,7 +16,11 @@ use App\Models\Assessment;
 use App\Models\AssessmentCategory;
 use App\Models\Assignment;
 use App\Models\AttendanceRegister;
+use App\Models\GradingScheme;
 use App\Models\Guardian;
+use App\Models\ReportCardConfiguration;
+use App\Models\ResultRun;
+use App\Models\ResultWeightingScheme;
 use App\Models\School;
 use App\Models\SchoolModule;
 use App\Models\Student;
@@ -24,6 +28,7 @@ use App\Models\Subject;
 use App\Models\Teacher;
 use App\Models\Timetable;
 use App\Models\User;
+use App\Services\Results\ResultCompiler;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Database\Seeder;
 
@@ -430,6 +435,88 @@ class DatabaseSeeder extends Seeder
         $draftAssignment->eligibleStudents()->get()->each(fn (Student $student) => $draftAssignment->submissions()->create([
             'student_id' => $student->id,
         ]));
+
+        // Results & report cards — a grading scheme, a weighting scheme, a
+        // second subject fully locked and scored alongside Mathematics, and a
+        // compiled, published, locked result run for Primary 1 Gold's first
+        // term. Homework stays outside the weighting scheme — a category a
+        // school simply hasn't chosen to weight.
+        $grading = GradingScheme::create(['name' => 'Standard Grading', 'description' => 'The school\'s default A-F scale.']);
+        foreach ([
+            ['A', 70, 100, 'Excellent', 1], ['B', 60, 69.99, 'Very Good', 2], ['C', 50, 59.99, 'Good', 3],
+            ['D', 45, 49.99, 'Fair', 4], ['E', 40, 44.99, 'Pass', 5], ['F', 0, 39.99, 'Fail', 6],
+        ] as [$code, $min, $max, $remark, $pos]) {
+            $grading->grades()->create(['code' => $code, 'min_percentage' => $min, 'max_percentage' => $max, 'remark' => $remark, 'position' => $pos]);
+        }
+
+        $weighting = ResultWeightingScheme::create(['name' => 'Standard Weighting', 'description' => 'Classwork 20% / Test 30% / Examination 50%.']);
+        $weighting->items()->create(['assessment_category_id' => $categories[0]->id, 'weight_percentage' => 20, 'position' => 1]); // Classwork
+        $weighting->items()->create(['assessment_category_id' => $categories[2]->id, 'weight_percentage' => 30, 'position' => 2]); // Test
+        $weighting->items()->create(['assessment_category_id' => $categories[3]->id, 'weight_percentage' => 50, 'position' => 3]); // Examination
+
+        $english = $subjects->firstWhere('code', 'ENG');
+        $p1GoldRoster = $lockedAssessment->eligibleStudents()->get();
+
+        // A locked "Test" and "Examination" assessment for Mathematics, on top
+        // of the already-locked "Classwork" assessment above.
+        foreach ([
+            [$categories[2], 'First Term Test — Numbers (Final)', '2025-11-01', 20, [16, 18, 14, 12, 19, 17, 15, 13]],
+            [$categories[3], 'First Term Examination', '2025-12-01', 100, [78, 85, 65, 58, 90, 74, 69, 61]],
+        ] as [$category, $title, $date, $max, $scores]) {
+            $assessment = Assessment::create([
+                ...$mathsContext, 'assessment_category_id' => $category->id, 'title' => $title,
+                'assessment_date' => $date, 'max_score' => $max,
+            ]);
+            $assessment->created_by = $admin->id;
+            $assessment->save();
+            $p1GoldRoster->each(fn (Student $student, int $i) => $assessment->scores()->create([
+                'student_id' => $student->id, 'score' => $scores[$i % count($scores)],
+            ]));
+            $assessment->publish();
+            $assessment->lock($admin);
+        }
+
+        // A full, fully-scored English set (Classwork / Test / Examination).
+        $englishContext = [...$mathsContext, 'subject_id' => $english->id];
+        foreach ([
+            [$categories[0], 'Week 2 Classwork — Reading', '2025-09-19', 10, [7, 9, 6, 5, 10, 8, 7, 6]],
+            [$categories[2], 'First Term Test — Comprehension', '2025-11-01', 20, [14, 17, 12, 10, 18, 15, 13, 11]],
+            [$categories[3], 'First Term Examination', '2025-12-01', 100, [72, 88, 60, 55, 92, 70, 66, 58]],
+        ] as [$category, $title, $date, $max, $scores]) {
+            $assessment = Assessment::create([
+                ...$englishContext, 'assessment_category_id' => $category->id, 'title' => $title,
+                'assessment_date' => $date, 'max_score' => $max,
+            ]);
+            $assessment->created_by = $admin->id;
+            $assessment->save();
+            $p1GoldRoster->each(fn (Student $student, int $i) => $assessment->scores()->create([
+                'student_id' => $student->id, 'score' => $scores[$i % count($scores)],
+            ]));
+            $assessment->publish();
+            $assessment->lock($admin);
+        }
+
+        $resultRun = ResultRun::create([
+            'academic_session_id' => $session->id,
+            'academic_period_id' => $firstTerm?->id,
+            'academic_level_id' => $p1->id,
+            'level_arm_id' => $p1Gold->id,
+            'grading_scheme_id' => $grading->id,
+            'result_weighting_scheme_id' => $weighting->id,
+        ]);
+        app(ResultCompiler::class)->compile($resultRun, $admin);
+        $resultRun->refresh();
+        $resultRun->review($admin);
+        $resultRun->approve($admin);
+        $resultRun->publish($admin);
+        ReportCardConfiguration::snapshotForRun($resultRun);
+        $resultRun->lock($admin);
+
+        $defaultReportCardConfiguration = ReportCardConfiguration::exactScopeRow(null, null);
+        if (! $defaultReportCardConfiguration->exists) {
+            $defaultReportCardConfiguration->fill(['name' => 'Alpha Academy default', 'show_student_photo' => false]);
+            $defaultReportCardConfiguration->save();
+        }
 
         // One graduated student with a completed placement — history is kept.
         $alumnus = Student::factory()->status(StudentStatus::Graduated)->create(['first_name' => 'Ada', 'last_name' => 'Obi']);

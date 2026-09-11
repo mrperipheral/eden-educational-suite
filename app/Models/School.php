@@ -146,6 +146,30 @@ class School extends Model
     }
 
     /**
+     * @return HasMany<GradingScheme, $this>
+     */
+    public function gradingSchemes(): HasMany
+    {
+        return $this->hasMany(GradingScheme::class);
+    }
+
+    /**
+     * @return HasMany<ResultWeightingScheme, $this>
+     */
+    public function resultWeightingSchemes(): HasMany
+    {
+        return $this->hasMany(ResultWeightingScheme::class);
+    }
+
+    /**
+     * @return HasMany<ResultRun, $this>
+     */
+    public function resultRuns(): HasMany
+    {
+        return $this->hasMany(ResultRun::class);
+    }
+
+    /**
      * @return HasMany<Timetable, $this>
      */
     public function timetables(): HasMany
