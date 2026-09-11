@@ -148,11 +148,16 @@ enum Module: string
      *     assessment scores, class position, and a configurable, printable
      *     report card (`docs/results-report-cards.md`). Depends on
      *     `assessments` only — not Timetable, Attendance or CBT.
+     *   - `parent-portal` — Parent Portal (M16): a secure, read-only,
+     *     child-scoped window for a signed-in parent onto their own
+     *     children's published data (results, report cards, attendance,
+     *     assignments, timetable) — see `docs/parent-portal.md`. Depends on
+     *     `guardians` only.
      */
     public function isAvailable(): bool
     {
         return match ($this) {
-            self::Academics, self::Students, self::Guardians, self::Staff, self::Timetable, self::Attendance, self::Assessments, self::Results => true,
+            self::Academics, self::Students, self::Guardians, self::Staff, self::Timetable, self::Attendance, self::Assessments, self::Results, self::ParentPortal => true,
             default => false,
         };
     }

@@ -100,7 +100,8 @@ Applied in `routes/web.php` to the tenant-scoped group: `/dashboard`,
 `/students/*` (also `module:students`), `/guardians/*` (also `module:guardians`),
 `/teachers/*` (also `module:staff`), `/timetables/*` (also `module:timetable`),
 `/attendance/*` (also `module:attendance`), `/assessments/*` (also
-`module:assessments`), `/results/*` (also `module:results`).
+`module:assessments`), `/results/*` (also `module:results`), `/parent/*`
+(also `module:parent-portal`).
 Account-level routes (`/settings/profile`, `/settings/password`, `/school`) and
 platform routes (`/admin/schools*`) do **not** use it.
 
@@ -132,7 +133,13 @@ parent in the join (see `docs/academic-foundation.md`,
 `docs/student-management.md`, `docs/guardian-management.md`,
 `docs/teacher-management.md`, `docs/timetable-management.md`,
 `docs/attendance-management.md`, `docs/assessment-management.md`,
-`docs/results-report-cards.md`). All follow the pattern:
+`docs/results-report-cards.md`). Milestone 16 introduces no new
+`BelongsToSchool` model — it adds one column (`Guardian.user_id`) and reads
+every other milestone's existing tenant-scoped models through a new
+non-model service, `App\Support\Portal\ParentPortalAuthorizer` (see
+`docs/parent-portal.md`), which is itself tenant-safe only because every
+query it issues goes through an already-`BelongsToSchool` model. All follow
+the pattern:
 
 ```php
 use App\Support\Tenancy\Concerns\BelongsToSchool;

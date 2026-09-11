@@ -1,14 +1,14 @@
 # Project Status
 
-_Last updated: 2026-09-23_
+_Last updated: 2026-09-24_
 
 ## Current milestone
 
-**Milestone 15 — Results & Report Cards: COMPLETE.**
+**Milestone 16 — Parent Portal: COMPLETE.**
 
-Next up: further **Domain Modules** — Fees, CBT, Notifications, Portals,
-Promotion. Not started — do not begin without picking one up explicitly. See
-`docs/roadmap.md`.
+Next up: further **Domain Modules** — Fees, CBT, Notifications, Student
+Portal, Promotion. Not started — do not begin without picking one up
+explicitly. See `docs/roadmap.md`.
 
 ## What the application is
 
@@ -16,7 +16,7 @@ Multi-school School Management SaaS (management + portals only — no website
 features). PHP 8.3 · Laravel 13.31 · MySQL 8 · Blade + Tailwind v4 · Alpine.js ·
 Vite · PHPUnit · Pint.
 
-## Environment (verified 2026-09-23)
+## Environment (verified 2026-09-24)
 
 | Item | Value |
 |------|-------|
@@ -25,7 +25,7 @@ Vite · PHPUnit · Pint.
 | Node / npm | 22.x |
 | Database | MySQL 8 (app) · SQLite `:memory:` (tests) |
 | Local mail | Mailpit (`127.0.0.1:1025`, UI `:8025`) — `.env` only, not committed |
-| Tests | `php artisan test` — 699 passing |
+| Tests | `php artisan test` — 761 passing |
 | Build | `npm run build` — passing |
 | Formatting | `vendor/bin/pint --test` — passing |
 
@@ -46,8 +46,72 @@ Vite · PHPUnit · Pint.
 - **M13 — Attendance Management** (`attendance-management-complete`) — `docs/attendance-management.md`.
 - **M14 — Assessment & Assignments** (`assessment-assignments-complete`) —
   `docs/assessment-management.md`.
-- **M15 — Results & Report Cards** (this milestone, `results-report-cards-complete`) —
-  `docs/results-report-cards.md`; see below.
+- **M15 — Results & Report Cards** (`results-report-cards-complete`) —
+  `docs/results-report-cards.md`.
+- **M16 — Parent Portal** (this milestone, `parent-portal-complete`) —
+  `docs/parent-portal.md`; see below.
+
+## Delivered in Milestone 16
+
+A secure, read-only, child-scoped window for a signed-in parent onto their
+own children's published data. Built on the existing `TenantContext` +
+`BelongsToSchool` + `Permission` + `module:parent-portal` seams, the M2
+`User` account, M10's `Guardian`/`GuardianStudent` relationship, and
+M9/M12/M13/M14/M15's own data — no second authentication system, no second
+tenancy mechanism, no second report-card generator. Full detail in
+`docs/parent-portal.md`.
+
+- **`Guardian.user_id`** (new, additive column via migration
+  `2026_09_24_100000_add_user_id_to_guardians_table.php` — M10's own
+  migration untouched) — nullable, unique per school, **not**
+  mass-assignable, set only through `GuardianController::updateUser()`
+  (mirrors `Teacher.user_id` from M11 exactly). A `User` is not automatically
+  a `Guardian` — the two stay separate concepts.
+- **`App\Support\Portal\ParentPortalAuthorizer`** — the one seam every portal
+  controller uses: `guardianFor()`, `studentsFor()`, `authorizedStudent()`.
+  Tenant-scoped for free (`Guardian` is `BelongsToSchool`); a student id is
+  never trusted from the URL until proven to be one of that guardian's own
+  linked children.
+- **`App\Services\Results\ReportCardRenderer`** — extracted from M15's own
+  `Results\ReportCardController` (identical behaviour; the M15 test suite
+  passed unchanged) so the school/staff report card and the Parent Portal's
+  report card share **one** renderer, never a duplicated generator.
+- **`App\Http\Controllers\Portal\*`** (8 thin controllers) +
+  `resources/views/parent/*` — dashboard ("My Children"), child profile, a
+  child-scoped tab nav + "switch child" dropdown
+  (`resources/views/parent/_child-nav.blade.php`), results, report cards
+  (reusing the renderer above), attendance (reusing M15's
+  `AttendanceSummarizer`), assignments (M14's `AssignmentSubmission`,
+  paginated), timetable (M12's published timetable for the child's current
+  class), and a read-only guardian profile.
+- **Result & report-card visibility** — `App\Enums\ResultRunStatus::
+  visibleToParents()` (new, small, additive method): only `published` /
+  `locked` runs are ever shown to a parent — M15 has no dedicated
+  parent-visibility flag, documented as the safest interpretation.
+  `App\Enums\AssignmentStatus::visibleToParents()` similarly gates
+  assignments to `published`/`closed`, never `draft`.
+- **Bug fixed during this milestone's own reuse of the M15 report card
+  view**: its "← Result run" back-link pointed at a staff-only page — a
+  parent clicking it would have hit a 403. Now audience-aware
+  (`@can('result.view')` vs. a Parent Portal link).
+- **`Module::ParentPortal->isAvailable()`** flipped to `true` (on by default,
+  declared since M7); depends on **`Module::Guardians` only**. A Parent-role
+  member is redirected from `/dashboard` straight to `/parent`
+  (`DashboardController`); the main nav renders a portal-specific link set
+  for them instead of the (near-empty, for a parent) admin nav.
+- **No new permission** — reuses `Permission::PortalParent` (`portal.parent`),
+  declared since M4, enforced for the first time here. `Role::SchoolAdmin`
+  also holds it (full bundle) but is never itself a `Guardian`, so it sees
+  the same safe empty state as an unlinked parent.
+- **Seeder** — a Parent account (`parent@example.com`) linked to the existing
+  M10 "siblings sharing a guardian" record, extended to three children across
+  three classes (one with full M12/M13/M14/M15 data); `dual@example.com`
+  (Parent at Beta, Teacher at Alpha) demonstrates the "no linked guardian"
+  empty state and the two-different-families-two-different-schools case.
+- **Docs** — new `docs/parent-portal.md`; updated `architecture.md`,
+  `authorization.md`, `database-design.md`, `security.md`, `scalability.md`,
+  `tenancy.md`, `roadmap.md`, `PROJECT_STATUS.md`, `ui-ux-guidelines.md`,
+  `CLAUDE.md`, `AGENTS.md`.
 
 ## Delivered in Milestone 15
 
@@ -302,6 +366,30 @@ auto-optimisation or student/parent views. Built on the existing `TenantContext`
   `tenancy.md`, `module-activation.md`, `roadmap.md`, `ui-ux-guidelines.md`,
   `CLAUDE.md`, `AGENTS.md`.
 
+## Authorization & tenant controls (M16)
+
+- **Two gates on every `/parent/*` route:** `module:parent-portal` (404 when
+  off) **and** `->can('portal.parent')`. No new permission — `portal.parent`
+  was declared since M4.
+- Every `{student}` route param is resolved via `App\Support\Portal\
+  ParentPortalAuthorizer::authorizedStudent()`, never route-model-bound and
+  never trusted from the URL — it 404s unless the signed-in parent's own
+  `Guardian` record (in the active school) is linked to that exact student.
+  `{run}` is additionally re-checked against `ResultRunStatus::
+  visibleToParents()` before any result or report card is returned.
+- `Guardian.user_id` lookups are tenant-scoped for free (`Guardian` is
+  `BelongsToSchool`) — no second tenancy mechanism. Explicit HTTP tests prove
+  a parent cannot open an unrelated student in the same school, cannot reach
+  a student from another school by id, cannot use a second school membership
+  to reach that school's other families' children, and every child-scoped
+  page (results/report-cards/attendance/assignments/timetable) 404s for an
+  unauthorized child regardless of whether real data exists for them.
+- Admin-side linking (`GuardianController::updateUser()`, `guardian.manage`)
+  is tenant-scoped exactly like M11's `TeacherController::updateUser()`: the
+  account must be a member of the active school, `{guardian}` is
+  tenant-scoped `findOrFail`, and the same account may be linked to a
+  *different* guardian in a *different* school (`unique` per school).
+
 ## Authorization & tenant controls (M15)
 
 - **Two gates on every `/results/*` route:** `module:results` (404 when off)
@@ -353,6 +441,9 @@ auto-optimisation or student/parent views. Built on the existing `TenantContext`
 
 ## Database
 
+M16 adds one column: `guardians.user_id` (nullable, additive — M10's own
+migration is untouched).
+
 M15 adds two columns to M14's tables (`assessments.purpose`,
 `assessment_scores.source`, via additive migrations — the original M14
 migrations are untouched) and 10 new tables: `grading_schemes`,
@@ -363,6 +454,15 @@ migrations are untouched) and 10 new tables: `grading_schemes`,
 
 M14 adds `assessment_categories`, `assignments`, `assessments`,
 `assessment_scores` and `assignment_submissions`. No other schema changes.
+
+## Routes (application, additions in M16)
+
+Tenant-scoped + `module:parent-portal`, gated `portal.parent`. 10 routes
+under `/parent/` (`parent.dashboard`, `.children.show`, `.results.*`,
+`.report-cards.*`, `.attendance.index`, `.assignments.index`,
+`.timetable.index`, `.profile.edit`) plus one addition to the existing
+Guardian routes: `PATCH /guardians/{guardian}/user` (`guardians.user`,
+`guardian.manage`).
 
 ## Routes (application, additions in M15)
 
@@ -385,6 +485,42 @@ scores.update/scores.sync/publish/unpublish/lock/unlock; `assessments.categories
 submissions.edit/submissions.update/publish/unpublish/close/reopen).
 
 ## Tests
+
+761 passing (was 699 at M15; +62 in M16, M1–M15 intact). New
+`tests/Feature/Portal/*` (+ `ParentPortalTestCase` base) —
+`ParentAuthorizationTest`, `ParentChildAccessTest`, `ParentResultTest`,
+`ParentReportCardTest`, `ParentAttendanceTest`, `ParentAssignmentTest`,
+`ParentTimetableTest`, `ParentProfileTest`, `ParentGuardianProtectionTest`,
+`ParentPortalStructureTest`: module off → 404, denied roles → 403,
+unauthenticated → redirect to login, no-linked-guardian /
+guardian-with-no-students safe empty states, School Admin sees the empty
+state rather than a leak, a Guardian record without the Parent role still
+denies access; own child accessible, unrelated student in the same school
+404s, student-id tampering blocked, cross-school student blocked, switching
+active school never exposes another family's child, multiple children all
+accessible, the child switcher never mixes up page content (only the
+switcher's own list of names), non-numeric/nonexistent id 404s; results —
+approved-but-unpublished invisible, published/locked visible with the
+correct weighted breakdown, wrong child / wrong school inaccessible, module
+off degrades gracefully; report cards — unpublished invisible, published
+renders via the shared `ReportCardRenderer` (and its audience-aware back
+link), locked stays reachable, wrong child / wrong school inaccessible;
+attendance — only the child's own data, a sibling's attendance never leaks
+into another child's page, no-data-yet and module-off empty states;
+assignments — published/closed visible, draft invisible, another student's
+submission never leaks, module-off empty state; timetable — published
+visible, draft invisible, no-current-enrollment and module-off empty states;
+guardian protection — a parent cannot link/unlink a student, create a link by
+posting directly, change a relationship or make themselves primary, or link
+their account to a different guardian record; structure — dashboard and
+child-page query counts stay flat as unrelated school size and the parent's
+own child count grow, resolving one authorized student never scans the whole
+table. New `tests/Feature/Guardian/GuardianUserLinkTest.php` (admin-side
+linking: link/unlink, must be a school member, uniqueness per school, same
+account linkable in a different school, view-only roles forbidden, tenant
+isolation). `Unit/Enums/ModuleTest` updated (available list).
+`Tests\Feature\Onboarding\OnboardingChecklistTest` updated (a Parent-role
+member is now redirected to the Parent Portal instead of seeing `/dashboard`).
 
 699 passing (was 615 at M14; +84 in M15, M1–M14 intact). New
 `tests/Feature/Results/*` (+ `ResultsTestCase` base) — `GradingSchemeTest`,
@@ -457,7 +593,14 @@ check, DB duplicate prevention, assessment↔assignment link (same class only). 
 
 - Production env: `SESSION_SECURE_COOKIE=true`, real `MAIL_MAILER`, `APP_DEBUG=false`.
 - Next milestone: pick a further domain module (Fees, CBT, Notifications,
-  Portals, Promotion) — see `docs/roadmap.md`.
+  Student Portal, Promotion) — see `docs/roadmap.md`.
+- **Parent Portal follow-ups** — a communication hub (WhatsApp/SMS/email;
+  this milestone is the foundation it will plug into), fee/payment visibility
+  (no finance module exists yet), the Student Portal (kept deliberately
+  separate), a full platform audit trail of parent access events, parent
+  self-service editing of guardian contact details, push notifications, the
+  inherited M15 report-card branding-logo gap (never renders for a Teacher /
+  Staff / Parent viewer — see `docs/parent-portal.md` §5).
 - **Results follow-ups** — PDF export (browser print covers it for now),
   per-level/per-arm report-card configuration overrides, bulk "unlock" of an
   approved/published/locked run, signature-image snapshotting per run,
@@ -465,14 +608,17 @@ check, DB duplicate prevention, assessment↔assignment link (same class only). 
   `ScoreSource` enums are ready for it), advanced result analytics, automatic
   report-card comments, a full drag-and-drop report-card designer.
 - **Assessment follow-ups** — assignment file attachments + online
-  submission, automated grading, per-student submission on the portal.
+  submission, automated grading, a Student Portal submission view (the
+  Parent Portal, M16, only ever reads an assignment's status).
 - **Attendance follow-ups** — attendance rate / percentage analytics, term &
-  monthly reports, per-lesson (timetable-driven) registers, portal attendance
-  views, absence notifications, an attendance-reason taxonomy, half-day records.
-- **Timetable follow-ups** — student/parent timetable views (portals), publish
-  notifications, a rooms/facilities module, timetable templates / term cloning,
-  named period grids, teacher workload limits.
-- **Teacher portal** / **Parent portal** — sign-in + invitations.
+  monthly reports, per-lesson (timetable-driven) registers, a Student Portal
+  attendance view (the parent one shipped in M16), absence notifications, an
+  attendance-reason taxonomy, half-day records.
+- **Timetable follow-ups** — a Student Portal timetable view (the parent one
+  shipped in M16), publish notifications, a rooms/facilities module,
+  timetable templates / term cloning, named period grids, teacher workload
+  limits.
+- **Teacher portal** — sign-in + invitations (Parent Portal delivered in M16).
 - Promotion / graduation workflow; bulk import; documents / photo.
 - Audit trail + data-erasure handling for student / guardian / teacher / timetable / attendance / assessment records.
 - Apply the stored `timezone` / `locale` / `date_format` at render time.

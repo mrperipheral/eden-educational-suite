@@ -9,7 +9,9 @@ use Illuminate\Support\Facades\Schema;
 /**
  * The clean domain boundaries M10 preserves:
  *   School → Guardians · Guardian ↔ Students · Student → Guardians
- * and nothing else (no teacher / attendance / fee / portal relationships).
+ * and nothing else (no teacher / attendance / fee relationships). `user()`
+ * (M16, `docs/parent-portal.md`) is a deliberate, later exception — the
+ * Parent Portal login link — not a boundary violation.
  */
 class GuardianStructureTest extends GuardianTestCase
 {
@@ -48,7 +50,7 @@ class GuardianStructureTest extends GuardianTestCase
     {
         $guardian = new Guardian;
 
-        foreach (['teachers', 'attendance', 'fees', 'invoices', 'payments', 'user', 'portalUser'] as $relation) {
+        foreach (['teachers', 'attendance', 'fees', 'invoices', 'payments'] as $relation) {
             $this->assertFalse(method_exists($guardian, $relation), "Guardian should not define `{$relation}()`");
         }
     }

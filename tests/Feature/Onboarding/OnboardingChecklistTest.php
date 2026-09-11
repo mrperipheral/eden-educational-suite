@@ -50,10 +50,22 @@ class OnboardingChecklistTest extends TestCase
     {
         $school = $this->newSchool();
 
-        foreach ([Role::Principal, Role::Teacher, Role::Bursar, Role::Parent, null] as $role) {
+        // Parent is excluded here — since M16, a Parent-role member is sent
+        // straight to their own Parent Portal (see
+        // test_a_parent_role_member_is_sent_to_the_parent_portal_instead below)
+        // rather than seeing the admin dashboard at all.
+        foreach ([Role::Principal, Role::Teacher, Role::Bursar, null] as $role) {
             $this->actingAsMemberOf($school, $role);
             $this->get('/dashboard')->assertOk()->assertDontSee('Finish setting up');
         }
+    }
+
+    public function test_a_parent_role_member_is_sent_to_the_parent_portal_instead(): void
+    {
+        $school = $this->newSchool();
+        $this->actingAsMemberOf($school, Role::Parent);
+
+        $this->get('/dashboard')->assertRedirect(route('parent.dashboard'));
     }
 
     public function test_admin_step_reflects_membership_not_the_viewer(): void

@@ -204,6 +204,30 @@ everything but the card; a "Print" button calls `window.print()`) — the
 roles (`result.view`) see runs, schemes and report cards with no create /
 compile / lifecycle / adjust controls.
 
+The **Parent Portal** (`resources/views/parent/`, `docs/parent-portal.md`,
+gated `portal.parent` + `module:parent-portal`) gets its own, much simpler
+nav — a Parent-role viewer sees **My Children** / **Profile** / **Account
+settings** in the main layout instead of the admin/staff link set, which
+would otherwise render almost empty for them (the layout branches on
+`roleIn() === Role::Parent`, reusing `<x-layouts.authenticated>` — no
+parallel layout component). **Dashboard** (`/parent`) is a grid of child
+cards (name, admission number, class + arm, session, term, status badge)
+linking into each child's profile. Every child-scoped page
+(`results/report-cards/attendance/assignments/timetable`) shares one partial,
+`resources/views/parent/_child-nav.blade.php`: a back-link to My Children, a
+horizontally-scrollable tab bar (mobile-first — wraps to a compact strip
+rather than overflowing the viewport), and, when the parent has more than one
+child, a **"Switch child"** dropdown listing every authorized child by name.
+Tabs are hidden (not merely disabled) for a section whose module is off for
+the school. Empty states are specific and reassuring
+(`x-empty-state`) — "No published results are available for this student
+yet", "No published timetable is currently available", etc. — never a raw
+"nothing found." The report card page is unchanged from M15 (print-styled,
+same view, same "Print" button) except its back-link is now audience-aware —
+a parent sees "← Report cards" instead of the staff-only run link. The
+Profile page is read-only cards, no edit form — a link out to the shared
+`/settings/profile` for login/account changes.
+
 Flash messages (`session('success' | 'error' | 'status')`) are rendered
 automatically by `<x-layouts.app>` as alerts.
 

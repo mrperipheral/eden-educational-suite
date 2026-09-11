@@ -62,10 +62,18 @@ class DatabaseSeeder extends Seeder
         User::factory()->create(['name' => 'Bola Bursar', 'email' => 'bursar@example.com'])
             ->joinSchool($alpha, Role::Bursar);
 
-        // Teacher at Alpha, Parent at Beta — the cross-school role case.
+        // Teacher at Alpha, Parent at Beta — the cross-school role case. Beta
+        // has no Guardian records at all, so this also demonstrates the
+        // Parent Portal's "no linked guardian" empty state (M16).
         $dual = User::factory()->create(['name' => 'Dele Dual', 'email' => 'dual@example.com']);
         $dual->joinSchool($alpha, Role::Staff);
         $dual->joinSchool($beta, Role::Parent);
+
+        // A Parent-role account for Alpha, linked (below, once the shared
+        // guardian exists) to Folake Ade's children — the Parent Portal
+        // (M16) sign-in.
+        $folakeUser = User::factory()->create(['name' => 'Folake Ade', 'email' => 'parent@example.com']);
+        $folakeUser->joinSchool($alpha, Role::Parent);
 
         // Alpha's school-owned onboarding data (created inside its tenant context).
         $tenant = app(TenantContext::class);
@@ -180,8 +188,11 @@ class DatabaseSeeder extends Seeder
             }
         });
 
-        // Siblings sharing a guardian.
+        // Siblings sharing a guardian — linked to the Parent Portal (M16)
+        // login above, so Folake Ade can sign in and see both children.
         $sharedGuardian = Guardian::factory()->create(['last_name' => 'Ade', 'first_name' => 'Folake']);
+        $sharedGuardian->user_id = $folakeUser->id;
+        $sharedGuardian->save();
         foreach ($cohort->slice(12, 2) as $sibling) {
             $sibling->guardianLinks()->create([
                 'guardian_id' => $sharedGuardian->id,
@@ -456,6 +467,16 @@ class DatabaseSeeder extends Seeder
 
         $english = $subjects->firstWhere('code', 'ENG');
         $p1GoldRoster = $lockedAssessment->eligibleStudents()->get();
+
+        // A third child for Folake Ade — from the Primary 1 Gold roster, so
+        // the Parent Portal (M16) demo account has one child with the full
+        // attendance / assessment / results / timetable picture alongside
+        // the two siblings above.
+        $p1GoldRoster->first()->guardianLinks()->create([
+            'guardian_id' => $sharedGuardian->id,
+            'relationship' => GuardianRelationship::LegalGuardian->value,
+            'is_primary' => false,
+        ]);
 
         // A locked "Test" and "Examination" assessment for Mathematics, on top
         // of the already-locked "Classwork" assessment above.

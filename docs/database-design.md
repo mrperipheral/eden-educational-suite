@@ -1,21 +1,22 @@
 # Database Design
 
-Status: Milestone 15. Tenant + roles + onboarding + school settings + module
+Status: Milestone 16. Tenant + roles + onboarding + school settings + module
 activation + academic foundation + student management + guardian management +
 teacher management + timetable management + attendance management + assessment &
-assignments + results & report cards. School-owned tables: `school_settings`
-(M6), `school_modules` (M7), the academic structure — `academic_sessions`,
-`academic_periods`, `academic_levels`, `level_arms`, `subjects`,
-`level_subject` (M8) — `students` + `enrollments` (M9), `guardians` +
-`guardian_student` (M10), `teachers` + `teacher_assignments` (M11),
-`timetables` + `timetable_entries` (M12), `attendance_registers` +
+assignments + results & report cards + parent portal. School-owned tables:
+`school_settings` (M6), `school_modules` (M7), the academic structure —
+`academic_sessions`, `academic_periods`, `academic_levels`, `level_arms`,
+`subjects`, `level_subject` (M8) — `students` + `enrollments` (M9),
+`guardians` + `guardian_student` (M10), `teachers` + `teacher_assignments`
+(M11), `timetables` + `timetable_entries` (M12), `attendance_registers` +
 `attendance_records` (M13), `assessment_categories`, `assignments`,
-`assessments`, `assessment_scores`, `assignment_submissions` (M14), and
+`assessments`, `assessment_scores`, `assignment_submissions` (M14),
 `grading_schemes`, `grading_scheme_grades`, `result_weighting_schemes`,
 `result_weighting_scheme_items`, `result_runs`, `student_results`,
 `student_subject_results`, `student_subject_result_components`,
-`result_adjustments`, `report_card_configurations` (M15). No fees tables yet.
-This document records the conventions every future migration follows.
+`result_adjustments`, `report_card_configurations` (M15). M16 adds no new
+table — only `guardians.user_id` (additive). No fees tables yet. This
+document records the conventions every future migration follows.
 
 ## Current schema
 
@@ -33,7 +34,7 @@ This document records the conventions every future migration follows.
 | `level_subject` | which subjects a level offers. School-owned. `unique(academic_level_id, subject_id)`, `index(school_id, academic_level_id)`. |
 | `students` | student records. School-owned. `unique(school_id, admission_number)`, `index(school_id, status)`, `index(school_id, last_name, first_name)`. Never hard-deleted. |
 | `enrollments` | a student's academic placement over time. School-owned **+** `student_id`. `index(school_id, student_id, status)`, roster index `(school_id, session, level, arm)`. One `active` row per student. |
-| `guardians` | parent / guardian contact records. School-owned. `index(school_id, last_name, first_name)`, `index(school_id, phone)`, `index(school_id, email)`. No global uniqueness; minimal contact data; never hard-deleted. |
+| `guardians` | parent / guardian contact records. School-owned. Optional `user_id` FK (`nullOnDelete`, M16 — the Parent Portal login link, mirrors `teachers.user_id`). `unique(school_id, user_id)`, `index(school_id, last_name, first_name)`, `index(school_id, phone)`, `index(school_id, email)`. No global uniqueness; minimal contact data; never hard-deleted. |
 | `guardian_student` | student ↔ guardian link. School-owned **+** `student_id` **+** `guardian_id`. `unique(student_id, guardian_id)`, `index(school_id, student_id, is_primary)`, `index(school_id, guardian_id)`. `relationship`, `is_primary` (at most one per student). |
 | `teachers` | teacher professional records. School-owned. Optional `user_id` FK (`nullOnDelete`). `unique(school_id, employee_number)`, `unique(school_id, user_id)`, `index(school_id, status)`, `index(school_id, last_name, first_name)`. Minimal professional data (no ID / financial / medical / credential fields); never hard-deleted. |
 | `teacher_assignments` | a teacher's teaching assignment over time. School-owned **+** `teacher_id`. FKs to session (req) / period (opt) / level (req) / arm (opt) / subject (req). `index(school_id, teacher_id, status)`, class-roster index `(school_id, session, level, arm)`, `index(school_id, subject_id)`. `status` (`active` / `ended`); history preserved. |
@@ -360,6 +361,21 @@ The eligible-student rule for a run (an active `enrollments` row for the
 exact session/level/arm as of the term's `ends_on`) reuses
 `App\Models\Concerns\HasClassRoster` (M13/M14's trait) via
 `ResultRun::rosterDate()`.
+
+### `2026_09_24_100000_add_user_id_to_guardians_table` — Parent Portal (Milestone 16)
+One migration, additive onto M10's `guardians` table (that migration is
+untouched). See `docs/parent-portal.md`.
+
+- **`user_id`** — `foreignId('user_id')->nullable()->after('school_id')
+  ->constrained()->nullOnDelete()`, plus `unique(['school_id', 'user_id'])` —
+  the exact shape of `teachers.user_id` (M11). Set only through
+  `GuardianController::updateUser()`, never mass-assigned; a `User` is not
+  automatically a `Guardian`.
+
+No new table — the Parent Portal reads M10's own `guardians` +
+`guardian_student` and reuses every other milestone's tables (`students`,
+`result_runs`, `student_results`, `attendance_registers`, `assignments`,
+`timetables`, ...) unchanged.
 
 ### `2026_09_15_100000_create_school_modules_table`
 Milestone 7 — per-school feature/module activation. `module` (`string(40)`, an

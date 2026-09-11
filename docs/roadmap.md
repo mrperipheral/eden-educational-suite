@@ -278,10 +278,45 @@ designer, PDF export (browser print for now), per-level report-card overrides,
 bulk unlock of an approved+ run, per-run signature snapshotting, student photo
 capture, notifications, a full audit-trail / retention workflow.
 
-## Milestone 16+ — Domain Modules
+## ✅ Milestone 16 — Parent Portal (complete, 2026-09-24)
 
-Fees / Invoices / Payments (Paystack) · CBT · Role-specific portals &
-dashboards · Notifications · Reporting · Promotion.
+A secure, read-only, child-scoped window for a signed-in parent onto their
+own children's published data. `Guardian.user_id` (new, additive column —
+M10's own migration untouched; nullable, unique per school, not
+mass-assignable, mirrors `Teacher.user_id` from M11) links an *existing*
+member account to a `Guardian` record via `GuardianController::updateUser()`
+— no accounts created, no invitations sent. `App\Support\Portal\
+ParentPortalAuthorizer` is the single seam every portal controller uses to
+resolve "which children may this parent see" — tenant-scoped for free
+(`Guardian` is `BelongsToSchool`), never trusting a student id from the URL
+until proven to be one of that guardian's own linked children via M10's
+`guardian_student` link (no second student-parent table). `App\Services\
+Results\ReportCardRenderer` was extracted from M15's own report-card
+controller (identical behaviour, M15's test suite unchanged) so the
+school/staff and parent report cards share one renderer. Result/report-card
+visibility uses the documented, safest interpretation of M15's lifecycle —
+`ResultRunStatus::visibleToParents()` (`published`/`locked` only), since M15
+has no dedicated parent-visibility flag. Attendance reuses M15's
+`AttendanceSummarizer`; assignments read M14's `AssignmentSubmission`
+(`AssignmentStatus::visibleToParents()` excludes drafts); timetable shows
+only a published M12 timetable for the child's current class. 8 thin
+controllers under `App\Http\Controllers\Portal\*`, `/parent/*` routes gated
+`module:parent-portal` (depends on `Guardians` only, declared since M7, now
+flipped available) **and** `->can('portal.parent')` (no new permission —
+declared since M4). A Parent-role member is redirected from `/dashboard`
+straight to `/parent`; the main nav renders a portal-specific link set for
+them. Full detail in `docs/parent-portal.md`.
+
+Deferred: a communication hub (WhatsApp/SMS/email — this milestone is the
+foundation it plugs into), fee/payment visibility (no finance module yet),
+the Student Portal (kept deliberately separate), a full platform audit trail
+of parent access events, parent self-service editing of guardian contact
+details, push notifications.
+
+## Milestone 17+ — Domain Modules
+
+Fees / Invoices / Payments (Paystack) · CBT · Student Portal ·
+Notifications · Reporting · Promotion.
 
 Each domain module checks its `App\Enums\Module` flag (`module:` middleware /
 `@module`) **and** its M4 permissions — the two stay orthogonal.

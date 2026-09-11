@@ -1,6 +1,6 @@
 # Architecture
 
-Status: Milestone 15 (Results & Report Cards) complete. This describes the intended
+Status: Milestone 16 (Parent Portal) complete. This describes the intended
 shape of the system and what exists today.
 
 ## 1. High-level model
@@ -435,12 +435,67 @@ no PDF library, no full audit-trail platform.
 
 ### Deferred
 
-Question Bank / CBT engine, Entry/Placement Assessment admin UI, student &
-parent portal result views, promotion & graduation, advanced transcripts,
-automatic report-card comments, a full drag-and-drop report-card designer,
-PDF export (browser print for now), per-level report-card overrides, bulk
-unlock of an approved+ run, per-run signature-image snapshotting, student
-photo capture, a full audit-trail / retention workflow.
+Question Bank / CBT engine, Entry/Placement Assessment admin UI, student
+portal result views (parent views ship in M16), promotion & graduation,
+advanced transcripts, automatic report-card comments, a full drag-and-drop
+report-card designer, PDF export (browser print for now), per-level
+report-card overrides, bulk unlock of an approved+ run, per-run
+signature-image snapshotting, student photo capture, a full audit-trail /
+retention workflow.
+
+## 2n. Parent Portal (implemented — Milestone 16)
+
+Full reference: **`docs/parent-portal.md`**. A secure, read-only,
+child-scoped window for a signed-in parent onto their own children's
+published data. No communication hub, no fee/payment visibility, no Student
+Portal, no full audit trail.
+
+- **`Guardian.user_id`** — new, additive column (M10's own migration
+  untouched); nullable, unique per school, **not** mass-assignable, set only
+  through `GuardianController::updateUser()` — mirrors `Teacher.user_id`
+  (M11) exactly. A `User` is not automatically a `Guardian`.
+- **`App\Support\Portal\ParentPortalAuthorizer`** — the single seam every
+  portal controller uses: `guardianFor()`, `studentsFor()`,
+  `authorizedStudent()`. Tenant-scoped for free (`Guardian` is
+  `BelongsToSchool` — no second tenancy mechanism); a student id is never
+  trusted from the URL until proven to be one of that guardian's own linked
+  children via M10's `guardian_student` link — no second student-parent
+  table.
+- **`App\Services\Results\ReportCardRenderer`** — extracted from M15's own
+  `Results\ReportCardController` during this milestone (identical
+  behaviour; M15's own test suite passed unchanged). The school/staff report
+  card and the Parent Portal's report card share this **one** renderer —
+  they differ only in *who may ask for which run/student*, never in how the
+  report card itself is built.
+- **Result & report-card visibility** — `ResultRunStatus::
+  visibleToParents()` (new, small, additive method): only `published` /
+  `locked` runs are ever shown to a parent. M15 has no dedicated
+  parent-visibility flag; this is the documented, safest interpretation.
+  `AssignmentStatus::visibleToParents()` similarly excludes `draft`
+  assignments.
+- **`App\Http\Controllers\Portal\*`** (8 thin controllers, one concern
+  each), `/parent/*` routes behind `['tenant', 'module:parent-portal']`,
+  gated `->can('portal.parent')` — **no new permission**, `Permission::
+  PortalParent` was declared since M4. `Module::ParentPortal->isAvailable()`
+  is now `true` (**on by default**); it **depends on `Module::Guardians`
+  only**. A Parent-role member is redirected from `/dashboard` straight to
+  `/parent`; the main nav renders a portal-specific link set for them.
+- Attendance/assignments/timetable/results all degrade to a clean, rendered
+  empty state (not a 404) when their underlying module is off, checked via
+  `SchoolModules` inside the controller — a route-level `module:` gate on
+  those specific pages would have 404'd the whole child page instead of
+  degrading just that one section.
+- Profile (`/parent/profile`) is deliberately **read-only** — M10 remains
+  the source of truth for guardian data; no write route exists for a parent
+  to self-edit their guardian record or M10 relationships.
+
+### Deferred
+
+A communication hub (WhatsApp/SMS/email — this milestone is the foundation
+it plugs into), fee/payment visibility (no finance module yet), the Student
+Portal (kept deliberately separate — no shared "generic portal" abstraction
+was introduced), a full platform audit trail of parent access events, parent
+self-service editing of guardian contact details, push notifications.
 
 ## 3. Application layers & conventions
 
@@ -553,3 +608,8 @@ pre-auth screens.
 | 2026-09-23 | A result correction is a `ResultAdjustment` propose→apply/reject workflow, not a direct field edit, and there is no bulk "unlock" of an approved+ run | keeps `result.adjust` from becoming a general editing bypass once numbers are meant to be frozen; a wholesale re-mark stays a deliberate, visible, per-subject act |
 | 2026-09-23 | `ReportCardConfiguration` is 24 independent typed boolean columns, not a JSON blob; a **second row** (`result_run_id` set) is the frozen per-run snapshot, taken at publish, used only once the run is **locked** | typed/relational stays queryable and matches every other model in the app; distinguishing "live" from "historical" by an extra row (not a duplicated column set on `ResultRun`) keeps one schema doing both jobs, at the cost of every live-scope query needing an explicit `whereNull('result_run_id')` guard |
 | 2026-09-23 | Signature *images* are not copied into the per-run snapshot — only the show/hide toggle freezes | re-signing after a staff change is expected to be more common than needing a pixel-identical historical signature; documented as a reviewable trade-off |
+| 2026-09-24 | `Guardian.user_id` added via a **new, additive migration** rather than editing M10's original `guardians` migration | keeps "don't reopen completed milestones" while letting the schema grow forward-compatibly, exactly the pattern M15 used for `assessments.purpose`/`assessment_scores.source` |
+| 2026-09-24 | Result/report-card visibility for parents uses `ResultRunStatus::visibleToParents()` (publication status alone), not a new dedicated flag on `ResultRun` | M15 has no such flag; adding one would mean reopening M15 for a single caller when the existing lifecycle already expresses "is this finished" precisely enough |
+| 2026-09-24 | `App\Services\Results\ReportCardRenderer` extracted from M15's `ReportCardController` rather than writing a second, parent-specific report-card query | "one secure renderer, authorization differs" avoids the two views drifting apart over time — a real bug (a stale staff-only back-link) surfaced immediately from sharing the exact same Blade template |
+| 2026-09-24 | The Parent Portal's "selected child" is **not** a second global tenant context — every child-scoped route names the student explicitly in its own URL | keeps URLs shareable/bookmarkable and re-validates ownership on every request; avoids inventing session-based portal state alongside the existing `TenantContext` |
+| 2026-09-24 | A parent's guardian profile (`/parent/profile`) is read-only; no write route was built for guardian self-edit | M10 remains the source of truth for guardian data; a self-edit workflow (with its own validation/authorization) was judged out of scope for "the smallest clean changes necessary" |

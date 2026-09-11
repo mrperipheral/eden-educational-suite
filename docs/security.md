@@ -302,6 +302,24 @@ Full detail in `docs/results-report-cards.md`. Summary of controls:
 | No premature derived data | column allow-list tests assert the compiled tables carry only the designed columns — no extra derived fields beyond what M15 stores |
 | CSRF | every form; `@method('PATCH'|'DELETE')` spoofing |
 
+## Implemented in Milestone 16 (Parent Portal)
+
+Full detail in `docs/parent-portal.md`. Summary of controls:
+
+| Control | How |
+|---------|-----|
+| Two gates on every `/parent/*` route | `module:parent-portal` (feature on? else 404) **and** `->can('portal.parent')` — no new permission, declared since M4 |
+| No trust in URL ids | every `{student}` is resolved via `ParentPortalAuthorizer::authorizedStudent()` — a wrong id, another family's child, or a cross-school id all 404 identically, regardless of whether real data exists for that id |
+| Tenant isolation | `Guardian` is `BelongsToSchool`; `guardianFor()` is scoped to the active tenant automatically; explicit HTTP tests prove a parent cannot open an unrelated student in the same school, cannot reach a student from another school, and switching the active school context never exposes another family's child (resolves that school's own Guardian link, or the empty state) |
+| Least-privilege data linkage, not just permission | `Role::SchoolAdmin` also holds `portal.parent` (full bundle) but is never itself a `Guardian`, so it sees the same "no linked children" empty state as an unlinked parent — permission and data-linkage protect independently at two layers (tested) |
+| Result / report-card visibility | only `published`/`locked` result runs are ever reachable (`ResultRunStatus::visibleToParents()`); an approved-but-unpublished run 404s even when the correct child id is used |
+| Assignment / attendance isolation | every query is scoped `where('student_id', $studentModel->id)` — another student's submission, or a sibling's attendance, never appears on a different child's page (tested) |
+| Guardian-relationship protection | no route exists for a parent to link/unlink a student, change a relationship type, make themselves primary, or link their account to a different guardian record — every M10 write stays `guardian.manage`-gated, which Parent never holds (tested) |
+| Read-only profile | `/parent/profile` has no corresponding write route; guardian contact data stays school-managed (M10 remains the source of truth) |
+| Account linking (admin side) | `GuardianController::updateUser()` mirrors M11's `TeacherController::updateUser()` exactly — the account must be a member of the active school (`Rule::exists('school_user', ...)->where('school_id', ...)`), unique per school (`Rule::unique('guardians', 'user_id')->where('school_id', ...)`), `{guardian}` resolved by tenant-scoped `findOrFail`; `guardian.manage`-gated, never self-service |
+| No premature exposure | the report card and results pages show only what M15's own configuration/publication rules already permit — the portal narrows visibility further (own child, published only), never widens it |
+| CSRF | every form; the portal itself has no state-changing forms beyond the shared M2 account settings it links out to |
+
 ## Deferred (with the milestone that owns them)
 
 - **Auth follow-ups:** 2FA, "log out other devices" on password change, session
@@ -311,7 +329,8 @@ Full detail in `docs/results-report-cards.md`. Summary of controls:
   audit logging of role & membership changes, enforcing the remaining dormant
   domain permissions (each in its module — `academics.*` in M8, `student.*` in
   M9, `guardian.*` in M10, `staff.*` in M11, `timetable.*` in M12,
-  `attendance.*` in M13, `assessment.*` in M14, `result.*` in M15).
+  `attendance.*` in M13, `assessment.*` in M14, `result.*` in M15,
+  `portal.parent` in M16).
 - **Tenancy follow-ups:** queue-job tenant propagation, per-tenant rate limiting,
   per-tenant cache keys, audit logging of context switches.
 - **Later:** audit logging (who did what, per school — incl. student record /

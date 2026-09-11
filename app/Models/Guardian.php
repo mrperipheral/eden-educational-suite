@@ -7,6 +7,7 @@ use Database\Factories\GuardianFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
@@ -19,6 +20,12 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * medical / emergency information. The student ↔ guardian relationship (with its
  * type and primary-contact flag) lives on the `guardian_student` link
  * ({@see GuardianStudent}).
+ *
+ * `user_id` (M16) is a **nullable** link to an existing application account —
+ * the same pattern as {@see Teacher::$fillable}'s `user_id`: set only through
+ * `GuardianController::updateUser()`, never mass-assigned. A guardian is a
+ * person record first; whether they can sign in to the Parent Portal is a
+ * separate, later concern. See `docs/parent-portal.md`.
  */
 class Guardian extends Model
 {
@@ -40,6 +47,18 @@ class Guardian extends Model
         'state',
         'notes',
     ];
+
+    /**
+     * The application account this guardian record is linked to, if any. Not
+     * automatically a Parent Portal login — this stays `null` until an admin
+     * links an existing member.
+     *
+     * @return BelongsTo<User, $this>
+     */
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
+    }
 
     /**
      * The students this guardian is linked to, with the relationship type and

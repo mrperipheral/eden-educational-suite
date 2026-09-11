@@ -17,6 +17,14 @@ use App\Http\Controllers\Guardian\GuardianLinkController;
 use App\Http\Controllers\HealthController;
 use App\Http\Controllers\MemberController;
 use App\Http\Controllers\Platform\SchoolController as PlatformSchoolController;
+use App\Http\Controllers\Portal\ParentAssignmentController;
+use App\Http\Controllers\Portal\ParentAttendanceController;
+use App\Http\Controllers\Portal\ParentPortalController;
+use App\Http\Controllers\Portal\ParentProfileController;
+use App\Http\Controllers\Portal\ParentReportCardController;
+use App\Http\Controllers\Portal\ParentResultController;
+use App\Http\Controllers\Portal\ParentStudentController;
+use App\Http\Controllers\Portal\ParentTimetableController;
 use App\Http\Controllers\Results\GradingSchemeController;
 use App\Http\Controllers\Results\GradingSchemeGradeController;
 use App\Http\Controllers\Results\ReportCardConfigurationController;
@@ -263,6 +271,8 @@ Route::middleware(['auth', 'verified', 'active'])->group(function () {
                 ->whereNumber('guardian')->can('guardian.manage')->name('edit');
             Route::patch('{guardian}', [GuardianController::class, 'update'])
                 ->whereNumber('guardian')->can('guardian.manage')->name('update');
+            Route::patch('{guardian}/user', [GuardianController::class, 'updateUser'])
+                ->whereNumber('guardian')->can('guardian.manage')->name('user');
         });
 
         /*
@@ -554,6 +564,49 @@ Route::middleware(['auth', 'verified', 'active'])->group(function () {
                 ->whereNumber(['run', 'adjustment'])->can('result.adjust')->name('adjustments.apply');
             Route::post('runs/{run}/adjustments/{adjustment}/reject', [ResultAdjustmentController::class, 'reject'])
                 ->whereNumber(['run', 'adjustment'])->can('result.adjust')->name('adjustments.reject');
+        });
+
+        /*
+        | Parent Portal (see docs/parent-portal.md). Two gates:
+        |   module:parent-portal  — is the feature on? (depends on guardians)
+        |   ->can('portal.parent')  — may this user?
+        | Every {student} is resolved through
+        | App\Support\Portal\ParentPortalAuthorizer::authorizedStudent(), never
+        | route-model-bound and never trusted from the URL alone — it 404s
+        | unless the signed-in parent is legitimately linked (via their own
+        | Guardian record, in the active school) to that exact student.
+        | {run} is additionally re-checked against ResultRunStatus::
+        | visibleToParents() (published/locked only) before any result or
+        | report card is returned.
+        */
+        Route::middleware('module:parent-portal')->prefix('parent')->name('parent.')->group(function () {
+            Route::get('/', [ParentPortalController::class, 'index'])
+                ->can('portal.parent')->name('dashboard');
+
+            Route::get('children/{student}', [ParentStudentController::class, 'show'])
+                ->whereNumber('student')->can('portal.parent')->name('children.show');
+
+            Route::get('children/{student}/results', [ParentResultController::class, 'index'])
+                ->whereNumber('student')->can('portal.parent')->name('results.index');
+            Route::get('children/{student}/results/{run}', [ParentResultController::class, 'show'])
+                ->whereNumber(['student', 'run'])->can('portal.parent')->name('results.show');
+
+            Route::get('children/{student}/report-cards', [ParentReportCardController::class, 'index'])
+                ->whereNumber('student')->can('portal.parent')->name('report-cards.index');
+            Route::get('children/{student}/report-cards/{run}', [ParentReportCardController::class, 'show'])
+                ->whereNumber(['student', 'run'])->can('portal.parent')->name('report-cards.show');
+
+            Route::get('children/{student}/attendance', [ParentAttendanceController::class, 'index'])
+                ->whereNumber('student')->can('portal.parent')->name('attendance.index');
+
+            Route::get('children/{student}/assignments', [ParentAssignmentController::class, 'index'])
+                ->whereNumber('student')->can('portal.parent')->name('assignments.index');
+
+            Route::get('children/{student}/timetable', [ParentTimetableController::class, 'index'])
+                ->whereNumber('student')->can('portal.parent')->name('timetable.index');
+
+            Route::get('profile', [ParentProfileController::class, 'edit'])
+                ->can('portal.parent')->name('profile.edit');
         });
     });
 });

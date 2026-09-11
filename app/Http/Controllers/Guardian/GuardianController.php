@@ -5,7 +5,9 @@ namespace App\Http\Controllers\Guardian;
 use App\Enums\GuardianRelationship;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Guardian\GuardianRequest;
+use App\Http\Requests\Guardian\LinkGuardianUserRequest;
 use App\Models\Guardian;
+use App\Support\Tenancy\TenantContext;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -17,10 +19,14 @@ use Illuminate\View\View;
  * **and** `->can('guardian.view' | 'guardian.manage')`.
  *
  * The student ↔ guardian relationship itself is managed by
- * {@see GuardianLinkController}.
+ * {@see GuardianLinkController}. A guardian record is separate from
+ * authentication — `user_id` is optional and set only through
+ * {@see self::updateUser()} (M16 Parent Portal, `docs/parent-portal.md`).
  */
 class GuardianController extends Controller
 {
+    public function __construct(private readonly TenantContext $tenant) {}
+
     public function index(Request $request): View
     {
         $this->authorize('guardian.view');
@@ -60,14 +66,20 @@ class GuardianController extends Controller
         $this->authorize('guardian.view');
 
         $guardian = Guardian::query()
-            ->with(['studentLinks' => fn ($q) => $q->with([
-                'student' => fn ($s) => $s->with(['currentEnrollment' => fn ($e) => $e->with(['level', 'arm'])]),
-            ])])
+            ->with([
+                'user:id,name,email',
+                'studentLinks' => fn ($q) => $q->with([
+                    'student' => fn ($s) => $s->with(['currentEnrollment' => fn ($e) => $e->with(['level', 'arm'])]),
+                ]),
+            ])
             ->findOrFail($guardian);
 
         return view('guardians.show', [
             'guardian' => $guardian,
             'relationships' => GuardianRelationship::all(),
+            'members' => $this->tenant->schoolOrFail()->users()
+                ->orderBy('name')
+                ->get(['users.id', 'users.name', 'users.email']),
         ]);
     }
 
@@ -86,5 +98,18 @@ class GuardianController extends Controller
         $model->update($request->validated());
 
         return to_route('guardians.show', $model)->with('status', __('Guardian details updated.'));
+    }
+
+    public function updateUser(LinkGuardianUserRequest $request, int $guardian): RedirectResponse
+    {
+        $model = Guardian::query()->findOrFail($guardian);
+
+        // `user_id` is deliberately not mass-assignable — set it directly.
+        $model->user_id = $request->userId();
+        $model->save();
+
+        return to_route('guardians.show', $model)->with('status', $model->user_id
+            ? __('Account linked.')
+            : __('Account unlinked.'));
     }
 }

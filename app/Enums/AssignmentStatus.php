@@ -47,6 +47,16 @@ enum AssignmentStatus: string
         return $this === self::Closed;
     }
 
+    /**
+     * Whether an assignment in this state may be shown in the Parent Portal
+     * (M16, `docs/parent-portal.md`) — issued or done work only; a `Draft`
+     * assignment is not yet real set work and stays teacher/admin-only.
+     */
+    public function visibleToParents(): bool
+    {
+        return $this !== self::Draft;
+    }
+
     public function badgeVariant(): string
     {
         return match ($this) {

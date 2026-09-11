@@ -17,7 +17,12 @@
     <div class="space-y-4">
         <div class="no-print flex flex-wrap items-center justify-between gap-2">
             <p class="text-sm">
-                <a href="{{ route('results.runs.show', $run->id) }}" class="text-brand-600 hover:text-brand-700">{{ __('← Result run') }}</a>
+                @can('result.view')
+                    <a href="{{ route('results.runs.show', $run->id) }}" class="text-brand-600 hover:text-brand-700">{{ __('← Result run') }}</a>
+                @elseif (auth()->user()->can('portal.parent'))
+                    {{-- Parent Portal viewer (M16) — this view is shared, not duplicated; see docs/parent-portal.md §"Report card reuse". --}}
+                    <a href="{{ route('parent.report-cards.index', $studentResult->student_id) }}" class="text-brand-600 hover:text-brand-700">{{ __('← Report cards') }}</a>
+                @endif
             </p>
             <x-button type="button" size="sm" x-data x-on:click="window.print()">{{ __('Print') }}</x-button>
         </div>

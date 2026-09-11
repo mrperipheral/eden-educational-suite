@@ -62,6 +62,18 @@ enum ResultRunStatus: string
         return $this === self::Locked;
     }
 
+    /**
+     * Whether a run in this state may be shown in the Parent Portal (M16,
+     * `docs/parent-portal.md`). M15 has no dedicated "parent-visible" flag,
+     * so this is the documented, safest interpretation: publication status
+     * alone gates parent visibility — a `draft`/`compiled`/`reviewed`/
+     * `approved` run is still subject to change and stays admin/staff-only.
+     */
+    public function visibleToParents(): bool
+    {
+        return in_array($this, [self::Published, self::Locked], true);
+    }
+
     public function badgeVariant(): string
     {
         return match ($this) {

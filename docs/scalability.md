@@ -50,6 +50,15 @@ below, not a rewrite.
   student in PHP rather than re-querying per row. Attendance roll-up for a
   report card is exactly 2 queries regardless of class size (reused from the
   M13 pattern above).
+- The Parent Portal (M16) resolves every child through one tenant-scoped
+  `Guardian` ↔ `Student` join (`ParentPortalAuthorizer`) — never "load every
+  student, filter to this parent's in Blade." Regression tests prove the
+  dashboard and child pages issue the **same** query count regardless of how
+  many *other* students/guardians the school has, and regardless of how many
+  children the signed-in parent themselves has. Assignments are paginated
+  (15/page, sorted server-side via a join, never in PHP); attendance and
+  report-card rendering reuse M15's already-batched
+  `AttendanceSummarizer`/`ReportCardRenderer` rather than recomputing.
 
 ### Caching
 - Cache expensive, read-mostly, tenant-scoped computations with a
