@@ -56,6 +56,7 @@
             ['route' => 'fees.index', 'label' => __('Fees'), 'active' => 'fees.*', 'allowed' => $moduleOn(\App\Enums\Module::Fees) && auth()->user()->can('fees.report')],
             ['route' => 'learning-materials.index', 'label' => __('Learning Materials'), 'active' => 'learning-materials.*', 'allowed' => $moduleOn(\App\Enums\Module::LearningMaterials) && auth()->user()->can('material.view')],
             ['route' => 'cbt.examinations.index', 'label' => __('CBT'), 'active' => 'cbt.*', 'allowed' => $moduleOn(\App\Enums\Module::Cbt) && auth()->user()->can('cbt.view')],
+            ['route' => 'entry-assessments.index', 'label' => __('Entry Assessment'), 'active' => 'entry-assessments.*', 'allowed' => $moduleOn(\App\Enums\Module::EntryAssessment) && auth()->user()->can('placement.view')],
             ['route' => 'academic.sessions.index', 'label' => __('Academic'), 'active' => 'academic.*', 'allowed' => $moduleOn(\App\Enums\Module::Academics) && auth()->user()->can('academics.view')],
             ['route' => 'communication.threads.index', 'label' => __('Communication'), 'active' => 'communication.*', 'allowed' => $moduleOn(\App\Enums\Module::Notifications) && auth()->user()->can('communication.view')],
             ['route' => 'announcements.index', 'label' => __('Announcements'), 'active' => 'announcements.*', 'allowed' => $moduleOn(\App\Enums\Module::Notifications) && auth()->user()->can('announcement.view')],

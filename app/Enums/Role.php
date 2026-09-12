@@ -107,6 +107,9 @@ enum Role: string
                 Permission::CbtView,
                 Permission::CbtAuthor,
                 Permission::CbtManage,
+                Permission::EntryAssessmentView,
+                Permission::EntryAssessmentRecord,
+                Permission::EntryAssessmentManage,
             ],
 
             self::Bursar => [
@@ -148,6 +151,8 @@ enum Role: string
                 Permission::LearningMaterialUpload,
                 Permission::CbtView,
                 Permission::CbtAuthor,
+                Permission::EntryAssessmentView,
+                Permission::EntryAssessmentRecord,
             ],
 
             self::Staff => [
@@ -165,6 +170,7 @@ enum Role: string
                 Permission::PromotionView,
                 Permission::LearningMaterialView,
                 Permission::CbtView,
+                Permission::EntryAssessmentView,
             ],
 
             self::Parent => [

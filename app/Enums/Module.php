@@ -33,6 +33,7 @@ enum Module: string
     case Fees = 'fees';
     case LearningMaterials = 'learning-materials';
     case Cbt = 'cbt';
+    case EntryAssessment = 'entry-assessment';
     case Notifications = 'notifications';
     case ParentPortal = 'parent-portal';
     case StudentPortal = 'student-portal';
@@ -52,6 +53,7 @@ enum Module: string
             self::Fees => __('Fees & Payments'),
             self::LearningMaterials => __('Learning Materials'),
             self::Cbt => __('CBT / Online Examinations'),
+            self::EntryAssessment => __('Entry / Placement Assessment'),
             self::Notifications => __('Notifications'),
             self::ParentPortal => __('Parent Portal'),
             self::StudentPortal => __('Student Portal'),
@@ -73,6 +75,7 @@ enum Module: string
             self::Fees => __('Fee structures, invoices and payment tracking.'),
             self::LearningMaterials => __('Notes, documents and resources shared with classes.'),
             self::Cbt => __('Computer-based tests sat online by students.'),
+            self::EntryAssessment => __('Records assessments conducted for prospective or newly admitted students — not a placement decision.'),
             self::Notifications => __('Communication threads, announcements and in-app notices to staff, parents and students.'),
             self::ParentPortal => __('The portal parents sign in to for their children.'),
             self::StudentPortal => __('The portal students sign in to for their own records.'),
@@ -87,7 +90,7 @@ enum Module: string
         return match ($this) {
             self::Students, self::Guardians, self::Staff, self::Promotion => __('People'),
             self::Academics, self::Timetable, self::Attendance, self::LearningMaterials => __('Academics'),
-            self::Assessments, self::Results, self::Cbt => __('Assessment'),
+            self::Assessments, self::Results, self::Cbt, self::EntryAssessment => __('Assessment'),
             self::Fees => __('Finance'),
             self::Notifications => __('Communication'),
             self::ParentPortal, self::StudentPortal => __('Portals'),
@@ -115,6 +118,7 @@ enum Module: string
             self::Fees => [self::Students],
             self::LearningMaterials => [self::Academics],
             self::Cbt => [self::Assessments],
+            self::EntryAssessment => [self::Academics],
             self::ParentPortal => [self::Guardians],
             self::StudentPortal => [self::Students],
             default => [],
@@ -196,25 +200,33 @@ enum Module: string
      *     automatic marking, and immediate or scheduled result release
      *     (`docs/cbt.md`). No essay/manual-marking questions, no proctoring.
      *     Depends on `assessments` only.
+     *   - `entry-assessment` — Entry / Placement Assessment (M25): records
+     *     an assessment conducted for a prospective or newly admitted
+     *     student — candidate details, an assessed subject, a score against
+     *     a school-defined maximum, and a free-text result label
+     *     (`docs/entry-placement-assessment.md`). It does **not** make a
+     *     placement decision or change a student's enrolment — recording
+     *     only. Depends on `academics` only; a linked `Student` record is
+     *     optional, not required.
      */
     public function isAvailable(): bool
     {
         return match ($this) {
-            self::Academics, self::Students, self::Guardians, self::Staff, self::Timetable, self::Attendance, self::Assessments, self::Results, self::Notifications, self::Fees, self::Promotion, self::LearningMaterials, self::Cbt, self::ParentPortal, self::StudentPortal => true,
+            self::Academics, self::Students, self::Guardians, self::Staff, self::Timetable, self::Attendance, self::Assessments, self::Results, self::Notifications, self::Fees, self::Promotion, self::LearningMaterials, self::Cbt, self::EntryAssessment, self::ParentPortal, self::StudentPortal => true,
             default => false,
         };
     }
 
     /**
      * Sensible default for a newly onboarded school. Core management modules are
-     * on; specialised ones (timetable, learning materials, CBT) start off. A
-     * school with no stored preference for a module uses this value — no row is
-     * written at onboarding.
+     * on; specialised ones (timetable, learning materials, CBT, entry/placement
+     * assessment) start off. A school with no stored preference for a module
+     * uses this value — no row is written at onboarding.
      */
     public function enabledByDefault(): bool
     {
         return match ($this) {
-            self::Timetable, self::LearningMaterials, self::Cbt => false,
+            self::Timetable, self::LearningMaterials, self::Cbt, self::EntryAssessment => false,
             default => true,
         };
     }

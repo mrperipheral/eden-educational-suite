@@ -88,6 +88,11 @@ enum Permission: string
     case CbtManage = 'cbt.manage';
     case CbtTake = 'cbt.take';
 
+    // ---- Entry / Placement Assessment (enforced: Entry / Placement Assessment M25) ----
+    case EntryAssessmentView = 'placement.view';
+    case EntryAssessmentRecord = 'placement.record';
+    case EntryAssessmentManage = 'placement.manage';
+
     // ---- Communication & notifications (enforced: Communication & Notification Foundation M18) ----
     case CommunicationView = 'communication.view';
     case CommunicationCreate = 'communication.create';

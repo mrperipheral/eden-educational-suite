@@ -599,7 +599,50 @@ Deferred: tagging beyond the single `topic` field, question pools/
 randomised selection, versioning, bulk import/export, a shared
 cross-school library, a per-teacher "my questions" filtered view.
 
-## Milestone 25+ — Domain Modules
+## ✅ Milestone 25 — Entry / Placement Assessment (complete, 2026-10-03)
+
+A simple, school-scoped record of an assessment conducted for a prospective
+or newly admitted student — recording only, never a placement decision.
+`App\Models\EntryAssessment` — one row per candidate per subject assessed
+(a multi-subject candidate gets several rows sharing the same candidate/
+admission-reference/date, no batch entity introduced); `candidate_name` is
+always stored explicitly, independent of the optional `student_id` link, so
+the record is self-contained even for a genuinely prospective candidate
+with no `Student` row at all. `academic_level_id` is required,
+`level_arm_id` nullable (the arm may not be decided yet); `score` is
+nullable (a record can exist ahead of the assessment being conducted),
+`max_score` always required. `percentage` is never stored — always derived
+via `EntryAssessment::percentage()` (`bcmath`); `result` is a free-text,
+school-defined outcome label (e.g. "Pass"/"Fail"), not an enum, and never
+drives any automatic action. `App\Enums\EntryAssessmentStatus`
+(`Active`/`Archived` only) is the record's own retention lifecycle —
+freely reversible, like `Question::archive()`/`activate()` (M24); no hard
+delete, ever. New permissions `entry_assessment.view`/`.record`/`.manage`
+reuse the M23/M24 three-permission shape exactly (School Admin + Principal
+full; Teacher `.record` scoped to classes/subjects they hold an active M11
+`TeacherAssignment` for via `App\Support\EntryAssessment\
+EntryAssessmentAuthorizer`, mirroring `CbtAuthorizer::canAuthorFor()`
+precisely; Staff `.view` only; Bursar/Parent/Student none). A CSV export
+(`response()->streamDownload()`, no new package) shares the exact same
+filtered, tenant-scoped query the list page uses, so it always reflects the
+active search/filters and can never include another school's rows;
+iterates via `chunk()` rather than `cursor()` so eager-loaded relations
+stay batched (avoiding N+1) while memory stays bounded. `Module::
+EntryAssessment`, off by default (a specialised opt-in, like Timetable/
+Learning Materials/CBT), depends on `Academics` only — a linked `Student`
+record is optional, not required. No CBT engine of its own; the existing
+M23/M24 Question Bank/CBT system is untouched. Full detail in
+`docs/entry-placement-assessment.md`.
+
+Deferred (explicitly out of scope per spec): placement recommendation,
+recommended class/arm, a placement decision workflow, automatic placement/
+enrolment, promotion/graduation, AI-based placement decisions, an
+admissions CRM, application payment, interviews, document management,
+psychometric testing, proctoring, adaptive testing, question pools/
+randomisation, a second CBT engine, notifications, SMS/WhatsApp workflows,
+complex reporting/analytics, bulk import.
+
+## Milestone 26+ — Domain Modules
 
 Reporting.
 

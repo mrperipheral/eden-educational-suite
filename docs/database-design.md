@@ -1,12 +1,12 @@
 # Database Design
 
-Status: Milestone 24. Tenant + roles + onboarding + school settings + module
+Status: Milestone 25. Tenant + roles + onboarding + school settings + module
 activation + academic foundation + student management + guardian management +
 teacher management + timetable management + attendance management + assessment &
 assignments + results & report cards + parent portal + student portal +
 communication & notification foundation + fees & fee management + online fee
 payment (Paystack) + promotion & graduation + learning materials + CBT / online
-examinations + question bank. School-owned tables: `school_settings` (M6),
+examinations + question bank + entry / placement assessment. School-owned tables: `school_settings` (M6),
 `school_modules` (M7), the academic structure — `academic_sessions`,
 `academic_periods`, `academic_levels`, `level_arms`, `subjects`,
 `level_subject` (M8) — `students` + `enrollments` (M9), `guardians` +
@@ -29,7 +29,8 @@ examinations + question bank. School-owned tables: `school_settings` (M6),
 `question_options`, `examinations`, `examination_questions`,
 `examination_question_options`, `exam_attempts`, `exam_answers` (M23),
 `questions.academic_level_id`/`.level_arm_id`/`.topic`/`.difficulty`/
-`.status` (M24, additive onto M23's own table — replaces `.is_active`).
+`.status` (M24, additive onto M23's own table — replaces `.is_active`),
+`entry_assessments` (M25).
 This document records the conventions every future migration follows.
 
 ## Current schema
@@ -696,6 +697,38 @@ convention, so a freshly-`new`-ed instance has both available in memory
 immediately without a round-trip reload.
 
 See `docs/question-bank.md` for the full Question Bank design rationale.
+
+### `2026_10_03_100000_create_entry_assessments_table` — Entry / Placement Assessment (Milestone 25)
+
+School-owned; one row per candidate per subject assessed:
+
+- `student_id` (nullable, `nullOnDelete`) — optional link to an existing
+  `App\Models\Student`; `null` for a genuinely prospective candidate.
+- `candidate_name` (`string(150)`) — always stored explicitly, independent
+  of `student_id`, so the record stays self-contained and historically
+  reliable even if the linked student's name changes later.
+  `admission_reference` (nullable `string(100)`).
+- `academic_level_id` (required, `cascadeOnDelete`) / `level_arm_id`
+  (nullable, `nullOnDelete`) — the intended/assessed class; the arm may not
+  be decided yet. `subject_id` (required, `cascadeOnDelete`).
+- `assessed_on` (date), `score` (nullable `decimal(6,2)` — not yet entered
+  until the assessment is actually conducted), `max_score` (required
+  `decimal(6,2)`). `percentage` is **not** a column — always derived at
+  read time (`EntryAssessment::percentage()`, `bcmath`).
+- `result` (nullable `string(50)`) — a free-text, school-defined outcome
+  label (e.g. "Pass"/"Fail"), not an enum; never drives any automatic
+  action. `notes` (nullable text).
+- `assessor_id` (nullable, `nullOnDelete` onto `users`) — captured from the
+  authenticated user at creation, not mass-assignable.
+- `status` (`string(10)`, default `active` — `App\Enums\
+  EntryAssessmentStatus`, not mass-assignable) — Active/Archived only, the
+  row's own retention lifecycle. No hard delete.
+
+Indexes: `entry_assessments_class_index` (`school_id, academic_level_id,
+level_arm_id`), `index(school_id, subject_id)`, `index(school_id,
+student_id)`, `index(school_id, status)`, `index(school_id, assessed_on)`.
+
+See `docs/entry-placement-assessment.md` for the full design rationale.
 
 ### `2026_09_15_100000_create_school_modules_table`
 Milestone 7 — per-school feature/module activation. `module` (`string(40)`, an

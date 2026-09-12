@@ -20,6 +20,7 @@ use App\Http\Controllers\Communication\CommunicationMessageController;
 use App\Http\Controllers\Communication\CommunicationStatusController;
 use App\Http\Controllers\Communication\CommunicationThreadController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\EntryAssessment\EntryAssessmentController;
 use App\Http\Controllers\Fees\FeeAdjustmentController;
 use App\Http\Controllers\Fees\FeeCategoryController;
 use App\Http\Controllers\Fees\FeeChargeController;
@@ -797,6 +798,42 @@ Route::middleware(['auth', 'verified', 'active'])->group(function () {
                 Route::get('{examination}/attempts', [ExaminationAttemptController::class, 'index'])
                     ->whereNumber('examination')->can('cbt.view')->name('attempts.index');
             });
+        });
+
+        /*
+        | Entry / Placement Assessment (see docs/entry-placement-
+        | assessment.md). Two gates:
+        |   module:entry-assessment  — is the feature on for this school?
+        |   ->can('placement.view')  — staff read access (list, show,
+        |     export — not further scoped by teaching assignment).
+        |   ->can('placement.record')  — create/edit/archive/restore;
+        |     a Teacher holding this without `.manage` is further scoped to
+        |     classes/subjects they teach by EntryAssessmentAuthorizer,
+        |     re-checked inside the controller (the route gate alone can't
+        |     express it).
+        | {entryAssessment} is resolved by tenant-scoped `findOrFail`, so
+        | another school's id 404s. This records the assessment only — no
+        | placement recommendation, no automatic enrolment change.
+        */
+        Route::middleware('module:entry-assessment')->prefix('entry-assessments')->name('entry-assessments.')->group(function () {
+            Route::get('/', [EntryAssessmentController::class, 'index'])
+                ->can('placement.view')->name('index');
+            Route::get('export', [EntryAssessmentController::class, 'export'])
+                ->can('placement.view')->name('export');
+            Route::get('create', [EntryAssessmentController::class, 'create'])
+                ->can('placement.record')->name('create');
+            Route::post('/', [EntryAssessmentController::class, 'store'])
+                ->can('placement.record')->name('store');
+            Route::get('{entryAssessment}', [EntryAssessmentController::class, 'show'])
+                ->whereNumber('entryAssessment')->can('placement.view')->name('show');
+            Route::get('{entryAssessment}/edit', [EntryAssessmentController::class, 'edit'])
+                ->whereNumber('entryAssessment')->can('placement.record')->name('edit');
+            Route::patch('{entryAssessment}', [EntryAssessmentController::class, 'update'])
+                ->whereNumber('entryAssessment')->can('placement.record')->name('update');
+            Route::post('{entryAssessment}/archive', [EntryAssessmentController::class, 'archive'])
+                ->whereNumber('entryAssessment')->can('placement.record')->name('archive');
+            Route::post('{entryAssessment}/restore', [EntryAssessmentController::class, 'restore'])
+                ->whereNumber('entryAssessment')->can('placement.record')->name('restore');
         });
 
         /*

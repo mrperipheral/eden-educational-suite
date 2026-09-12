@@ -81,10 +81,12 @@ class ModuleTest extends TestCase
         // Results & Report Cards (M15), Parent Portal (M16), Student Portal
         // (M17), Communication & Notification Foundation (M18), Fees & Fee
         // Management (M19, M20's Paystack integration reuses it),
-        // Promotion & Graduation (M21), Learning Materials (M22) and CBT /
-        // Online Examinations (M23); the rest Planned. (Timetable, Learning
-        // Materials and CBT are available but still off by default.)
-        $available = ['academics', 'students', 'guardians', 'staff', 'timetable', 'attendance', 'assessments', 'results', 'notifications', 'fees', 'promotion', 'learning-materials', 'cbt', 'parent-portal', 'student-portal'];
+        // Promotion & Graduation (M21), Learning Materials (M22), CBT /
+        // Online Examinations (M23), Question Bank (M24, reuses the `cbt`
+        // module) and Entry / Placement Assessment (M25); the rest Planned.
+        // (Timetable, Learning Materials, CBT and Entry Assessment are
+        // available but still off by default.)
+        $available = ['academics', 'students', 'guardians', 'staff', 'timetable', 'attendance', 'assessments', 'results', 'notifications', 'fees', 'promotion', 'learning-materials', 'cbt', 'entry-assessment', 'parent-portal', 'student-portal'];
 
         foreach (Module::cases() as $module) {
             $this->assertSame(

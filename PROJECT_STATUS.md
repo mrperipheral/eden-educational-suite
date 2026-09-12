@@ -1,10 +1,10 @@
 # Project Status
 
-_Last updated: 2026-10-02_
+_Last updated: 2026-10-03_
 
 ## Current milestone
 
-**Milestone 24 — Question Bank: COMPLETE.**
+**Milestone 25 — Entry / Placement Assessment: COMPLETE.**
 
 Next up: further **Domain Modules** — Reporting. Not started — do not
 begin without picking one up explicitly. See `docs/roadmap.md`.
@@ -55,8 +55,109 @@ Vite · PHPUnit · Pint.
 - **M21 — Promotion & Graduation** (`promotion-graduation-complete`) — `docs/promotion.md`.
 - **M22 — Learning Materials** (`learning-materials-complete`) — `docs/learning-materials.md`.
 - **M23 — CBT / Online Examinations** (`cbt-online-examinations-complete`) — `docs/cbt.md`.
-- **M24 — Question Bank** (this milestone,
-  `question-bank-complete`) — `docs/question-bank.md`; see below.
+- **M24 — Question Bank** (`question-bank-complete`) — `docs/question-bank.md`.
+- **M25 — Entry / Placement Assessment** (this milestone,
+  `entry-placement-assessment-complete`) — `docs/entry-placement-assessment.md`; see below.
+
+## Delivered in Milestone 25
+
+A simple, school-scoped record of an assessment conducted for a prospective
+or newly admitted student — **recording only, never a placement decision**.
+Full detail in `docs/entry-placement-assessment.md`.
+
+- **`App\Models\EntryAssessment`** (school-owned) — one row per candidate
+  per subject assessed; "Subject(s)" is satisfied by recording several rows
+  sharing the same `candidate_name`/`admission_reference`/`assessed_on`
+  rather than inventing a batch/grouping entity, the same one-class-one-
+  subject-per-row choice `Assessment` (M14) already makes.
+  `candidate_name` is always stored explicitly, independent of the
+  optional `student_id` link — a self-contained historical record even for
+  a genuinely prospective candidate with no `Student` row at all.
+  `academic_level_id` is required, `level_arm_id` nullable (the arm may not
+  be decided yet); `score` is nullable (a record can exist ahead of the
+  assessment being conducted), `max_score` always required. `percentage`
+  is **never stored** — always derived via `EntryAssessment::percentage()`
+  (`bcmath`, `null` until a score exists). `result` is a free-text,
+  school-defined outcome label (e.g. "Pass"/"Fail"), **not** an enum — the
+  vocabulary is the school's to choose, and it never drives any automatic
+  action. `assessor_id` is captured from the authenticated user at
+  creation, mirroring `assessments.created_by`/`learning_materials.
+  uploaded_by` — never a request-supplied name, never mass-assignable.
+- **A minimal lifecycle** — `App\Enums\EntryAssessmentStatus`
+  (`Active`/`Archived` only) is the record's own retention lifecycle,
+  deliberately **not** the assessment's conducted/pending state (read
+  directly from `score === null`) and **not** a pass/fail outcome (the
+  free-text `result` field). `archive()`/`restore()` are freely reversible,
+  like `Question::archive()`/`activate()` (M24) — nothing ever attaches to
+  an entry assessment record the way an exam attaches to a Question Bank
+  entry. No hard delete, ever.
+- **New permissions** `entry_assessment.view`/`.record`/`.manage` (stored
+  as `placement.view`/`.record`/`.manage` — the Permission enum's own
+  dotted-value convention doesn't allow an underscore in the first
+  segment), reusing the exact M23/M24 three-permission shape: School Admin
+  + Principal → full; Teacher → `.view` + `.record`, scoped via
+  `App\Support\EntryAssessment\EntryAssessmentAuthorizer::canManageFor()`
+  (mirrors `CbtAuthorizer::canAuthorFor()` precisely) to classes/subjects
+  they hold an active M11 `TeacherAssignment` for; Staff → `.view` only;
+  Bursar/Parent/Student → none. *Viewing* the list (including export) stays
+  unscoped by teaching assignment, the same choice M23/M24 make for their
+  own staff-facing lists. No second authorization system.
+- **CSV export** (`GET /entry-assessments/export`,
+  `response()->streamDownload()` + `fputcsv()` — no new package) shares the
+  **exact same filtered, tenant-scoped query** the list page uses, so it
+  always reflects the active search/filters and can never include another
+  school's rows. Iterates via `Builder::chunk(200, …)` rather than
+  `cursor()` — `cursor()` skips Eloquent's eager-loading entirely (would
+  N+1 `level`/`arm`/`subject`/`assessor` per row); `chunk()` keeps memory
+  bounded to one page at a time while still eager-loading each page's
+  relations in bulk. Excludes internal ids — only human-facing columns.
+- **Reuses `Module::EntryAssessment`** (new) — off by default (a
+  specialised opt-in, like Timetable/Learning Materials/CBT), depends on
+  `Module::Academics` only — a linked `Student` record is optional, not
+  required.
+- **No CBT engine of its own** — the existing M23/M24 Question Bank/CBT
+  system is completely untouched; nothing in this milestone reads from or
+  writes to it. No placement recommendation, recommended class/arm,
+  placement decision workflow, automatic placement/enrolment, promotion/
+  graduation, or AI-based placement decisions — see `docs/entry-placement-
+  assessment.md` §10 for the full explicitly-out-of-scope list.
+- **1 new table** (migration `2026_10_03_100000`): `entry_assessments` —
+  `school_id`-leading indexed (`entry_assessments_class_index` plus
+  `subject_id`/`student_id`/`status`/`assessed_on`).
+- **5 new views** — `resources/views/entry-assessments/*`: a searchable/
+  filterable `index.blade.php` (level/arm/subject/status filters, an Export
+  CSV button that carries the active filters through as query parameters),
+  a shared `_form.blade.php` (mirrors `cbt/questions/_form.blade.php`'s own
+  unrestricted-cascade vs. scoped-Teacher-assignment-picker split, plus an
+  optional student-link select), `show.blade.php` (read-only detail page),
+  `create.blade.php`/`edit.blade.php` (thin wrappers). One new "Entry
+  Assessment" staff nav link, module + permission gated.
+- **Seeder** — Alpha Academy's Entry Assessment module is explicitly turned
+  on (off by default); one record links to the same Primary 1 Gold student
+  used throughout the Parent/Student Portal demos and is recorded by Tomiwa
+  Teacher (his real M11 assignment — a genuine demonstration of the Teacher
+  scoping, not a bypass); two more are genuine prospective candidates with
+  no `Student` row at all — one still awaiting its score, one archived
+  (did not proceed with admission) to demonstrate the retention lifecycle.
+- **Docs** — new `docs/entry-placement-assessment.md`; `PROJECT_STATUS.md`,
+  `docs/roadmap.md`, `docs/database-design.md`, `CLAUDE.md` updated.
+- **51 new tests** under `tests/Feature/EntryAssessment/*` (+
+  `EntryAssessmentTestCase` base) — record creation (with and without a
+  score, with and without a linked `Student`), percentage computed not
+  stored, field validation (candidate name/level/subject/date/max-score
+  required, score-exceeds-max-score rejected, arm-belongs-to-level,
+  subject-offered-at-level), editing (assessor/status untouched by an
+  edit), viewing, search/filter/pagination, archive/restore via HTTP (never
+  a hard delete, an archived record stays viewable, editing one record
+  never touches another's status), authorization (School Admin/Principal
+  full access, Teacher scoped by subject+level+arm and rejected outside it,
+  Staff view-only, Bursar/Parent/Student/role-less forbidden, module-off
+  404), cross-school isolation + IDOR protection (view/edit/archive/index/
+  export all reject another school's data, `school_id` from the request
+  ignored), export (CSV header + rows, respects search/status filters,
+  never includes another school's records, shows the assessor's name not
+  their internal id, Bursar forbidden), and N+1 regression on the index
+  (with and without filters).
 
 ## Delivered in Milestone 24
 
@@ -1229,6 +1330,12 @@ check, DB duplicate prevention, assessment↔assignment link (same class only). 
 - Production env: `SESSION_SECURE_COOKIE=true`, real `MAIL_MAILER`, `APP_DEBUG=false`.
 - Next milestone: pick a further domain module (Reporting) — see
   `docs/roadmap.md`.
+- **Entry / Placement Assessment follow-ups** — placement recommendation/
+  decision workflow of any kind (deliberately not built — this stays a
+  recording-only feature), an admissions CRM, application payment,
+  interview scheduling, document management, psychometric testing,
+  proctoring/adaptive testing, notification (M18) hooks, bulk import, a
+  batch/grouping entity for a multi-subject candidate's rows.
 - **Question Bank follow-ups** — tagging beyond the single `topic` field,
   question pools/randomised selection, versioning, bulk import/export, a
   shared cross-school library, a per-teacher "my questions" filtered view.

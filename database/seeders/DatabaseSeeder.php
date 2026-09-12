@@ -25,6 +25,7 @@ use App\Models\Assignment;
 use App\Models\AttendanceRegister;
 use App\Models\CommunicationMessage;
 use App\Models\CommunicationThread;
+use App\Models\EntryAssessment;
 use App\Models\Examination;
 use App\Models\FeeCategory;
 use App\Models\FeePayment;
@@ -133,6 +134,7 @@ class DatabaseSeeder extends Seeder
         SchoolModule::create(['module' => Module::Timetable->value, 'enabled' => true]);
         SchoolModule::create(['module' => Module::LearningMaterials->value, 'enabled' => true]);
         SchoolModule::create(['module' => Module::Cbt->value, 'enabled' => true]);
+        SchoolModule::create(['module' => Module::EntryAssessment->value, 'enabled' => true]);
 
         // Academic foundation — a current session with three terms, a handful of
         // levels + arms, and a starter subject list. All school-configured;
@@ -963,6 +965,60 @@ class DatabaseSeeder extends Seeder
         $retiredQuestion->options()->create(['option_text' => 'IV', 'is_correct' => true, 'position' => 1]);
         $retiredQuestion->options()->create(['option_text' => 'VI', 'is_correct' => false, 'position' => 2]);
         $retiredQuestion->archive();
+
+        // Entry / Placement Assessment (M25) — records the assessment
+        // conducted for a prospective or newly admitted candidate. Never a
+        // placement decision: nothing here changes a student's enrolment.
+        // One record is linked to the same Primary 1 Gold student used
+        // throughout the Parent/Student Portal demos (an already-enrolled
+        // student can still have a historical entry assessment on file);
+        // recorded by Tomiwa Teacher, who holds an active M11 assignment
+        // for Primary 1 Gold Mathematics — a real demonstration of the
+        // Teacher scoping, not a bypass. The other two are genuine
+        // prospective candidates with no Student record at all: one still
+        // awaiting its score, one archived (did not proceed with
+        // admission) to demonstrate the retention lifecycle.
+        $entryAssessmentLinked = new EntryAssessment([
+            'student_id' => $heroStudent->id,
+            'candidate_name' => $heroStudent->fullName(),
+            'academic_level_id' => $primary1->id,
+            'level_arm_id' => $primary1Gold->id,
+            'subject_id' => $mathSubject->id,
+            'assessed_on' => now()->subWeeks(2)->toDateString(),
+            'score' => 78,
+            'max_score' => 100,
+            'result' => 'Pass',
+            'notes' => 'Confident with addition and multiplication; some hesitation with word problems.',
+        ]);
+        $entryAssessmentLinked->assessor_id = $tomiwa->id;
+        $entryAssessmentLinked->save();
+
+        $entryAssessmentScheduled = new EntryAssessment([
+            'candidate_name' => 'Ifeoma Nwachukwu',
+            'admission_reference' => 'APP-2026-014',
+            'academic_level_id' => $primary1->id,
+            'subject_id' => $englishSubject->id,
+            'assessed_on' => now()->addDays(3)->toDateString(),
+            'max_score' => 50,
+            'notes' => 'Scheduled for the entrance assessment; not yet conducted.',
+        ]);
+        $entryAssessmentScheduled->assessor_id = $admin->id;
+        $entryAssessmentScheduled->save();
+
+        $entryAssessmentArchived = new EntryAssessment([
+            'candidate_name' => 'Chinedu Obi',
+            'admission_reference' => 'APP-2025-231',
+            'academic_level_id' => $primary1->id,
+            'subject_id' => $mathSubject->id,
+            'assessed_on' => now()->subMonths(4)->toDateString(),
+            'score' => 40,
+            'max_score' => 100,
+            'result' => 'Fail',
+            'notes' => 'Did not proceed with admission.',
+        ]);
+        $entryAssessmentArchived->assessor_id = $admin->id;
+        $entryAssessmentArchived->save();
+        $entryAssessmentArchived->archive();
 
         $tenant->forget();
     }
