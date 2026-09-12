@@ -164,6 +164,16 @@ class Student extends Model
     }
 
     /**
+     * This student's CBT examination attempts (M23, `docs/cbt.md`).
+     *
+     * @return HasMany<ExamAttempt, $this>
+     */
+    public function examAttempts(): HasMany
+    {
+        return $this->hasMany(ExamAttempt::class);
+    }
+
+    /**
      * The session this student graduated in, if any (M21).
      *
      * @return BelongsTo<AcademicSession, $this>

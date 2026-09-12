@@ -22,8 +22,13 @@ class RoleTest extends TestCase
 
     public function test_portal_roles_are_minimal(): void
     {
+        // Parent stays a single permission. Student additionally holds
+        // `cbt.take` (M23) — the one student-facing action permission
+        // that isn't folded into the general `portal.student` gate,
+        // mirroring how CBT student routes are gated by `cbt.take` alone
+        // rather than `portal.student` + a second check.
         $this->assertSame([Permission::PortalParent], Role::Parent->permissions());
-        $this->assertSame([Permission::PortalStudent], Role::Student->permissions());
+        $this->assertSame([Permission::PortalStudent, Permission::CbtTake], Role::Student->permissions());
     }
 
     public function test_no_role_grants_a_permission_outside_the_permission_enum(): void

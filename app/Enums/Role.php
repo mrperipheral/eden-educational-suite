@@ -104,6 +104,9 @@ enum Role: string
                 Permission::LearningMaterialView,
                 Permission::LearningMaterialUpload,
                 Permission::LearningMaterialManage,
+                Permission::CbtView,
+                Permission::CbtAuthor,
+                Permission::CbtManage,
             ],
 
             self::Bursar => [
@@ -143,6 +146,8 @@ enum Role: string
                 Permission::PromotionView,
                 Permission::LearningMaterialView,
                 Permission::LearningMaterialUpload,
+                Permission::CbtView,
+                Permission::CbtAuthor,
             ],
 
             self::Staff => [
@@ -159,6 +164,7 @@ enum Role: string
                 Permission::AnnouncementView,
                 Permission::PromotionView,
                 Permission::LearningMaterialView,
+                Permission::CbtView,
             ],
 
             self::Parent => [
@@ -167,6 +173,7 @@ enum Role: string
 
             self::Student => [
                 Permission::PortalStudent,
+                Permission::CbtTake,
             ],
         };
     }

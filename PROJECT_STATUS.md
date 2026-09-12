@@ -1,13 +1,14 @@
 # Project Status
 
-_Last updated: 2026-09-30_
+_Last updated: 2026-10-01_
 
 ## Current milestone
 
-**Milestone 22 — Learning Materials: COMPLETE.**
+**Milestone 23 — CBT / Online Examinations: COMPLETE.**
 
-Next up: further **Domain Modules** — CBT, Reporting. Not started — do not
-begin without picking one up explicitly. See `docs/roadmap.md`.
+Next up: further **Domain Modules** — CBT Question Bank (M24), Reporting.
+Not started — do not begin without picking one up explicitly. See
+`docs/roadmap.md`.
 
 ## What the application is
 
@@ -53,8 +54,126 @@ Vite · PHPUnit · Pint.
 - **M19 — Fees & Fee Management** (`fees-management-complete`) — `docs/fees.md`.
 - **M20 — Online Fee Payment / Paystack** (`online-payment-paystack-complete`) — `docs/paystack.md`.
 - **M21 — Promotion & Graduation** (`promotion-graduation-complete`) — `docs/promotion.md`.
-- **M22 — Learning Materials** (this milestone,
-  `learning-materials-complete`) — `docs/learning-materials.md`; see below.
+- **M22 — Learning Materials** (`learning-materials-complete`) — `docs/learning-materials.md`.
+- **M23 — CBT / Online Examinations** (this milestone,
+  `cbt-online-examinations-complete`) — `docs/cbt.md`; see below.
+
+## Delivered in Milestone 23
+
+School-scoped online examinations: multiple-choice and true/false
+questions, one timed attempt per student, server-side automatic marking,
+and immediate or scheduled result release. No essay/manual-marking
+questions, no proctoring. Full detail in `docs/cbt.md`.
+
+- **`App\Models\Question` + `QuestionOption`** (school-owned; a reusable,
+  subject-scoped bank — deliberately minimal M24-compatible groundwork,
+  not the bank itself) are never read directly by a live exam.
+  **`App\Services\Cbt\ExaminationQuestionService::attach()`** snapshots a
+  question's `question_text`/`type`/`marks` and every option's
+  `option_text`/`is_correct`/`position` into a new
+  **`App\Models\ExaminationQuestion` + `ExaminationQuestionOption`** the
+  moment it's attached — never re-read from the source afterwards, so
+  editing or deleting the bank question never changes an exam that
+  already uses it.
+- **`App\Enums\ExaminationStatus`** (`Draft` → `Scheduled` → `Closed`,
+  one-way, not mass-assignable) is deliberately separate from
+  **`App\Enums\ExamAttemptStatus`** (`InProgress`/`Completed`) — closing an
+  exam stops new attempts *starting*; one already in progress is still
+  individually finalised by its own expiry check, never force-submitted by
+  the close action. `Examination::schedule()` requires ≥1 question and
+  freezes both structure and metadata; `isOpenForAttempts()` additionally
+  gates on `starts_at`/`ends_at` against the server clock.
+- **`App\Services\Cbt\ExamAttemptService`** is the single seam every
+  student-facing action goes through. `start()` bulk-inserts one
+  unanswered `ExamAnswer` per question up front (mirrors M13's
+  `AttendanceRecord` roster-snapshot convention) and computes `expires_at`
+  once at `started_at + duration_minutes` (capped to the exam's own
+  `ends_at`) — never recalculated, never trusting a client value.
+  `answer()`/`submit()` re-check the server clock against `expires_at`
+  before accepting anything; an expired attempt is auto-marked and
+  finalised (`auto_submitted = true`) the next time anything touches it.
+  `submit()` is idempotent — resubmitting an already-`Completed` attempt
+  is a safe no-op. **`unique(examination_id, student_id)`** at the DB
+  level is the real "one attempt per student" guarantee; a concurrent
+  double-start is caught by the constraint and resolved by resuming the
+  row that won the race, never a 500 or a duplicate.
+- **Marking** compares each answer's `selected_option_id` against the
+  snapshotted option's `is_correct` server-side only, via `bcmath`
+  (`score`/`max_score`/`percentage`/`passed` — never float drift, never a
+  client-submitted mark). Unanswered questions score zero. Correct answers
+  are never exposed to a student at any point — the take-page's own
+  question payload excludes `is_correct` at the query level.
+- **Result release** (`App\Enums\ResultReleaseMode`: `Immediate`/
+  `Scheduled` + a validated `result_release_at`) is evaluated inline, at
+  read time, via `ExamAttempt::isResultVisible()` — this app has no
+  queue/scheduler at all (confirmed: zero `Schedule::` calls, `sync` queue
+  in tests) and M23 doesn't add one; a release "happens" simply because
+  the clock has moved past `result_release_at` the next time anyone asks,
+  mirroring `ResultRunStatus::visibleToParents()`'s own lifecycle-gate
+  precedent with an actual timestamp instead.
+- **`App\Support\Cbt\CbtAuthorizer`** mirrors `AssessmentAuthorizer` (M14)
+  exactly: `cbt.manage` (School Admin, Principal) → any class/subject;
+  `cbt.author` without `.manage` (Teacher) → only a `(level, subject)` they
+  hold an active M11 `TeacherAssignment` for. The create-form only offers
+  a Teacher's own assigned classes.
+- **New permissions** `cbt.view` / `.author` / `.manage` / `.take`,
+  slotted into the existing role tiers: School Admin + Principal → full;
+  Teacher → `.view` + `.author` (scoped); Staff → `.view` only;
+  Bursar/Parent → none; Student → `cbt.take` (the single gate for the
+  whole `/student/cbt/*` surface, like `portal.student` gates the rest of
+  the Student Portal).
+- **Reuses `Module::Cbt`** (declared since M7, flipped available this
+  milestone) — off by default (a specialised opt-in), depends on
+  `Module::Assessments` only. Staff `/cbt/*` routes are hard-gated by
+  `module:cbt`; the student index degrades to an empty state instead, but
+  every deeper student action (show/start/take/answer/submit/result) is
+  still hard-gated.
+- **M15 integration deferred, extension point documented** — CBT results
+  are not compiled into `ResultRun` in this milestone; the path is M14's
+  own `ScoreSource::OnlineCbt` case on `AssessmentScore`, already reserved
+  for exactly this.
+- **7 new tables** (migrations `2026_10_01_100000`–`100060`): `questions`,
+  `question_options`, `examinations`, `examination_questions`,
+  `examination_question_options`, `exam_attempts`, `exam_answers` — all
+  `school_id`-leading indexed.
+- **16 new views** — staff question-bank CRUD (a single Alpine-driven
+  form handling both MCQ and true/false option authoring), examination
+  CRUD + preview (correct answers shown to staff only) + schedule/close +
+  question attach/detach + a plain attempts/results list; Student Portal
+  exam list + instructions + a single-page Alpine exam-taking interface
+  (server-synchronised countdown display, question navigation with
+  answered/unanswered indicators, auto-save per answer, automatic expiry
+  handling) + a result page that respects release visibility. One new
+  staff nav link and one new Student Portal tab.
+- **Seeder** — Alpha Academy's CBT module is explicitly turned on (off by
+  default); a Mathematics quiz (immediate release) is left completely
+  unattempted for a live demo, and an English quiz (scheduled release) has
+  one genuinely-submitted, genuinely-marked attempt by the same Primary 1
+  Gold demo student the Portal/Learning-Materials demos already use — a
+  real "submitted but not yet visible" demonstration, not simulated. Both
+  exams' questions go through the real bank-create → attach-and-snapshot →
+  schedule flow.
+- **Docs** — new `docs/cbt.md`; `PROJECT_STATUS.md`, `docs/roadmap.md`,
+  `docs/database-design.md`, `CLAUDE.md` updated.
+- **77 new tests** under `tests/Feature/Cbt/*` (+ `CbtTestCase` base) —
+  question creation/validation (exactly one correct option, type-correct
+  option counts, tenant isolation); examination CRUD + lifecycle (draft
+  editable, scheduling requires ≥1 question, invalid transitions
+  rejected, metadata frozen once scheduled); question snapshotting
+  (editing/deleting the source question never changes an attached
+  snapshot, attach/detach only while draft); the full attempt service
+  (start/resume/duplicate-prevention, answering, correct/wrong/unanswered
+  scoring, idempotent submission, server-side expiry + auto-finalisation,
+  `expires_at` capped to the exam window); result release (immediate vs.
+  scheduled visibility, hidden-then-visible-at-the-server-clock,
+  correct-answers-never-exposed); authorization (all 7 roles + role-less,
+  module-off 404 without affecting Assessments/Results, teacher scoping
+  including an ended assignment losing access, tenant isolation on every
+  surface); the full student HTTP flow (eligibility by exact class match,
+  draft exams never shown, start→take→answer→submit→result,
+  cross-student and cross-school access prevention, a tampered
+  foreign-question option rejected); N+1 regression guards on both listing
+  pages.
 
 ## Delivered in Milestone 22
 
@@ -136,6 +255,8 @@ approval workflow. Full detail in `docs/learning-materials.md`.
   arm's/session's material never leaks, module-off and unlinked-student
   safe empty states, non-student role forbidden, download scoped to the
   student's own class — cross-class and cross-school ids 404).
+
+## Delivered in Milestone 21
 
 A safe, auditable academic progression workflow built entirely on M9's
 existing `Student`/`Enrollment` architecture — promoting a student never
@@ -1027,8 +1148,14 @@ check, DB duplicate prevention, assessment↔assignment link (same class only). 
 ## Known follow-ups / recommendations
 
 - Production env: `SESSION_SECURE_COOKIE=true`, real `MAIL_MAILER`, `APP_DEBUG=false`.
-- Next milestone: pick a further domain module (CBT, Reporting) — see
-  `docs/roadmap.md`.
+- Next milestone: pick a further domain module (the M24 Question Bank,
+  Reporting) — see `docs/roadmap.md`.
+- **CBT follow-ups** — essay/manual-marking questions, the full M24
+  Question Bank, a detailed per-question answer-review screen, multiple
+  attempts per exam, any proctoring, M15 `ResultRun` integration (the
+  extension point — M14's `ScoreSource::OnlineCbt` — is documented and
+  ready), notification (M18) hooks, bulk question import/exam templates,
+  staff analytics beyond a plain attempts list.
 - **Learning Materials follow-ups** — Parent Portal visibility, editing an
   uploaded material (delete + re-upload covers a correction today),
   multiple files per material, video upload/streaming/transcoding/

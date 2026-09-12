@@ -520,9 +520,57 @@ re-upload covers a correction), multiple files per material, video
 upload/streaming/transcoding/thumbnails/player, download analytics,
 notification (M18) hooks, bulk upload.
 
-## Milestone 23+ — Domain Modules
+## ✅ Milestone 23 — CBT / Online Examinations (complete, 2026-10-01)
 
-CBT · Reporting.
+School-scoped online examinations with multiple-choice and true/false
+questions, one timed attempt per student, server-side automatic marking,
+and immediate or scheduled result release. No essay/manual-marking
+questions, no proctoring. `App\Models\Question` + `QuestionOption`
+(school-owned, reusable bank — deliberately minimal M24-compatible
+groundwork, not the bank itself) are never read directly by a live exam:
+`App\Services\Cbt\ExaminationQuestionService::attach()` snapshots a
+question's content into `App\Models\ExaminationQuestion` +
+`ExaminationQuestionOption` the moment it's attached, so a later edit to
+the bank question never changes an exam that already uses it.
+`App\Enums\ExaminationStatus` (`Draft` → `Scheduled` → `Closed`, one-way)
+is deliberately separate from `App\Enums\ExamAttemptStatus`
+(`InProgress`/`Completed`) — closing an exam stops new attempts starting;
+one already in progress is still individually finalised by its own expiry
+check. `unique(examination_id, student_id)` at the DB level is the real
+"one attempt per student" guarantee — a concurrent double-start is caught
+and resolved by resuming the row that won the race, never a duplicate or a
+500. `App\Services\Cbt\ExamAttemptService` computes `expires_at` once at
+`started_at + duration_minutes` (capped to the exam's own `ends_at`) and
+re-checks the server clock — never a client value — before accepting any
+answer or letting a submission stand; an expired attempt is auto-marked
+and finalised the next time anything touches it. Marking compares each
+answer's `selected_option_id` against the snapshotted option's
+`is_correct` server-side only. Result release
+(`App\Enums\ResultReleaseMode`: `Immediate`/`Scheduled`) is evaluated
+inline at read time via `ExamAttempt::isResultVisible()` — no queue or
+scheduler exists in this app and M23 doesn't add one, mirroring
+`ResultRunStatus::visibleToParents()`'s own lifecycle-gate precedent but
+with an actual timestamp. Correct answers are never exposed to a student
+at any point, independent of result release. New permissions `cbt.view` /
+`.author` / `.manage` / `.take` — Teacher `.author` scoped to
+classes/subjects they hold an active M11 `TeacherAssignment` for
+(`App\Support\Cbt\CbtAuthorizer`, mirrors `AssessmentAuthorizer`
+exactly); Student reaches it through `cbt.take`, the single gate for the
+whole `/student/cbt/*` surface. `Module::Cbt`, off by default, depends on
+`Assessments` only. CBT results are **not** compiled into M15's
+`ResultRun` in this milestone — the documented extension point is M14's
+own `ScoreSource::OnlineCbt` case on `AssessmentScore`, reserved
+precisely for this. Full detail in `docs/cbt.md`.
+
+Deferred: essay/manual-marking questions, the full M24 Question Bank, a
+detailed per-question answer-review screen, multiple attempts per exam,
+any proctoring (webcam/screen recording/AI/biometric/browser lockdown),
+M15 `ResultRun` integration, notification (M18) hooks, bulk question
+import/exam templates, staff analytics beyond a plain attempts list.
+
+## Milestone 24+ — Domain Modules
+
+CBT Question Bank · Reporting.
 
 Each domain module checks its `App\Enums\Module` flag (`module:` middleware /
 `@module`) **and** its M4 permissions — the two stay orthogonal.

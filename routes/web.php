@@ -11,6 +11,10 @@ use App\Http\Controllers\Assessment\AssessmentScoreController;
 use App\Http\Controllers\Assessment\AssignmentController;
 use App\Http\Controllers\Assessment\AssignmentSubmissionController;
 use App\Http\Controllers\Attendance\AttendanceRegisterController;
+use App\Http\Controllers\Cbt\ExaminationAttemptController;
+use App\Http\Controllers\Cbt\ExaminationController;
+use App\Http\Controllers\Cbt\ExaminationQuestionController;
+use App\Http\Controllers\Cbt\QuestionController;
 use App\Http\Controllers\Communication\AnnouncementController;
 use App\Http\Controllers\Communication\CommunicationMessageController;
 use App\Http\Controllers\Communication\CommunicationStatusController;
@@ -42,6 +46,8 @@ use App\Http\Controllers\Portal\ParentStudentController;
 use App\Http\Controllers\Portal\ParentTimetableController;
 use App\Http\Controllers\Portal\StudentAssignmentController;
 use App\Http\Controllers\Portal\StudentAttendanceController;
+use App\Http\Controllers\Portal\StudentExamAttemptController;
+use App\Http\Controllers\Portal\StudentExaminationController;
 use App\Http\Controllers\Portal\StudentFeeController;
 use App\Http\Controllers\Portal\StudentLearningMaterialController;
 use App\Http\Controllers\Portal\StudentOnlinePaymentController;
@@ -728,6 +734,66 @@ Route::middleware(['auth', 'verified', 'active'])->group(function () {
         });
 
         /*
+        | CBT / Online Examinations (see docs/cbt.md). Two gates:
+        |   module:cbt  — is the feature on for this school?
+        |   ->can('cbt.view')  — staff read access.
+        |   ->can('cbt.author')  — create/edit-while-draft/attach questions/
+        |     schedule/close; a Teacher holding this without `cbt.manage` is
+        |     further scoped to classes/subjects they teach by CbtAuthorizer,
+        |     re-checked inside the controller (the route gate alone can't
+        |     express it).
+        | {question}/{examination}/{examinationQuestion} are resolved by
+        | tenant-scoped `findOrFail`, so another school's id 404s.
+        */
+        Route::middleware('module:cbt')->prefix('cbt')->name('cbt.')->group(function () {
+            Route::prefix('questions')->name('questions.')->group(function () {
+                Route::get('/', [QuestionController::class, 'index'])
+                    ->can('cbt.view')->name('index');
+                Route::get('create', [QuestionController::class, 'create'])
+                    ->can('cbt.author')->name('create');
+                Route::post('/', [QuestionController::class, 'store'])
+                    ->can('cbt.author')->name('store');
+                Route::get('{question}/edit', [QuestionController::class, 'edit'])
+                    ->whereNumber('question')->can('cbt.author')->name('edit');
+                Route::patch('{question}', [QuestionController::class, 'update'])
+                    ->whereNumber('question')->can('cbt.author')->name('update');
+                Route::post('{question}/toggle-active', [QuestionController::class, 'toggleActive'])
+                    ->whereNumber('question')->can('cbt.author')->name('toggle-active');
+            });
+
+            Route::prefix('examinations')->name('examinations.')->group(function () {
+                Route::get('/', [ExaminationController::class, 'index'])
+                    ->can('cbt.view')->name('index');
+                Route::get('create', [ExaminationController::class, 'create'])
+                    ->can('cbt.author')->name('create');
+                Route::post('/', [ExaminationController::class, 'store'])
+                    ->can('cbt.author')->name('store');
+                Route::get('{examination}', [ExaminationController::class, 'show'])
+                    ->whereNumber('examination')->can('cbt.view')->name('show');
+                Route::get('{examination}/edit', [ExaminationController::class, 'edit'])
+                    ->whereNumber('examination')->can('cbt.author')->name('edit');
+                Route::patch('{examination}', [ExaminationController::class, 'update'])
+                    ->whereNumber('examination')->can('cbt.author')->name('update');
+                Route::get('{examination}/preview', [ExaminationController::class, 'preview'])
+                    ->whereNumber('examination')->can('cbt.view')->name('preview');
+                Route::post('{examination}/schedule', [ExaminationController::class, 'schedule'])
+                    ->whereNumber('examination')->can('cbt.author')->name('schedule');
+                Route::post('{examination}/close', [ExaminationController::class, 'close'])
+                    ->whereNumber('examination')->can('cbt.author')->name('close');
+
+                Route::get('{examination}/questions/create', [ExaminationQuestionController::class, 'create'])
+                    ->whereNumber('examination')->can('cbt.author')->name('questions.create');
+                Route::post('{examination}/questions', [ExaminationQuestionController::class, 'store'])
+                    ->whereNumber('examination')->can('cbt.author')->name('questions.store');
+                Route::delete('{examination}/questions/{examinationQuestion}', [ExaminationQuestionController::class, 'destroy'])
+                    ->whereNumber('examination')->whereNumber('examinationQuestion')->can('cbt.author')->name('questions.destroy');
+
+                Route::get('{examination}/attempts', [ExaminationAttemptController::class, 'index'])
+                    ->whereNumber('examination')->can('cbt.view')->name('attempts.index');
+            });
+        });
+
+        /*
         | Communication Hub, Announcements & Notifications (see
         | docs/communication.md). module:notifications gates all of it.
         |   ->can('communication.view' | '.create' | '.manage' | '.resolve' |
@@ -928,6 +994,29 @@ Route::middleware(['auth', 'verified', 'active'])->group(function () {
                 ->can('portal.student')->name('learning-materials.index');
             Route::get('learning-materials/{material}/download', [StudentLearningMaterialController::class, 'download'])
                 ->whereNumber('material')->can('portal.student')->name('learning-materials.download');
+
+            // CBT / online examinations (M23, docs/cbt.md) — the listing
+            // is not middleware-gated by module:cbt, same reasoning as
+            // learning materials above; every deeper, state-mutating
+            // action (start/take/answer/submit/result) is hard-gated so an
+            // exam can never actually be sat while the module is off.
+            Route::get('cbt', [StudentExaminationController::class, 'index'])
+                ->can('cbt.take')->name('cbt.index');
+
+            Route::middleware('module:cbt')->prefix('cbt')->name('cbt.')->group(function () {
+                Route::get('{examination}', [StudentExaminationController::class, 'show'])
+                    ->whereNumber('examination')->can('cbt.take')->name('show');
+                Route::post('{examination}/start', [StudentExamAttemptController::class, 'start'])
+                    ->whereNumber('examination')->can('cbt.take')->name('start');
+                Route::get('{examination}/take', [StudentExamAttemptController::class, 'take'])
+                    ->whereNumber('examination')->can('cbt.take')->name('take');
+                Route::post('{examination}/answer', [StudentExamAttemptController::class, 'answer'])
+                    ->whereNumber('examination')->can('cbt.take')->name('answer');
+                Route::post('{examination}/submit', [StudentExamAttemptController::class, 'submit'])
+                    ->whereNumber('examination')->can('cbt.take')->name('submit');
+                Route::get('{examination}/result', [StudentExamAttemptController::class, 'result'])
+                    ->whereNumber('examination')->can('cbt.take')->name('result');
+            });
 
             // Announcements & notifications (M18, docs/communication.md) —
             // AnnouncementController/NotificationController shared with staff

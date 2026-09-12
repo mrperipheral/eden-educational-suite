@@ -189,11 +189,18 @@ enum Module: string
      *     disabled) for a subject + class, students in that class can view
      *     and download it (`docs/learning-materials.md`). No drafts,
      *     versioning or approval workflow. Depends on `academics` only.
+     *   - `cbt` — CBT / Online Examinations (M23): school-scoped
+     *     multiple-choice/true-false examinations with a draft → scheduled
+     *     → closed lifecycle, a per-exam question snapshot (immune to a
+     *     later question edit), one timed attempt per student, server-side
+     *     automatic marking, and immediate or scheduled result release
+     *     (`docs/cbt.md`). No essay/manual-marking questions, no proctoring.
+     *     Depends on `assessments` only.
      */
     public function isAvailable(): bool
     {
         return match ($this) {
-            self::Academics, self::Students, self::Guardians, self::Staff, self::Timetable, self::Attendance, self::Assessments, self::Results, self::Notifications, self::Fees, self::Promotion, self::LearningMaterials, self::ParentPortal, self::StudentPortal => true,
+            self::Academics, self::Students, self::Guardians, self::Staff, self::Timetable, self::Attendance, self::Assessments, self::Results, self::Notifications, self::Fees, self::Promotion, self::LearningMaterials, self::Cbt, self::ParentPortal, self::StudentPortal => true,
             default => false,
         };
     }

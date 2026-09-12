@@ -82,6 +82,12 @@ enum Permission: string
     case LearningMaterialUpload = 'material.upload';
     case LearningMaterialManage = 'material.manage';
 
+    // ---- CBT / online examinations (enforced: CBT / Online Examinations M23) ----
+    case CbtView = 'cbt.view';
+    case CbtAuthor = 'cbt.author';
+    case CbtManage = 'cbt.manage';
+    case CbtTake = 'cbt.take';
+
     // ---- Communication & notifications (enforced: Communication & Notification Foundation M18) ----
     case CommunicationView = 'communication.view';
     case CommunicationCreate = 'communication.create';

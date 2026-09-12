@@ -1,11 +1,12 @@
 # Database Design
 
-Status: Milestone 22. Tenant + roles + onboarding + school settings + module
+Status: Milestone 23. Tenant + roles + onboarding + school settings + module
 activation + academic foundation + student management + guardian management +
 teacher management + timetable management + attendance management + assessment &
 assignments + results & report cards + parent portal + student portal +
 communication & notification foundation + fees & fee management + online fee
-payment (Paystack) + promotion & graduation + learning materials. School-owned tables: `school_settings` (M6),
+payment (Paystack) + promotion & graduation + learning materials + CBT / online
+examinations. School-owned tables: `school_settings` (M6),
 `school_modules` (M7), the academic structure — `academic_sessions`,
 `academic_periods`, `academic_levels`, `level_arms`, `subjects`,
 `level_subject` (M8) — `students` + `enrollments` (M9), `guardians` +
@@ -24,7 +25,9 @@ payment (Paystack) + promotion & graduation + learning materials. School-owned t
 `school_settings.paystack_*` (M20, additive), `paystack_transactions` (M20),
 `promotion_batches`, `promotion_records` (M21),
 `students.graduated_at`/`.graduated_academic_session_id`/`.graduation_notes`/
-`.graduated_by` (M21, additive), `learning_materials` (M22).
+`.graduated_by` (M21, additive), `learning_materials` (M22), `questions`,
+`question_options`, `examinations`, `examination_questions`,
+`examination_question_options`, `exam_attempts`, `exam_answers` (M23).
 This document records the conventions every future migration follows.
 
 ## Current schema
@@ -578,6 +581,90 @@ arm) for one student. See `docs/promotion.md` §4.
 source/target nullability, not `assessments`' always-fully-scoped shape —
 a deliberate choice for this milestone's coarser-grained content. See
 `docs/learning-materials.md` §2.
+
+### `2026_10_01_100000`–`100060` — CBT / Online Examinations (Milestone 23)
+
+- **`questions`** — school-owned: `subject_id` (`cascadeOnDelete`, not
+  level/session-scoped — reusable across any exam of a matching subject),
+  `question_text`, `type` (`string(20)`, an
+  `App\Enums\ExaminationQuestionType` value, not mass-assignable),
+  `marks` (`decimal(6,2)`, default `1`), `is_active` (soft on/off switch
+  for the attach-picker — questions are never hard-deleted), `created_by`
+  (nullable, `nullOnDelete`). `index(school_id, subject_id)`,
+  `index(school_id, is_active)`.
+- **`question_options`** — school-owned + `question_id`
+  (`cascadeOnDelete`): `option_text`, `is_correct` (bool, default false),
+  `position`. Both MCQ and true/false questions share this one table —
+  true/false is just two rows. "Exactly one correct option" is an
+  application-layer invariant (`QuestionRequest`), not a DB constraint.
+  `index(school_id, question_id)`.
+- **`examinations`** — school-owned: the full academic-scope chain
+  `academic_session_id → academic_period_id → academic_level_id →
+  level_arm_id → subject_id`, **all required** (`cascadeOnDelete`) —
+  mirrors `assessments` exactly, unlike `learning_materials`'/
+  `promotion_batches`' nullable period/arm. `title`, `description`,
+  `duration_minutes`, `starts_at`/`ends_at` (the attempt-start window),
+  `pass_mark_percentage` (`decimal(5,2)`, a percentage so it stays
+  meaningful as questions are added/removed while still `draft`), `status`
+  (`string(15)`, an `App\Enums\ExaminationStatus` value, default `draft`,
+  not mass-assignable), `result_release` (`string(15)`, an
+  `App\Enums\ResultReleaseMode` value, default `immediate`),
+  `result_release_at` (nullable), `scheduled_at`/`closed_at` (nullable
+  lifecycle timestamps), `created_by` (nullable, `nullOnDelete`).
+  `index(school_id, academic_session_id, academic_period_id)` (named
+  `examinations_scope_index`), `index(school_id, academic_level_id,
+  level_arm_id)` (named `examinations_class_index`),
+  `index(school_id, subject_id)`, `index(school_id, status)`,
+  `index(school_id, starts_at, ends_at)` (named
+  `examinations_window_index`). The `Examination` model additionally sets
+  `protected $attributes = ['status' => 'draft']` — not just the DB
+  column default — so a freshly-`new`-ed instance has `status` available
+  in memory immediately without a round-trip reload (a real bug caught
+  during development: `new Examination([...])->save()` left `->status`
+  `null` in memory until the row was re-fetched, since the enum-cast
+  attribute was never actually set on the PHP object). `ExamAttempt`
+  carries the identical `$attributes` default for the same reason.
+- **`examination_questions`** — school-owned + `examination_id`
+  (`cascadeOnDelete`) + `question_id` (nullable, `nullOnDelete` — a soft
+  traceability pointer only): `question_text`/`type`/`marks` **snapshotted**
+  from the source `Question` at attach time, `position`.
+  `index(school_id, examination_id)`.
+- **`examination_question_options`** — school-owned + `examination_question_id`
+  (`cascadeOnDelete`): `option_text`/`is_correct`/`position`, snapshotted
+  from the source `QuestionOption` rows the same way. `is_correct` here is
+  the actual marking key — read only server-side, never serialised to a
+  student before submission.
+- **`exam_attempts`** — school-owned **+** student-scoped:
+  `examination_id`/`student_id` (`cascadeOnDelete`), `started_at`,
+  `expires_at` (computed once, `started_at + duration_minutes`, capped to
+  the exam's own `ends_at` — never recalculated), `submitted_at`
+  (nullable), `status` (`string(15)`, an `App\Enums\ExamAttemptStatus`
+  value, default `in_progress`, not mass-assignable), `score`/`max_score`
+  (`decimal(8,2)`, nullable until marked), `percentage` (`decimal(5,2)`,
+  nullable), `passed` (nullable bool), `auto_submitted` (bool, default
+  false — distinguishes a server-triggered expiry finalisation from a
+  genuine student submission for staff reporting).
+  **`unique(examination_id, student_id)`** (named
+  `exam_attempts_one_per_student_unique`) — the real, DB-level "one
+  attempt per student per examination" guarantee; a concurrent double-start
+  is caught by this constraint and resolved by resuming the row that won
+  the race (`App\Services\Cbt\ExamAttemptService::start()`), not a 500 and
+  not a duplicate. `index(school_id, student_id)`,
+  `index(school_id, examination_id)`, `index(school_id, status)`.
+- **`exam_answers`** — school-owned + `exam_attempt_id`
+  (`cascadeOnDelete`) + `examination_question_id` (`cascadeOnDelete`) +
+  `selected_option_id` (nullable FK to `examination_question_options`,
+  `nullOnDelete` — null means unanswered). One row per
+  `(exam_attempt_id, examination_question_id)` is bulk-inserted the moment
+  an attempt starts (mirrors `attendance_records`' own roster-snapshot
+  convention), `answered_at`/`is_correct`/`marks_awarded` filled in only
+  at answer/marking time. **`unique(exam_attempt_id,
+  examination_question_id)`** (named
+  `exam_answers_one_per_question_unique`).
+  `index(school_id, exam_attempt_id)`.
+
+See `docs/cbt.md` for the full lifecycle, timing, marking and result-release
+design rationale.
 
 ### `2026_09_15_100000_create_school_modules_table`
 Milestone 7 — per-school feature/module activation. `module` (`string(40)`, an

@@ -7,9 +7,11 @@ use App\Enums\AssignmentSubmissionStatus;
 use App\Enums\AttendanceStatus;
 use App\Enums\CommunicationCategory;
 use App\Enums\EnrollmentStatus;
+use App\Enums\ExaminationQuestionType;
 use App\Enums\GuardianRelationship;
 use App\Enums\Module;
 use App\Enums\PaymentMethod;
+use App\Enums\ResultReleaseMode;
 use App\Enums\Role;
 use App\Enums\StudentStatus;
 use App\Enums\TeacherStatus;
@@ -23,12 +25,14 @@ use App\Models\Assignment;
 use App\Models\AttendanceRegister;
 use App\Models\CommunicationMessage;
 use App\Models\CommunicationThread;
+use App\Models\Examination;
 use App\Models\FeeCategory;
 use App\Models\FeePayment;
 use App\Models\FeePaymentAllocation;
 use App\Models\FeeStructure;
 use App\Models\GradingScheme;
 use App\Models\Guardian;
+use App\Models\Question;
 use App\Models\ReportCardConfiguration;
 use App\Models\ResultRun;
 use App\Models\ResultWeightingScheme;
@@ -40,6 +44,8 @@ use App\Models\Subject;
 use App\Models\Teacher;
 use App\Models\Timetable;
 use App\Models\User;
+use App\Services\Cbt\ExamAttemptService;
+use App\Services\Cbt\ExaminationQuestionService;
 use App\Services\LearningMaterials\LearningMaterialUploadService;
 use App\Services\Promotion\GraduationService;
 use App\Services\Promotion\PromotionService;
@@ -120,12 +126,13 @@ class DatabaseSeeder extends Seeder
         ])->save();
         $settings->markReviewed();
 
-        // Alpha has tweaked two modules away from the catalogue defaults;
-        // every other module (and all of Beta) simply uses the default —
-        // including Fees (M19), on by default, so the fee statement has
-        // real data to show.
+        // Alpha has tweaked three modules away from the catalogue
+        // defaults; every other module (and all of Beta) simply uses the
+        // default — including Fees (M19), on by default, so the fee
+        // statement has real data to show.
         SchoolModule::create(['module' => Module::Timetable->value, 'enabled' => true]);
         SchoolModule::create(['module' => Module::LearningMaterials->value, 'enabled' => true]);
+        SchoolModule::create(['module' => Module::Cbt->value, 'enabled' => true]);
 
         // Academic foundation — a current session with three terms, a handful of
         // levels + arms, and a starter subject list. All school-configured;
@@ -809,6 +816,125 @@ class DatabaseSeeder extends Seeder
             'title' => 'Alphabet Chart',
             'description' => null,
         ], UploadedFile::fake()->create('alphabet-chart.png', 80, 'image/png'), $admin);
+
+        // CBT / online examinations (M23) — two scheduled (open)
+        // examinations for Primary 1 Gold, built through the real
+        // services (question bank create → attach-and-snapshot →
+        // schedule), not direct inserts. The Mathematics quiz is left
+        // completely unattempted, ready for a live demo/browser smoke
+        // test of the student-taking flow. The English quiz already has
+        // one genuinely-submitted, genuinely-marked attempt (by the same
+        // Primary 1 Gold demo student the Parent/Student Portal and
+        // Learning Materials demos use) sitting behind a scheduled result
+        // release — a real demonstration of "submitted but not yet
+        // visible" (M23 spec §3), not a simulated one.
+        $questionService = app(ExaminationQuestionService::class);
+        $mathSubject = $subjects->firstWhere('code', 'MTH');
+        $englishSubject = $subjects->firstWhere('code', 'ENG');
+
+        $examMath = new Examination([
+            'academic_session_id' => $session->id,
+            'academic_period_id' => $firstTerm?->id,
+            'academic_level_id' => $primary1->id,
+            'level_arm_id' => $primary1Gold->id,
+            'subject_id' => $mathSubject->id,
+            'title' => 'Mathematics Quiz — Term 1',
+            'description' => 'A short quiz covering addition, multiplication and number sense. You have 20 minutes.',
+            'duration_minutes' => 20,
+            'starts_at' => now()->subHour(),
+            'ends_at' => now()->addWeek(),
+            'pass_mark_percentage' => 50,
+            'result_release' => ResultReleaseMode::Immediate->value,
+        ]);
+        $examMath->created_by = $tomiwa->id;
+        $examMath->save();
+
+        foreach ([
+            ['text' => 'What is 2 + 2?', 'options' => ['3', '4', '5', '6'], 'correct' => 1],
+            ['text' => 'What is 5 × 3?', 'options' => ['15', '10', '20', '8'], 'correct' => 0],
+            ['text' => 'Which of these numbers is even?', 'options' => ['7', '9', '4', '11'], 'correct' => 2],
+        ] as $definition) {
+            $question = new Question([
+                'subject_id' => $mathSubject->id,
+                'question_text' => $definition['text'],
+                'marks' => 1,
+                'is_active' => true,
+            ]);
+            $question->type = ExaminationQuestionType::MultipleChoice->value;
+            $question->created_by = $tomiwa->id;
+            $question->save();
+
+            foreach ($definition['options'] as $i => $text) {
+                $question->options()->create(['option_text' => $text, 'is_correct' => $i === $definition['correct'], 'position' => $i + 1]);
+            }
+
+            $questionService->attach($examMath, $question->fresh('options'));
+        }
+
+        $trueFalse = new Question([
+            'subject_id' => $mathSubject->id,
+            'question_text' => '10 is greater than 5.',
+            'marks' => 1,
+            'is_active' => true,
+        ]);
+        $trueFalse->type = ExaminationQuestionType::TrueFalse->value;
+        $trueFalse->created_by = $tomiwa->id;
+        $trueFalse->save();
+        $trueFalse->options()->create(['option_text' => 'True', 'is_correct' => true, 'position' => 1]);
+        $trueFalse->options()->create(['option_text' => 'False', 'is_correct' => false, 'position' => 2]);
+        $questionService->attach($examMath, $trueFalse->fresh('options'));
+
+        $examMath->schedule();
+
+        $examEnglish = new Examination([
+            'academic_session_id' => $session->id,
+            'academic_period_id' => $firstTerm?->id,
+            'academic_level_id' => $primary1->id,
+            'level_arm_id' => $primary1Gold->id,
+            'subject_id' => $englishSubject->id,
+            'title' => 'English Language Quiz — Term 1',
+            'description' => 'A short vocabulary quiz. You have 15 minutes.',
+            'duration_minutes' => 15,
+            'starts_at' => now()->subDays(2),
+            'ends_at' => now()->addWeek(),
+            'pass_mark_percentage' => 50,
+            'result_release' => ResultReleaseMode::Scheduled->value,
+            'result_release_at' => now()->addDay(),
+        ]);
+        $examEnglish->created_by = $admin->id;
+        $examEnglish->save();
+
+        foreach ([
+            ['text' => 'Which word means "happy"?', 'options' => ['Sad', 'Joyful', 'Angry', 'Tired'], 'correct' => 1],
+            ['text' => 'Choose the correctly spelled word.', 'options' => ['Recieve', 'Receive', 'Receeve', 'Receve'], 'correct' => 1],
+        ] as $definition) {
+            $question = new Question([
+                'subject_id' => $englishSubject->id,
+                'question_text' => $definition['text'],
+                'marks' => 1,
+                'is_active' => true,
+            ]);
+            $question->type = ExaminationQuestionType::MultipleChoice->value;
+            $question->created_by = $admin->id;
+            $question->save();
+
+            foreach ($definition['options'] as $i => $text) {
+                $question->options()->create(['option_text' => $text, 'is_correct' => $i === $definition['correct'], 'position' => $i + 1]);
+            }
+
+            $questionService->attach($examEnglish, $question->fresh('options'));
+        }
+
+        $examEnglish->schedule();
+
+        $attemptService = app(ExamAttemptService::class);
+        $heroStudent = $p1GoldRoster->first();
+        $englishAttempt = $attemptService->start($examEnglish, $heroStudent);
+        foreach ($examEnglish->questions()->with('options')->get() as $examinationQuestion) {
+            $correctOption = $examinationQuestion->options->firstWhere('is_correct', true);
+            $attemptService->answer($examEnglish, $englishAttempt, $examinationQuestion, $correctOption->id);
+        }
+        $attemptService->submit($examEnglish, $englishAttempt);
 
         $tenant->forget();
     }
