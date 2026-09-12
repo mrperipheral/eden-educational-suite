@@ -1,12 +1,12 @@
 # Project Status
 
-_Last updated: 2026-09-28_
+_Last updated: 2026-09-29_
 
 ## Current milestone
 
-**Milestone 20 — Online Fee Payment / Paystack: COMPLETE.**
+**Milestone 21 — Promotion & Graduation: COMPLETE.**
 
-Next up: further **Domain Modules** — CBT, Promotion. Not started — do not
+Next up: further **Domain Modules** — CBT, Reporting. Not started — do not
 begin without picking one up explicitly. See `docs/roadmap.md`.
 
 ## What the application is
@@ -15,7 +15,7 @@ Multi-school School Management SaaS (management + portals only — no website
 features). PHP 8.3 · Laravel 13.31 · MySQL 8 · Blade + Tailwind v4 · Alpine.js ·
 Vite · PHPUnit · Pint.
 
-## Environment (verified 2026-09-28)
+## Environment (verified 2026-09-29)
 
 | Item | Value |
 |------|-------|
@@ -24,7 +24,7 @@ Vite · PHPUnit · Pint.
 | Node / npm | 22.x |
 | Database | MySQL 8 (app) · SQLite `:memory:` (tests) |
 | Local mail | Mailpit (`127.0.0.1:1025`, UI `:8025`) — `.env` only, not committed |
-| Tests | `php artisan test` — 938 passing |
+| Tests | `php artisan test` — 988 passing |
 | Build | `npm run build` — passing |
 | Formatting | `vendor/bin/pint --test` — passing |
 
@@ -51,8 +51,94 @@ Vite · PHPUnit · Pint.
 - **M17 — Student Portal** (`student-portal-complete`) — `docs/student-portal.md`.
 - **M18 — Communication & Notification Foundation** (`communication-notifications-complete`) — `docs/communication.md`.
 - **M19 — Fees & Fee Management** (`fees-management-complete`) — `docs/fees.md`.
-- **M20 — Online Fee Payment / Paystack** (this milestone,
-  `online-payment-paystack-complete`) — `docs/paystack.md`; see below.
+- **M20 — Online Fee Payment / Paystack** (`online-payment-paystack-complete`) — `docs/paystack.md`.
+- **M21 — Promotion & Graduation** (this milestone,
+  `promotion-graduation-complete`) — `docs/promotion.md`; see below.
+
+## Delivered in Milestone 21
+
+A safe, auditable academic progression workflow built entirely on M9's
+existing `Student`/`Enrollment` architecture — promoting a student never
+rewrites history, it creates a new enrollment for the target session while
+the old one is preserved, closed. Full detail in `docs/promotion.md`.
+
+- **`App\Models\PromotionBatch`** (school-owned; one bulk promotion run —
+  source session/period/level/arm, target session/level/arm, `created_by`,
+  aggregate `status` not mass-assignable) + **`PromotionRecord`**
+  (school-owned + student-scoped; one row per student per batch —
+  `promoted`/`skipped`/`failed`, `unique(school_id, promotion_batch_id,
+  student_id)`). Graduation has **no** separate batch/history table — four
+  additive `graduated_*` columns on `students` are the entire audit trail
+  (a student is graduated at most once at a time, unlike promotion).
+- **`App\Services\Promotion\PromotionEligibilityService`** — the single
+  seam both the roster UI and `PromotionService` use to decide who may be
+  promoted (active status + a matching active enrollment; no invented
+  pass/fail rule) and whether a student is already in the target session.
+  **`PromotionService::promoteBatch()`** processes every selected student
+  in its **own** `DB::transaction()` with the `Student` row
+  `lockForUpdate()`-ed — one student's failure never rolls back another's
+  success — and reuses M9's own `Enrollment::makeActive()` unchanged to
+  create the new placement while closing (never deleting) the old one.
+  **`GraduationService::graduate()`/`reactivate()`** transition
+  `StudentStatus::Graduated` and back, with no hard-coded graduating level;
+  `graduateBatch()` isolates one student's failure from the rest the same
+  way.
+- **No DB-level uniqueness constraint on `enrollments(session, level,
+  arm)`** for promotion's own duplicate/concurrency protection —
+  deliberately rejected because it would have broken M9's own
+  `test_historical_enrollments_are_preserved`. Concurrency safety instead
+  comes from the `Student` row lock plus an "already in target
+  session"/"already graduated" business-rule re-check after the lock is
+  acquired.
+- **New permissions** `promotion.view` / `promotion.manage` /
+  `graduation.manage`, slotted into the existing role tiers: School Admin +
+  Principal → full; Teacher/Staff → `.view` only, no execution;
+  Bursar/Parent/Student → none (Parent/Student reach their own/linked
+  child's *current* placement/status through the existing portals,
+  unchanged — `Student::currentEnrollment` is a live relation, so no portal
+  code changes were needed).
+- **Reuses `Module::Promotion`** (new, on by default) — depends on
+  `Module::Students` only, not Fees/CBT/Learning Materials.
+- **One targeted addition to an existing request** —
+  `App\Http\Requests\Student\EnrollmentRequest` (M9) now rejects creating a
+  **new** enrollment for a graduated student ("Reactivate them before
+  adding a new enrollment") — the explicit, authorised reversal path the
+  spec requires, without building a second system.
+- **2 new tables** (migrations `2026_09_29_100000`–`100010`):
+  `promotion_batches`, `promotion_records` — both `school_id`-leading
+  indexed. 1 additive migration (`2026_09_29_100020`) onto M9's `students`
+  table (`graduated_at`/`graduated_academic_session_id`/`graduation_notes`/
+  `graduated_by`).
+- **6 new views** under `resources/views/promotion/*` — a two-step,
+  bookmarkable **GET** flow (pick source class → eligible roster + target
+  picker + confirm) rather than a stateful wizard, deliberately avoiding a
+  generic workflow engine; bulk select-all/individual checkboxes; a batch
+  result summary; a graduation history list + source-picker → roster →
+  confirm flow; one new staff nav link (`Promotion`, module + permission
+  gated).
+- **Seeder** — Alpha Academy gets a second, non-current academic session
+  (`2026/2027`) to promote into, one Primary 1 Gold student promoted to
+  Primary 2 Gold there (the *other* Primary 1 Gold student — the Parent/
+  Student Portal, Communication and Fees demo child used throughout the
+  seed — is deliberately left untouched), and one JSS 2 student graduated
+  outright. Both go through the real services, not direct inserts.
+- **Docs** — new `docs/promotion.md`; `PROJECT_STATUS.md`,
+  `docs/roadmap.md`, `docs/database-design.md`, `CLAUDE.md` updated.
+- **50 new tests** under `tests/Feature/Promotion/*` (+ `PromotionTestCase`
+  base) — eligibility (active+matching-enrollment required, graduated/
+  withdrawn/wrong-arm/wrong-status excluded, cross-school never leaks,
+  already-in-target-session detection), promotion service (single, bulk,
+  historical enrollment preservation, duplicate/re-run skip-not-duplicate,
+  a graduated student in the selection fails safely, a nonexistent student
+  id fails without aborting the rest of the batch, exactly one record per
+  student per batch, aggregate status Completed/PartiallyCompleted/Failed),
+  graduation service (lifecycle + metadata, enrollment closed but
+  preserved, no-current-enrollment still succeeds, duplicate/withdrawn
+  rejected, batch isolation, reactivate + its own rejection, the
+  EnrollmentRequest guard), and authorization/tenant isolation for both
+  promotion and graduation (all 7 roles + role-less, module-off 404,
+  cross-school batch/student/session ids rejected, `school_id` from the
+  browser ignored, successful end-to-end HTTP flows).
 
 ## Delivered in Milestone 20
 
@@ -861,8 +947,13 @@ check, DB duplicate prevention, assessment↔assignment link (same class only). 
 ## Known follow-ups / recommendations
 
 - Production env: `SESSION_SECURE_COOKIE=true`, real `MAIL_MAILER`, `APP_DEBUG=false`.
-- Next milestone: pick a further domain module (CBT, Promotion) — see
+- Next milestone: pick a further domain module (CBT, Reporting) — see
   `docs/roadmap.md`.
+- **Promotion follow-ups** — automatic pass/fail promotion rules of any
+  kind (deliberately not built — promotion stays an authorised
+  administrative decision), a promotion approval step distinct from
+  running the batch, bulk import, bulk-undo of a completed batch,
+  notification (M18) hooks on promotion/graduation.
 - **Paystack follow-ups** — a dedicated staff-facing list of online-payment
   attempts (successes already show in the ordinary statement; failed/
   abandoned ones are only visible in `paystack_transactions` directly),
@@ -904,7 +995,7 @@ check, DB duplicate prevention, assessment↔assignment link (same class only). 
   timetable templates / term cloning, named period grids, teacher workload
   limits.
 - **Teacher portal** — sign-in + invitations (Parent Portal delivered in M16).
-- Promotion / graduation workflow; bulk import; documents / photo.
+- Bulk import; documents / photo.
 - Audit trail + data-erasure handling for student / guardian / teacher / timetable / attendance / assessment records.
 - Apply the stored `timezone` / `locale` / `date_format` at render time.
 - Add a CI workflow (Pint + PHPUnit + `npm run build`).

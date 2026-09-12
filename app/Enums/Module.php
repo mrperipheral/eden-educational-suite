@@ -25,6 +25,7 @@ enum Module: string
     case Students = 'students';
     case Guardians = 'guardians';
     case Staff = 'staff';
+    case Promotion = 'promotion';
     case Timetable = 'timetable';
     case Attendance = 'attendance';
     case Assessments = 'assessments';
@@ -43,6 +44,7 @@ enum Module: string
             self::Students => __('Student Management'),
             self::Guardians => __('Parent / Guardian Management'),
             self::Staff => __('Teacher / Staff Management'),
+            self::Promotion => __('Promotion & Graduation'),
             self::Timetable => __('Timetable'),
             self::Attendance => __('Attendance'),
             self::Assessments => __('Assessments'),
@@ -63,6 +65,7 @@ enum Module: string
             self::Students => __('Student records, enrolment and class placement.'),
             self::Guardians => __('Parent and guardian records linked to their children.'),
             self::Staff => __('Teacher and non-teaching staff records and assignments.'),
+            self::Promotion => __('Promote students between sessions/classes and graduate them, preserving history.'),
             self::Timetable => __('Weekly period timetables for classes and teachers.'),
             self::Attendance => __('Daily class attendance registers, independent of the timetable.'),
             self::Assessments => __('Assessment score entry and class assignments — the source data for results.'),
@@ -82,7 +85,7 @@ enum Module: string
     public function group(): string
     {
         return match ($this) {
-            self::Students, self::Guardians, self::Staff => __('People'),
+            self::Students, self::Guardians, self::Staff, self::Promotion => __('People'),
             self::Academics, self::Timetable, self::Attendance, self::LearningMaterials => __('Academics'),
             self::Assessments, self::Results, self::Cbt => __('Assessment'),
             self::Fees => __('Finance'),
@@ -104,6 +107,7 @@ enum Module: string
             self::Students => [self::Academics],
             self::Guardians => [self::Students],
             self::Staff => [self::Academics],
+            self::Promotion => [self::Students],
             self::Timetable => [self::Academics, self::Staff],
             self::Attendance => [self::Academics, self::Students],
             self::Assessments => [self::Academics, self::Students],
@@ -171,11 +175,20 @@ enum Module: string
      *     statement shared by staff and the Parent/Student portals
      *     (`docs/fees.md`). Online payment (Paystack) is **not** built here
      *     — M20. Depends on `students` only.
+     *   - `promotion` — Promotion & Graduation (M21): bulk-promotes eligible
+     *     students from a source session/level/arm to a target one by
+     *     creating a new `Enrollment` (the source one is preserved, closed
+     *     exactly as an ordinary class change already does), and an
+     *     explicit graduation action that transitions `StudentStatus` while
+     *     preserving every historical enrollment and result
+     *     (`docs/promotion.md`). No automatic pass/fail rules — every
+     *     promotion/graduation is an authorised administrative decision.
+     *     Depends on `students` only — not fees, CBT or learning materials.
      */
     public function isAvailable(): bool
     {
         return match ($this) {
-            self::Academics, self::Students, self::Guardians, self::Staff, self::Timetable, self::Attendance, self::Assessments, self::Results, self::Notifications, self::Fees, self::ParentPortal, self::StudentPortal => true,
+            self::Academics, self::Students, self::Guardians, self::Staff, self::Timetable, self::Attendance, self::Assessments, self::Results, self::Notifications, self::Fees, self::Promotion, self::ParentPortal, self::StudentPortal => true,
             default => false,
         };
     }

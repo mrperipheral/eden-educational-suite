@@ -48,6 +48,8 @@ use App\Http\Controllers\Portal\StudentProfileController;
 use App\Http\Controllers\Portal\StudentReportCardController;
 use App\Http\Controllers\Portal\StudentResultController;
 use App\Http\Controllers\Portal\StudentTimetableController;
+use App\Http\Controllers\Promotion\GraduationController;
+use App\Http\Controllers\Promotion\PromotionController;
 use App\Http\Controllers\Results\GradingSchemeController;
 use App\Http\Controllers\Results\GradingSchemeGradeController;
 use App\Http\Controllers\Results\ReportCardConfigurationController;
@@ -274,6 +276,38 @@ Route::middleware(['auth', 'verified', 'active'])->group(function () {
                 ->whereNumber('student')->can('student.manage')->name('status');
             Route::patch('{student}/user', [StudentController::class, 'updateUser'])
                 ->whereNumber('student')->can('student.manage')->name('user');
+        });
+
+        /*
+        | Promotion & Graduation (see docs/promotion.md). Two gates:
+        |   module:promotion  — is the feature on for this school? (depends on students)
+        |   ->can('promotion.view' | '.manage' | 'graduation.manage')  — may this user?
+        | Tenant-owned ids ({batch}, {student}) are resolved by tenant-scoped
+        | `findOrFail`, so another school's id 404s. Every academic id in a
+        | promotion payload is validated to belong to the active school by
+        | `PromoteBatchRequest`/`GraduateBatchRequest`.
+        */
+        Route::middleware('module:promotion')->prefix('promotion')->name('promotion.')->group(function () {
+            Route::get('/', [PromotionController::class, 'index'])
+                ->can('promotion.view')->name('index');
+            Route::get('create', [PromotionController::class, 'create'])
+                ->can('promotion.manage')->name('create');
+            Route::get('roster', [PromotionController::class, 'roster'])
+                ->can('promotion.manage')->name('roster');
+            Route::post('/', [PromotionController::class, 'store'])
+                ->can('promotion.manage')->name('store');
+            Route::get('{batch}', [PromotionController::class, 'show'])
+                ->whereNumber('batch')->can('promotion.view')->name('show');
+
+            // Graduation — literal prefix so it never collides with {batch}.
+            Route::get('graduation', [GraduationController::class, 'index'])
+                ->can('promotion.view')->name('graduation.index');
+            Route::get('graduation/create', [GraduationController::class, 'create'])
+                ->can('graduation.manage')->name('graduation.create');
+            Route::post('graduation', [GraduationController::class, 'store'])
+                ->can('graduation.manage')->name('graduation.store');
+            Route::post('graduation/{student}/reactivate', [GraduationController::class, 'reactivate'])
+                ->whereNumber('student')->can('graduation.manage')->name('graduation.reactivate');
         });
 
         /*

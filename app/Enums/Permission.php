@@ -65,6 +65,11 @@ enum Permission: string
     case ResultPublish = 'result.publish';
     case ResultAdjust = 'result.adjust';
 
+    // ---- Promotion & graduation (enforced: Promotion & Graduation M21) ------
+    case PromotionView = 'promotion.view';
+    case PromotionManage = 'promotion.manage';
+    case GraduationManage = 'graduation.manage';
+
     // ---- Fees & payments (enforced: Fees & Fee Management M19) --------------
     case FeesView = 'fees.view';
     case FeesManage = 'fees.manage';

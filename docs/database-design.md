@@ -1,11 +1,11 @@
 # Database Design
 
-Status: Milestone 20. Tenant + roles + onboarding + school settings + module
+Status: Milestone 21. Tenant + roles + onboarding + school settings + module
 activation + academic foundation + student management + guardian management +
 teacher management + timetable management + attendance management + assessment &
 assignments + results & report cards + parent portal + student portal +
 communication & notification foundation + fees & fee management + online fee
-payment (Paystack). School-owned tables: `school_settings` (M6),
+payment (Paystack) + promotion & graduation. School-owned tables: `school_settings` (M6),
 `school_modules` (M7), the academic structure — `academic_sessions`,
 `academic_periods`, `academic_levels`, `level_arms`, `subjects`,
 `level_subject` (M8) — `students` + `enrollments` (M9), `guardians` +
@@ -21,7 +21,10 @@ payment (Paystack). School-owned tables: `school_settings` (M6),
 `communication_threads`, `communication_messages`, `announcements`,
 `user_notifications` (M18), `fee_categories`, `fee_structures`,
 `student_fee_charges`, `fee_payments`, `fee_payment_allocations` (M19),
-`school_settings.paystack_*` (M20, additive), `paystack_transactions` (M20).
+`school_settings.paystack_*` (M20, additive), `paystack_transactions` (M20),
+`promotion_batches`, `promotion_records` (M21),
+`students.graduated_at`/`.graduated_academic_session_id`/`.graduation_notes`/
+`.graduated_by` (M21, additive).
 This document records the conventions every future migration follows.
 
 ## Current schema
@@ -499,6 +502,50 @@ One additive migration + one new table. See `docs/paystack.md`.
   `markSuccessful()`/`markFailed()`/`markAbandoned()`/
   `markVerificationFailed()`, each called from inside a row-locked DB
   transaction by `App\Services\Paystack\PaymentVerificationService`.
+
+### `2026_09_29_100000`–`100020` — Promotion & Graduation (Milestone 21)
+
+- **`promotion_batches`** — school-owned: `source_academic_session_id`
+  (`cascadeOnDelete`), `source_academic_period_id` (nullable,
+  `nullOnDelete`), `source_academic_level_id` (`cascadeOnDelete`),
+  `source_level_arm_id` (nullable, `nullOnDelete`), mirroring
+  `target_academic_session_id`/`target_academic_level_id`/
+  `target_level_arm_id`, `created_by` FK to `users` (`restrictOnDelete`,
+  not mass-assignable), `status` (`string(20)`, an
+  `App\Enums\PromotionBatchStatus` value, not mass-assignable — computed
+  once every selected student has been processed), `notes`.
+  `index(school_id, target_academic_session_id)` (named
+  `promotion_batches_school_target_session_idx`),
+  `index(school_id, source_academic_session_id)` (named
+  `promotion_batches_school_source_session_idx`).
+- **`promotion_records`** — school-owned **+** student-scoped:
+  `promotion_batch_id` (`cascadeOnDelete`), `student_id`
+  (`cascadeOnDelete`), `source_enrollment_id` / `target_enrollment_id`
+  (both nullable, `nullOnDelete` — `source_enrollment_id` is null only for
+  a `failed` record that never resolved a valid source placement at all;
+  `target_enrollment_id` is null for every `skipped`/`failed` record),
+  `status` (`string(20)`, an `App\Enums\PromotionRecordStatus` value —
+  `promoted`/`skipped`/`failed` — not mass-assignable), `failure_reason`
+  (nullable `string(255)`). `unique(school_id, promotion_batch_id,
+  student_id)` (named `promotion_records_batch_student_unique`) — a batch
+  can never log the same student's transition twice.
+  `index(school_id, student_id)` (named
+  `promotion_records_school_student_idx`). Never edited or hard-deleted —
+  written once by `App\Services\Promotion\PromotionService`.
+- **`students.graduated_at`/`.graduated_academic_session_id`/
+  `.graduation_notes`/`.graduated_by`** (additive onto M9's table) — the
+  entire graduation audit trail, deliberately not a separate table (a
+  student is graduated at most once at a time, unlike promotion, which
+  repeats every session). `graduated_academic_session_id` /
+  `graduated_by` are nullable FKs (`nullOnDelete`). None of the four are
+  mass-assignable — set only by `App\Services\Promotion\
+  GraduationService::graduate()` / cleared by `::reactivate()`.
+
+No DB-level uniqueness constraint on `enrollments(session, level, arm)` was
+added for promotion's own duplicate/concurrency protection — it would have
+broken M9's own `test_historical_enrollments_are_preserved`, which
+legitimately creates two enrollment rows with identical (session, level,
+arm) for one student. See `docs/promotion.md` §4.
 
 ### `2026_09_15_100000_create_school_modules_table`
 Milestone 7 — per-school feature/module activation. `module` (`string(40)`, an

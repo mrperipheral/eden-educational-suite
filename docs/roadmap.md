@@ -457,9 +457,39 @@ refunds through Paystack's own API, recurring/subscription billing, an
 inline-JS/Popup checkout alternative, any payment channel other than
 Paystack.
 
-## Milestone 21+ — Domain Modules
+## ✅ Milestone 21 — Promotion & Graduation (complete, 2026-09-29)
 
-CBT · Reporting · Promotion.
+A safe, auditable academic progression workflow built entirely on M9's
+existing `Student`/`Enrollment` architecture. `App\Models\PromotionBatch` +
+`PromotionRecord` (school-owned; one row per student per batch, `promoted`/
+`skipped`/`failed`) record a bulk promotion; graduation has no separate
+table — four additive `graduated_*` columns on `students` are the entire
+audit trail (a student can only be graduated once at a time, unlike
+promotion). `App\Services\Promotion\PromotionService::promoteBatch()`
+processes each selected student in its **own** `DB::transaction()` with the
+`Student` row `lockForUpdate()`-ed — one student's failure never rolls back
+another's success — and reuses M9's own `Enrollment::makeActive()` unchanged
+to create the new placement while preserving the old one, closed
+(`completed`), never deleted or rewritten.
+`App\Services\Promotion\PromotionEligibilityService` is the single seam
+both the roster UI and the service itself use to decide who may be
+promoted (active status + a matching active enrollment — no invented
+pass/fail rule). `App\Services\Promotion\GraduationService::graduate()` /
+`reactivate()` transition `StudentStatus::Graduated` and back — never a
+deletion — with no hard-coded graduating level. New permissions
+`promotion.view` / `promotion.manage` / `graduation.manage` (School Admin +
+Principal full; Teacher/Staff view-only; Bursar/Parent/Student none — they
+reach current placement through the existing portals, unchanged, since
+`currentEnrollment` is a live relation). `Module::Promotion`, on by default,
+depends on `Students` only. Full detail in `docs/promotion.md`.
+
+Deferred: automatic pass/fail promotion rules of any kind, a promotion
+approval step distinct from running the batch, bulk import, bulk-undo of a
+completed batch, notification (M18) hooks on promotion/graduation.
+
+## Milestone 22+ — Domain Modules
+
+CBT · Reporting.
 
 Each domain module checks its `App\Enums\Module` flag (`module:` middleware /
 `@module`) **and** its M4 permissions — the two stay orthogonal.

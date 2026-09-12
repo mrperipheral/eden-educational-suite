@@ -56,7 +56,9 @@ class Student extends Model
 
     /**
      * `status` is not mass-assignable — it changes only through the dedicated
-     * status endpoint (`StudentController::updateStatus()`).
+     * status endpoint (`StudentController::updateStatus()`). The
+     * `graduated_*` columns (M21, `docs/promotion.md`) are likewise not
+     * mass-assignable — set only by `App\Services\Promotion\GraduationService`.
      *
      * @var array<string, mixed>
      */
@@ -74,6 +76,7 @@ class Student extends Model
             'admitted_on' => 'date',
             'gender' => Gender::class,
             'status' => StudentStatus::class,
+            'graduated_at' => 'datetime',
         ];
     }
 
@@ -148,6 +151,39 @@ class Student extends Model
     public function feePayments(): HasMany
     {
         return $this->hasMany(FeePayment::class);
+    }
+
+    /**
+     * This student's promotion history (M21, `docs/promotion.md`).
+     *
+     * @return HasMany<PromotionRecord, $this>
+     */
+    public function promotionRecords(): HasMany
+    {
+        return $this->hasMany(PromotionRecord::class);
+    }
+
+    /**
+     * The session this student graduated in, if any (M21).
+     *
+     * @return BelongsTo<AcademicSession, $this>
+     */
+    public function graduatedSession(): BelongsTo
+    {
+        return $this->belongsTo(AcademicSession::class, 'graduated_academic_session_id');
+    }
+
+    /**
+     * @return BelongsTo<User, $this>
+     */
+    public function graduatedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'graduated_by');
+    }
+
+    public function isGraduated(): bool
+    {
+        return $this->status === StudentStatus::Graduated;
     }
 
     public function fullName(): string

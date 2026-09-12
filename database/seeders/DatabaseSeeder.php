@@ -40,6 +40,8 @@ use App\Models\Subject;
 use App\Models\Teacher;
 use App\Models\Timetable;
 use App\Models\User;
+use App\Services\Promotion\GraduationService;
+use App\Services\Promotion\PromotionService;
 use App\Services\Results\ResultCompiler;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Database\Seeder;
@@ -724,6 +726,56 @@ class DatabaseSeeder extends Seeder
             'paystack_secret_key' => 'sk_test_demo_0000000000000000000000',
             'paystack_test_mode' => true,
         ])->save();
+
+        // Promotion & graduation (M21) — a next session to promote into, one
+        // Primary 1 Gold student promoted to Primary 2 Gold (the *other*
+        // Primary 1 Gold student, `$p1GoldRoster->first()`, is deliberately
+        // left untouched — they're the Parent/Student Portal, Communication
+        // and Fees demo child used throughout the seed above), and one JSS 2
+        // student graduated outright. Both go through the real services, not
+        // direct inserts, so the resulting history/state is genuine.
+        $nextSession = AcademicSession::create([
+            'name' => '2026/2027',
+            'starts_on' => '2026-09-01',
+            'ends_on' => '2027-07-31',
+        ]);
+
+        $primary1 = $levels->firstWhere('code', 'PRI1');
+        $primary1Gold = $primary1->arms->firstWhere('code', 'G');
+        $primary2 = $levels->firstWhere('code', 'PRI2');
+        $primary2Gold = $primary2->arms->firstWhere('code', 'G');
+
+        $promotee = $cohort->first(function (Student $student) use ($primary1, $primary1Gold, $p1GoldRoster) {
+            $enrollment = $student->currentEnrollment;
+
+            return $enrollment
+                && $enrollment->academic_level_id === $primary1->id
+                && $enrollment->level_arm_id === $primary1Gold->id
+                && $student->id !== $p1GoldRoster->first()->id;
+        });
+
+        if ($promotee) {
+            app(PromotionService::class)->promoteBatch(
+                $session, null, $primary1, $primary1Gold,
+                $nextSession, $primary2, $primary2Gold,
+                [$promotee->id], 'End of First Term promotion demo.', $admin,
+            );
+        }
+
+        $jss2 = $levels->firstWhere('code', 'JSS2');
+        $jss2Gold = $jss2->arms->firstWhere('code', 'G');
+
+        $graduate = $cohort->first(function (Student $student) use ($jss2, $jss2Gold) {
+            $enrollment = $student->currentEnrollment;
+
+            return $enrollment
+                && $enrollment->academic_level_id === $jss2->id
+                && $enrollment->level_arm_id === $jss2Gold->id;
+        });
+
+        if ($graduate) {
+            app(GraduationService::class)->graduate($graduate, $session, 'Completed Basic Education at Alpha Academy.', $admin);
+        }
 
         $tenant->forget();
     }

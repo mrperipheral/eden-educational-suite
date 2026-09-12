@@ -45,6 +45,7 @@
             ['route' => 'members.index', 'label' => __('Members'), 'active' => 'members.*', 'allowed' => auth()->user()->can('member.view')],
             ['route' => 'students.index', 'label' => __('Students'), 'active' => 'students.*', 'allowed' => $moduleOn(\App\Enums\Module::Students) && auth()->user()->can('student.view')],
             ['route' => 'guardians.index', 'label' => __('Guardians'), 'active' => 'guardians.*', 'allowed' => $moduleOn(\App\Enums\Module::Guardians) && auth()->user()->can('guardian.view')],
+            ['route' => 'promotion.index', 'label' => __('Promotion'), 'active' => 'promotion.*', 'allowed' => $moduleOn(\App\Enums\Module::Promotion) && auth()->user()->can('promotion.view')],
             ['route' => 'teachers.index', 'label' => __('Teachers'), 'active' => 'teachers.*', 'allowed' => $moduleOn(\App\Enums\Module::Staff) && auth()->user()->can('staff.view')],
             ['route' => 'timetables.index', 'label' => __('Timetable'), 'active' => 'timetables.*', 'allowed' => $moduleOn(\App\Enums\Module::Timetable) && auth()->user()->can('timetable.view')],
             ['route' => 'attendance.index', 'label' => __('Attendance'), 'active' => 'attendance.*', 'allowed' => $moduleOn(\App\Enums\Module::Attendance) && auth()->user()->can('attendance.view')],

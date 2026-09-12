@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Student;
 
 use App\Enums\EnrollmentStatus;
+use App\Enums\StudentStatus;
 use App\Models\AcademicPeriod;
 use App\Models\Enrollment;
 use App\Models\LevelArm;
@@ -58,6 +59,18 @@ class EnrollmentRequest extends StudentModuleRequest
     {
         $validator->after(function (Validator $validator): void {
             $errors = $validator->errors();
+
+            // A graduated student cannot receive a normal new enrollment —
+            // the explicit, authorised reversal is
+            // `App\Services\Promotion\GraduationService::reactivate()`
+            // (M21, `docs/promotion.md`), not this form.
+            $studentId = $this->route('student');
+            if ($studentId !== null) {
+                $student = Student::query()->find($studentId);
+                if ($student?->status === StudentStatus::Graduated) {
+                    $errors->add('academic_session_id', __('This student has graduated. Reactivate them before adding a new enrollment.'));
+                }
+            }
 
             $sessionId = $this->input('academic_session_id');
             $periodId = $this->input('academic_period_id');
