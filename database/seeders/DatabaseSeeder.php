@@ -850,17 +850,22 @@ class DatabaseSeeder extends Seeder
         $examMath->save();
 
         foreach ([
-            ['text' => 'What is 2 + 2?', 'options' => ['3', '4', '5', '6'], 'correct' => 1],
-            ['text' => 'What is 5 × 3?', 'options' => ['15', '10', '20', '8'], 'correct' => 0],
-            ['text' => 'Which of these numbers is even?', 'options' => ['7', '9', '4', '11'], 'correct' => 2],
+            ['text' => 'What is 2 + 2?', 'options' => ['3', '4', '5', '6'], 'correct' => 1, 'topic' => 'Addition', 'difficulty' => 'easy'],
+            ['text' => 'What is 5 × 3?', 'options' => ['15', '10', '20', '8'], 'correct' => 0, 'topic' => 'Multiplication', 'difficulty' => 'medium'],
+            ['text' => 'Which of these numbers is even?', 'options' => ['7', '9', '4', '11'], 'correct' => 2, 'topic' => 'Number sense', 'difficulty' => 'hard'],
         ] as $definition) {
+            // Scoped to Primary 1 (any arm) — the exact class/level Tomiwa
+            // holds an active M11 assignment for, a genuine demonstration
+            // of the M24 Question Bank's level scoping, not a bypass.
             $question = new Question([
                 'subject_id' => $mathSubject->id,
+                'academic_level_id' => $primary1->id,
                 'question_text' => $definition['text'],
+                'topic' => $definition['topic'],
                 'marks' => 1,
-                'is_active' => true,
             ]);
             $question->type = ExaminationQuestionType::MultipleChoice->value;
+            $question->difficulty = $definition['difficulty'];
             $question->created_by = $tomiwa->id;
             $question->save();
 
@@ -873,11 +878,13 @@ class DatabaseSeeder extends Seeder
 
         $trueFalse = new Question([
             'subject_id' => $mathSubject->id,
+            'academic_level_id' => $primary1->id,
             'question_text' => '10 is greater than 5.',
+            'topic' => 'Number sense',
             'marks' => 1,
-            'is_active' => true,
         ]);
         $trueFalse->type = ExaminationQuestionType::TrueFalse->value;
+        $trueFalse->difficulty = 'easy';
         $trueFalse->created_by = $tomiwa->id;
         $trueFalse->save();
         $trueFalse->options()->create(['option_text' => 'True', 'is_correct' => true, 'position' => 1]);
@@ -905,16 +912,20 @@ class DatabaseSeeder extends Seeder
         $examEnglish->save();
 
         foreach ([
-            ['text' => 'Which word means "happy"?', 'options' => ['Sad', 'Joyful', 'Angry', 'Tired'], 'correct' => 1],
-            ['text' => 'Choose the correctly spelled word.', 'options' => ['Recieve', 'Receive', 'Receeve', 'Receve'], 'correct' => 1],
+            ['text' => 'Which word means "happy"?', 'options' => ['Sad', 'Joyful', 'Angry', 'Tired'], 'correct' => 1, 'topic' => 'Vocabulary', 'difficulty' => 'easy'],
+            ['text' => 'Choose the correctly spelled word.', 'options' => ['Recieve', 'Receive', 'Receeve', 'Receve'], 'correct' => 1, 'topic' => 'Spelling', 'difficulty' => 'medium'],
         ] as $definition) {
+            // Level-agnostic (no academic_level_id) — the School Admin
+            // holds `cbt.manage`, unrestricted, and this demonstrates a
+            // question genuinely reusable at any level of the subject.
             $question = new Question([
                 'subject_id' => $englishSubject->id,
                 'question_text' => $definition['text'],
+                'topic' => $definition['topic'],
                 'marks' => 1,
-                'is_active' => true,
             ]);
             $question->type = ExaminationQuestionType::MultipleChoice->value;
+            $question->difficulty = $definition['difficulty'];
             $question->created_by = $admin->id;
             $question->save();
 
@@ -935,6 +946,23 @@ class DatabaseSeeder extends Seeder
             $attemptService->answer($examEnglish, $englishAttempt, $examinationQuestion, $correctOption->id);
         }
         $attemptService->submit($examEnglish, $englishAttempt);
+
+        // A retired Question Bank entry (M24) — never attached to any
+        // exam, demonstrating the archived-question lifecycle state and
+        // its filter in the bank's own list, independent of any exam.
+        $retiredQuestion = new Question([
+            'subject_id' => $mathSubject->id,
+            'question_text' => 'What is the Roman numeral for 4? (retired — superseded by a clearer version)',
+            'topic' => 'Roman numerals',
+            'marks' => 1,
+        ]);
+        $retiredQuestion->type = ExaminationQuestionType::MultipleChoice->value;
+        $retiredQuestion->difficulty = 'hard';
+        $retiredQuestion->created_by = $tomiwa->id;
+        $retiredQuestion->save();
+        $retiredQuestion->options()->create(['option_text' => 'IV', 'is_correct' => true, 'position' => 1]);
+        $retiredQuestion->options()->create(['option_text' => 'VI', 'is_correct' => false, 'position' => 2]);
+        $retiredQuestion->archive();
 
         $tenant->forget();
     }

@@ -753,12 +753,18 @@ Route::middleware(['auth', 'verified', 'active'])->group(function () {
                     ->can('cbt.author')->name('create');
                 Route::post('/', [QuestionController::class, 'store'])
                     ->can('cbt.author')->name('store');
+                Route::get('{question}/preview', [QuestionController::class, 'preview'])
+                    ->whereNumber('question')->can('cbt.view')->name('preview');
                 Route::get('{question}/edit', [QuestionController::class, 'edit'])
                     ->whereNumber('question')->can('cbt.author')->name('edit');
                 Route::patch('{question}', [QuestionController::class, 'update'])
                     ->whereNumber('question')->can('cbt.author')->name('update');
-                Route::post('{question}/toggle-active', [QuestionController::class, 'toggleActive'])
-                    ->whereNumber('question')->can('cbt.author')->name('toggle-active');
+                Route::post('{question}/activate', [QuestionController::class, 'activate'])
+                    ->whereNumber('question')->can('cbt.author')->name('activate');
+                Route::post('{question}/deactivate', [QuestionController::class, 'deactivate'])
+                    ->whereNumber('question')->can('cbt.author')->name('deactivate');
+                Route::post('{question}/archive', [QuestionController::class, 'archive'])
+                    ->whereNumber('question')->can('cbt.author')->name('archive');
             });
 
             Route::prefix('examinations')->name('examinations.')->group(function () {

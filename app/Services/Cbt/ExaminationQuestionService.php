@@ -23,6 +23,10 @@ class ExaminationQuestionService
             throw new RuntimeException('Questions can only be added while the examination is a draft.');
         }
 
+        if (! $question->isSelectable()) {
+            throw new RuntimeException('Only an active Question Bank entry can be attached to an examination.');
+        }
+
         return DB::transaction(function () use ($examination, $question) {
             $position = ((int) $examination->questions()->max('position')) + 1;
 

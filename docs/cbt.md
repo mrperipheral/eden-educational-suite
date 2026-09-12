@@ -1,11 +1,12 @@
 # CBT / Online Examinations
 
-Status: **Milestone 23 — complete.** School-scoped online examinations with
-multiple-choice and true/false questions, one timed attempt per student,
-server-side automatic marking, and immediate or scheduled result release.
-Essay/manual-marking questions, proctoring (webcam/screen recording/AI/
-biometric/browser lockdown) and a detailed answer-review screen are
-explicitly **not** built in this milestone.
+Status: **Milestones 23–24 — complete.** School-scoped online examinations
+with multiple-choice and true/false questions, one timed attempt per
+student, server-side automatic marking, and immediate or scheduled result
+release (M23), drawing from a proper, searchable, filterable Question Bank
+(M24 — `docs/question-bank.md`). Essay/manual-marking questions, proctoring
+(webcam/screen recording/AI/biometric/browser lockdown) and a detailed
+answer-review screen are explicitly **not** built.
 
 ## 1. Data model
 
@@ -97,13 +98,19 @@ never leaks it.
 
 ## 5. Questions
 
-`Question`: `subject_id` (required — reusable across any exam of a
-matching subject; not level/session-scoped), `question_text`, `type`
+`Question`: `subject_id` (required), `academic_level_id`/`level_arm_id`
+(both optional — M24; null means reusable across every level of that
+subject), `question_text`, `topic` (optional free text — M24), `type`
 (`App\Enums\ExaminationQuestionType`: `MultipleChoice` / `TrueFalse`, not
-mass-assignable), `marks`, `is_active` (a soft on/off switch for the
-attach-picker — never hard-deleted, and deleting one is not offered at all
-in M23, since `ExaminationQuestion.question_id` is `nullOnDelete` and
-would silently detach traceability for no real benefit).
+mass-assignable), `marks`, `difficulty` (`App\Enums\QuestionDifficulty`:
+`Easy`/`Medium`/`Hard` — M24, not mass-assignable), `status`
+(`App\Enums\QuestionStatus`: `Active`/`Inactive`/`Archived` — M24,
+replaces the original M23 `is_active` boolean, not mass-assignable, changed
+only via `activate()`/`deactivate()`/`archive()`). Never hard-deleted —
+deleting one is not offered at all, since `ExaminationQuestion.question_id`
+is `nullOnDelete` and would silently detach traceability for no real
+benefit. Full Question Bank detail (search/filter/lifecycle/authorization)
+in `docs/question-bank.md`.
 
 Both question types share the **same** `QuestionOption` table —
 true/false is simply a question constrained to exactly two option rows
@@ -287,9 +294,10 @@ partial-credit/weighting applies, etc.) is left for a later milestone.
 ## 15. Deferred / not built here
 
 - Essay/manual-marking questions of any kind.
-- The full M24 Question Bank (tagging, difficulty, question analytics,
-  shared cross-school libraries) — `Question`/`QuestionOption` are
-  deliberately minimal groundwork only.
+- Advanced Question Bank taxonomy beyond the M24 `topic`/`difficulty`
+  fields — full tagging, question analytics, shared cross-school
+  libraries, question pools/randomised selection, versioning, bulk
+  import/export (see `docs/question-bank.md` §10).
 - A detailed per-question answer-review screen ("you answered X, the
   correct answer was Y") — explicitly out of scope; §4 protects against
   ever exposing correct answers to a student in the meantime.

@@ -25,7 +25,9 @@
                             <div class="min-w-0">
                                 <p class="truncate text-sm text-gray-900">{{ $question->question_text }}</p>
                                 <p class="text-xs text-gray-500">
-                                    {{ $question->type->label() }} · {{ __(':count marks', ['count' => $question->marks]) }} · {{ __(':count options', ['count' => $question->options->count()]) }}
+                                    {{ $question->type->label() }} · {{ $question->difficulty->label() }}
+                                    · {{ $question->level ? $question->level->name.($question->arm ? ' — '.$question->arm->name : '') : __('Any level') }}
+                                    · {{ __(':count marks', ['count' => $question->marks]) }} · {{ __(':count options', ['count' => $question->options->count()]) }}
                                 </p>
                             </div>
                             <form method="POST" action="{{ route('cbt.examinations.questions.store', $examination->id) }}">

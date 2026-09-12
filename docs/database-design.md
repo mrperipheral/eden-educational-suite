@@ -1,12 +1,12 @@
 # Database Design
 
-Status: Milestone 23. Tenant + roles + onboarding + school settings + module
+Status: Milestone 24. Tenant + roles + onboarding + school settings + module
 activation + academic foundation + student management + guardian management +
 teacher management + timetable management + attendance management + assessment &
 assignments + results & report cards + parent portal + student portal +
 communication & notification foundation + fees & fee management + online fee
 payment (Paystack) + promotion & graduation + learning materials + CBT / online
-examinations. School-owned tables: `school_settings` (M6),
+examinations + question bank. School-owned tables: `school_settings` (M6),
 `school_modules` (M7), the academic structure — `academic_sessions`,
 `academic_periods`, `academic_levels`, `level_arms`, `subjects`,
 `level_subject` (M8) — `students` + `enrollments` (M9), `guardians` +
@@ -27,7 +27,9 @@ examinations. School-owned tables: `school_settings` (M6),
 `students.graduated_at`/`.graduated_academic_session_id`/`.graduation_notes`/
 `.graduated_by` (M21, additive), `learning_materials` (M22), `questions`,
 `question_options`, `examinations`, `examination_questions`,
-`examination_question_options`, `exam_attempts`, `exam_answers` (M23).
+`examination_question_options`, `exam_attempts`, `exam_answers` (M23),
+`questions.academic_level_id`/`.level_arm_id`/`.topic`/`.difficulty`/
+`.status` (M24, additive onto M23's own table — replaces `.is_active`).
 This document records the conventions every future migration follows.
 
 ## Current schema
@@ -665,6 +667,35 @@ a deliberate choice for this milestone's coarser-grained content. See
 
 See `docs/cbt.md` for the full lifecycle, timing, marking and result-release
 design rationale.
+
+### `2026_10_02_100000_add_lifecycle_fields_to_questions_table` — Question Bank (Milestone 24)
+
+Additive onto M23's own `questions` table (no new table — the same model,
+evolved in place):
+
+- `academic_level_id` (nullable, `nullOnDelete`) / `level_arm_id`
+  (nullable, `nullOnDelete`) — both optional; null means the question is
+  reusable at any level/arm of its subject.
+- `topic` (nullable `string(150)`) — free text, not a taxonomy.
+- `difficulty` (`string(10)`, default `medium` — `App\Enums\
+  QuestionDifficulty`).
+- `status` (`string(15)`, default `active` — `App\Enums\QuestionStatus`,
+  not mass-assignable) — **replaces** the M23 `is_active` boolean.
+  Existing rows are data-migrated in `up()` (`is_active` true → `active`,
+  false → `inactive`) before the old column — and the index it was part
+  of, `questions_school_id_is_active_index`, explicitly dropped first —
+  are removed; no data is lost, and every M23 `ExaminationQuestion`
+  snapshot (which never reads this table) is unaffected either way.
+
+New indexes: `questions_class_index` (`school_id, academic_level_id,
+level_arm_id`), `index(school_id, status)`, `index(school_id,
+difficulty)`. The `Question` model sets `protected $attributes =
+['status' => 'active', 'difficulty' => 'medium']` — not just the DB
+column defaults — mirroring `Examination`'s/`ExamAttempt`'s own M23
+convention, so a freshly-`new`-ed instance has both available in memory
+immediately without a round-trip reload.
+
+See `docs/question-bank.md` for the full Question Bank design rationale.
 
 ### `2026_09_15_100000_create_school_modules_table`
 Milestone 7 — per-school feature/module activation. `module` (`string(40)`, an

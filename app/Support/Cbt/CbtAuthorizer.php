@@ -5,6 +5,7 @@ namespace App\Support\Cbt;
 use App\Enums\Permission;
 use App\Enums\TeacherAssignmentStatus;
 use App\Models\Examination;
+use App\Models\Question;
 use App\Models\Student;
 use App\Models\Teacher;
 use App\Models\TeacherAssignment;
@@ -44,6 +45,52 @@ class CbtAuthorizer
     public function canManage(User $user, Examination $examination): bool
     {
         return $this->canAuthorFor($user, $examination->academic_level_id, $examination->level_arm_id, $examination->subject_id);
+    }
+
+    /**
+     * Whether `$user` may create/edit a Question Bank entry for a given
+     * `(subject, level, arm)` — mirrors {@see self::canAuthorFor()}
+     * exactly, except a question's `level`/`arm` are optional: when
+     * `$levelId` is null (a subject-only, reusable-at-any-level question),
+     * a Teacher only needs **some** active assignment for that subject,
+     * at any level (Milestone 24, `docs/question-bank.md`).
+     */
+    public function canManageQuestionFor(User $user, int $subjectId, ?int $levelId, ?int $armId): bool
+    {
+        if (! $user->hasPermission(Permission::CbtAuthor)) {
+            return false;
+        }
+
+        if ($user->hasPermission(Permission::CbtManage)) {
+            return true;
+        }
+
+        $teacherId = $this->teacherIdFor($user);
+
+        if ($teacherId === null) {
+            return false;
+        }
+
+        $query = TeacherAssignment::query()
+            ->where('status', TeacherAssignmentStatus::Active->value)
+            ->where('teacher_id', $teacherId)
+            ->where('subject_id', $subjectId);
+
+        if ($levelId !== null) {
+            $query->where('academic_level_id', $levelId);
+
+            if ($armId !== null) {
+                $query->where(fn ($q) => $q->whereNull('level_arm_id')->orWhere('level_arm_id', $armId));
+            }
+        }
+
+        return $query->exists();
+    }
+
+    /** Whether `$user` may edit/archive this specific, already-existing Question Bank entry. */
+    public function canManageQuestion(User $user, Question $question): bool
+    {
+        return $this->canManageQuestionFor($user, $question->subject_id, $question->academic_level_id, $question->level_arm_id);
     }
 
     /**

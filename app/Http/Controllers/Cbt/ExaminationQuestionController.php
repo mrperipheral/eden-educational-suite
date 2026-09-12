@@ -38,9 +38,9 @@ class ExaminationQuestionController extends Controller
             'examination' => $examination,
             'availableQuestions' => Question::query()
                 ->active()
-                ->where('subject_id', $examination->subject_id)
+                ->compatibleWith($examination->subject_id, $examination->academic_level_id, $examination->level_arm_id)
                 ->whereNotIn('id', $attachedQuestionIds)
-                ->with('options')
+                ->with(['options', 'level:id,name', 'arm:id,name'])
                 ->ordered()
                 ->get(),
         ]);
@@ -52,7 +52,11 @@ class ExaminationQuestionController extends Controller
         abort_unless($this->authorizer->canManage($request->user(), $examination), 403);
 
         $question = Question::query()->findOrFail($request->integer('question_id'));
-        abort_unless($question->subject_id === $examination->subject_id, 422);
+        abort_unless($question->isSelectable(), 422);
+        abort_unless(
+            Question::query()->whereKey($question->id)->compatibleWith($examination->subject_id, $examination->academic_level_id, $examination->level_arm_id)->exists(),
+            422,
+        );
 
         try {
             $this->questions->attach($examination, $question);

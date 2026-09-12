@@ -3,6 +3,7 @@
 namespace Tests\Feature\Cbt;
 
 use App\Enums\Role;
+use App\Models\AcademicLevel;
 use App\Models\Question;
 use App\Models\Subject;
 
@@ -14,8 +15,8 @@ class QuestionTest extends CbtTestCase
             'subject_id' => $subject->id,
             'question_text' => 'What is 2 + 2?',
             'type' => 'multiple_choice',
+            'difficulty' => 'medium',
             'marks' => 1,
-            'is_active' => 1,
             'options' => [
                 ['option_text' => '3', 'is_correct' => 0],
                 ['option_text' => '4', 'is_correct' => 1],
@@ -37,8 +38,81 @@ class QuestionTest extends CbtTestCase
 
         $question = Question::query()->with('options')->firstOrFail();
         $this->assertSame('multiple_choice', $question->type->value);
+        $this->assertSame('medium', $question->difficulty->value);
+        $this->assertSame('active', $question->status->value);
+        $this->assertNull($question->academic_level_id, 'level-agnostic by default — reusable at any level of the subject');
         $this->assertCount(3, $question->options);
         $this->assertSame(1, $question->options->where('is_correct', true)->count());
+    }
+
+    public function test_a_question_can_be_scoped_to_a_specific_level_and_arm(): void
+    {
+        $school = $this->newSchool();
+        $this->enableCbt($school);
+        $context = $this->classContext($school);
+        $this->actingAsRole($school, Role::SchoolAdmin);
+
+        $this->post('/cbt/questions', $this->payload($context['subject'], [
+            'academic_level_id' => $context['level']->id,
+            'level_arm_id' => $context['arm']->id,
+            'topic' => 'Fractions',
+        ]))->assertRedirect(route('cbt.questions.index'));
+
+        $question = Question::query()->firstOrFail();
+        $this->assertSame($context['level']->id, $question->academic_level_id);
+        $this->assertSame($context['arm']->id, $question->level_arm_id);
+        $this->assertSame('Fractions', $question->topic);
+    }
+
+    public function test_an_arm_must_belong_to_the_selected_level(): void
+    {
+        $school = $this->newSchool();
+        $this->enableCbt($school);
+        $context = $this->classContext($school);
+        $this->enterSchool($school);
+        $otherLevel = AcademicLevel::factory()->create();
+        $otherArm = $otherLevel->arms()->create(['name' => 'Bronze', 'code' => 'B', 'position' => 1]);
+        $this->app->forgetScopedInstances();
+        $this->actingAsRole($school, Role::SchoolAdmin);
+
+        $response = $this->post('/cbt/questions', $this->payload($context['subject'], [
+            'academic_level_id' => $context['level']->id,
+            'level_arm_id' => $otherArm->id,
+        ]));
+
+        $response->assertSessionHasErrors('level_arm_id');
+    }
+
+    public function test_subject_must_be_offered_at_the_selected_level(): void
+    {
+        $school = $this->newSchool();
+        $this->enableCbt($school);
+        $context = $this->classContext($school);
+        $this->enterSchool($school);
+        $otherSubject = Subject::factory()->create(); // not attached to $context['level']
+        $this->app->forgetScopedInstances();
+        $this->actingAsRole($school, Role::SchoolAdmin);
+
+        $response = $this->post('/cbt/questions', $this->payload($otherSubject, [
+            'academic_level_id' => $context['level']->id,
+        ]));
+
+        $response->assertSessionHasErrors('subject_id');
+    }
+
+    public function test_difficulty_is_required(): void
+    {
+        $school = $this->newSchool();
+        $this->enableCbt($school);
+        $this->enterSchool($school);
+        $subject = Subject::factory()->create();
+        $this->app->forgetScopedInstances();
+        $this->actingAsRole($school, Role::SchoolAdmin);
+
+        $payload = $this->payload($subject);
+        unset($payload['difficulty']);
+
+        $this->post('/cbt/questions', $payload)->assertSessionHasErrors('difficulty');
     }
 
     public function test_true_false_question_requires_exactly_two_options(): void
@@ -177,17 +251,15 @@ class QuestionTest extends CbtTestCase
         $this->assertCount(2, $question->options()->get());
     }
 
-    public function test_toggle_active_flips_the_flag(): void
+    public function test_preview_shows_the_question_with_its_correct_option(): void
     {
         $school = $this->newSchool();
         $this->enableCbt($school);
         $context = $this->classContext($school);
         $question = $this->questionIn($school, $context['subject']);
-        $this->actingAsRole($school, Role::SchoolAdmin);
+        $this->actingAsRole($school, Role::Staff);
 
-        $this->post("/cbt/questions/{$question->id}/toggle-active")->assertRedirect();
-
-        $this->assertFalse($question->fresh()->is_active);
+        $this->get("/cbt/questions/{$question->id}/preview")->assertOk()->assertSee('Sample question?');
     }
 
     public function test_staff_can_view_but_not_create_questions(): void

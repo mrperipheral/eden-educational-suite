@@ -1,14 +1,13 @@
 # Project Status
 
-_Last updated: 2026-10-01_
+_Last updated: 2026-10-02_
 
 ## Current milestone
 
-**Milestone 23 — CBT / Online Examinations: COMPLETE.**
+**Milestone 24 — Question Bank: COMPLETE.**
 
-Next up: further **Domain Modules** — CBT Question Bank (M24), Reporting.
-Not started — do not begin without picking one up explicitly. See
-`docs/roadmap.md`.
+Next up: further **Domain Modules** — Reporting. Not started — do not
+begin without picking one up explicitly. See `docs/roadmap.md`.
 
 ## What the application is
 
@@ -16,7 +15,7 @@ Multi-school School Management SaaS (management + portals only — no website
 features). PHP 8.3 · Laravel 13.31 · MySQL 8 · Blade + Tailwind v4 · Alpine.js ·
 Vite · PHPUnit · Pint.
 
-## Environment (verified 2026-09-30)
+## Environment (verified 2026-10-02)
 
 | Item | Value |
 |------|-------|
@@ -25,7 +24,7 @@ Vite · PHPUnit · Pint.
 | Node / npm | 22.x |
 | Database | MySQL 8 (app) · SQLite `:memory:` (tests) |
 | Local mail | Mailpit (`127.0.0.1:1025`, UI `:8025`) — `.env` only, not committed |
-| Tests | `php artisan test` — 1027 passing |
+| Tests | `php artisan test` — 1138 passing |
 | Build | `npm run build` — passing |
 | Formatting | `vendor/bin/pint --test` — passing |
 
@@ -55,8 +54,88 @@ Vite · PHPUnit · Pint.
 - **M20 — Online Fee Payment / Paystack** (`online-payment-paystack-complete`) — `docs/paystack.md`.
 - **M21 — Promotion & Graduation** (`promotion-graduation-complete`) — `docs/promotion.md`.
 - **M22 — Learning Materials** (`learning-materials-complete`) — `docs/learning-materials.md`.
-- **M23 — CBT / Online Examinations** (this milestone,
-  `cbt-online-examinations-complete`) — `docs/cbt.md`; see below.
+- **M23 — CBT / Online Examinations** (`cbt-online-examinations-complete`) — `docs/cbt.md`.
+- **M24 — Question Bank** (this milestone,
+  `question-bank-complete`) — `docs/question-bank.md`; see below.
+
+## Delivered in Milestone 24
+
+Evolves M23's minimal `Question`/`QuestionOption` structure — the same two
+models, extended in place — into a proper reusable, searchable Question
+Bank, without touching the M23 exam/attempt/marking/result-release
+architecture at all. Full detail in `docs/question-bank.md`.
+
+- **Optional level/arm scoping** (`academic_level_id`/`level_arm_id`, both
+  nullable) — a question stays subject-only and reusable across every
+  level of that subject, or is scoped to one specific class. A free-text
+  `topic` field and a fixed `difficulty` scale
+  (`App\Enums\QuestionDifficulty`: Easy/Medium/Hard) round out the
+  Question Bank fields the spec asked for — deliberately **not** a
+  configurable taxonomy, tagging system or question pool.
+- **A real lifecycle** — `App\Enums\QuestionStatus`
+  (Active/Inactive/Archived) replaces M23's `is_active` boolean;
+  `Question::activate()`/`deactivate()`/`archive()` are unrestricted,
+  freely-reversible transitions (unlike an exam's own one-way lifecycle) —
+  a question's status only ever gates whether it can be **newly** attached
+  to a future exam, never anything already using it. No hard delete, ever.
+- **The M23 attach-time snapshot is completely unaffected** — editing,
+  deactivating or archiving a Question Bank entry after it's been attached
+  to an exam changes nothing about that exam; verified by tests that edit
+  a question via the real HTTP endpoint post-attach and archive a source
+  question post-attach, in both cases asserting the exam's own snapshot
+  (and, for the archive case, a student's ability to start/answer/submit
+  normally) is completely untouched.
+- **Only `Active` questions may be newly attached** — enforced at two
+  independent layers: the attach picker excludes non-active/incompatible
+  questions, and `App\Services\Cbt\ExaminationQuestionService::attach()`
+  itself re-checks `isSelectable()` and subject/level/arm compatibility
+  (`Question::scopeCompatibleWith()`), so even a direct/tampered request
+  is rejected server-side regardless of what the UI offers.
+- **`App\Support\Cbt\CbtAuthorizer::canManageQuestionFor()`** mirrors the
+  existing M23 `canAuthorFor()` exam-authorship check exactly: School
+  Admin/Principal (`cbt.manage`) → any subject/level; Teacher
+  (`cbt.author` only) → only a subject (+ level/arm, if the question sets
+  one) they hold an active M11 `TeacherAssignment` for. *Viewing* the bank
+  stays unscoped (a shared, reusable resource); only create/edit/archive
+  are scoped. No second authorization system.
+- **New/extended search & filters** on the existing Question Bank list —
+  free-text search (question text + topic), plus subject/level/arm/type/
+  difficulty/status filters, all as indexed, paginated, eager-loaded
+  queries — proven flat (no N+1) as the bank grows, filtered or not.
+- **New view** — `cbt/questions/preview.blade.php` (staff-only, correct
+  option highlighted, same pattern as the existing exam preview); the
+  question list and create/edit form gained the new filters/fields, the
+  old single toggle-active action became three explicit
+  activate/deactivate/archive actions.
+- **1 additive migration** (`2026_10_02_100000`) onto M23's `questions`
+  table — existing rows are data-migrated (`is_active` true/false →
+  `status` active/inactive) before the old column is dropped; no data
+  loss, and every M23 exam snapshot is unaffected either way since it
+  never reads this table.
+- **Seeder** — the existing M23 demo questions now carry realistic
+  topic/difficulty values and (for the Mathematics ones, created by
+  Tomiwa Teacher) explicit level scoping matching his real M11
+  assignment; one additional, never-attached, archived question
+  demonstrates the lifecycle state in the bank's own list.
+- **Docs** — new `docs/question-bank.md`; `docs/cbt.md`,
+  `PROJECT_STATUS.md`, `docs/roadmap.md`, `docs/database-design.md`
+  updated.
+- **34 new tests** under `tests/Feature/Cbt/*` — question creation/
+  validation with the new level/arm/topic/difficulty fields (arm-belongs-
+  to-level, subject-offered-at-level, difficulty required, preview);
+  lifecycle (activate/deactivate/archive via HTTP, an archived question
+  can be reactivated, inactive/archived excluded from the attach picker
+  and rejected server-side even via a direct request, a level-mismatched
+  question rejected as incompatible, a level-agnostic question compatible
+  with any matching-subject exam); authorization (Admin/Principal
+  unrestricted, Teacher scoped by subject alone or subject+level, a
+  Teacher blocked from a foreign subject/level on both create and update,
+  cross-school 404 on preview/edit/archive/list, Bursar/Parent/Student
+  forbidden); snapshot integrity after archive (exam still schedules,
+  student can still attempt it); N+1 regression on the bank index with
+  and without filters. All existing M23 CBT tests continue to pass
+  unchanged (aside from the two shared test helpers/factory updated for
+  the `is_active` → `status` migration).
 
 ## Delivered in Milestone 23
 
@@ -1148,14 +1227,17 @@ check, DB duplicate prevention, assessment↔assignment link (same class only). 
 ## Known follow-ups / recommendations
 
 - Production env: `SESSION_SECURE_COOKIE=true`, real `MAIL_MAILER`, `APP_DEBUG=false`.
-- Next milestone: pick a further domain module (the M24 Question Bank,
-  Reporting) — see `docs/roadmap.md`.
-- **CBT follow-ups** — essay/manual-marking questions, the full M24
-  Question Bank, a detailed per-question answer-review screen, multiple
-  attempts per exam, any proctoring, M15 `ResultRun` integration (the
-  extension point — M14's `ScoreSource::OnlineCbt` — is documented and
-  ready), notification (M18) hooks, bulk question import/exam templates,
-  staff analytics beyond a plain attempts list.
+- Next milestone: pick a further domain module (Reporting) — see
+  `docs/roadmap.md`.
+- **Question Bank follow-ups** — tagging beyond the single `topic` field,
+  question pools/randomised selection, versioning, bulk import/export, a
+  shared cross-school library, a per-teacher "my questions" filtered view.
+- **CBT follow-ups** — essay/manual-marking questions, a detailed
+  per-question answer-review screen, multiple attempts per exam, any
+  proctoring, M15 `ResultRun` integration (the extension point — M14's
+  `ScoreSource::OnlineCbt` — is documented and ready), notification (M18)
+  hooks, bulk exam templates, staff analytics beyond a plain attempts
+  list.
 - **Learning Materials follow-ups** — Parent Portal visibility, editing an
   uploaded material (delete + re-upload covers a correction today),
   multiple files per material, video upload/streaming/transcoding/

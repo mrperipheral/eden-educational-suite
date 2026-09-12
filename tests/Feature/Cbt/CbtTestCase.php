@@ -163,8 +163,9 @@ abstract class CbtTestCase extends TestCase
      * A reusable bank Question with options, in the given subject.
      *
      * @param  list<array{text: string, correct: bool}>|null  $options
+     * @param  array{academic_level_id?: ?int, level_arm_id?: ?int, topic?: ?string, status?: string, difficulty?: string}  $overrides
      */
-    protected function questionIn(School $school, Subject $subject, ?array $options = null, ExaminationQuestionType $type = ExaminationQuestionType::MultipleChoice): Question
+    protected function questionIn(School $school, Subject $subject, ?array $options = null, ExaminationQuestionType $type = ExaminationQuestionType::MultipleChoice, array $overrides = []): Question
     {
         $this->enterSchool($school);
 
@@ -174,13 +175,14 @@ abstract class CbtTestCase extends TestCase
             ['text' => 'C', 'correct' => false],
         ];
 
-        $question = new Question([
+        $question = new Question(array_merge([
             'subject_id' => $subject->id,
             'question_text' => 'Sample question?',
             'marks' => 1,
-            'is_active' => true,
-        ]);
+        ], array_intersect_key($overrides, array_flip(['academic_level_id', 'level_arm_id', 'topic']))));
         $question->type = $type->value;
+        $question->difficulty = $overrides['difficulty'] ?? 'medium';
+        $question->status = $overrides['status'] ?? 'active';
         $question->save();
 
         foreach ($options as $position => $option) {

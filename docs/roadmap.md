@@ -562,15 +562,46 @@ whole `/student/cbt/*` surface. `Module::Cbt`, off by default, depends on
 own `ScoreSource::OnlineCbt` case on `AssessmentScore`, reserved
 precisely for this. Full detail in `docs/cbt.md`.
 
-Deferred: essay/manual-marking questions, the full M24 Question Bank, a
-detailed per-question answer-review screen, multiple attempts per exam,
-any proctoring (webcam/screen recording/AI/biometric/browser lockdown),
-M15 `ResultRun` integration, notification (M18) hooks, bulk question
-import/exam templates, staff analytics beyond a plain attempts list.
+Deferred: essay/manual-marking questions, a detailed per-question
+answer-review screen, multiple attempts per exam, any proctoring
+(webcam/screen recording/AI/biometric/browser lockdown), M15 `ResultRun`
+integration, notification (M18) hooks, bulk exam templates, staff
+analytics beyond a plain attempts list.
 
-## Milestone 24+ — Domain Modules
+## ✅ Milestone 24 — Question Bank (complete, 2026-10-02)
 
-CBT Question Bank · Reporting.
+Evolves M23's minimal `Question`/`QuestionOption` structure — the same two
+models, extended in place, never a parallel system — into a proper
+reusable, searchable, filterable Question Bank, without touching the M23
+exam/attempt/marking/result-release architecture at all: the attach-time
+snapshot mechanism (`App\Services\Cbt\ExaminationQuestionService::attach()`)
+is unchanged and verified still fully isolates a live/historical exam from
+any later Question Bank edit, deactivation or archival. Adds optional
+level/arm scoping (`academic_level_id`/`level_arm_id`, both nullable — a
+question can stay subject-only and reusable at any level, or be scoped to
+one class), a free-text `topic`, a fixed `difficulty` scale
+(`App\Enums\QuestionDifficulty`), and a real lifecycle
+(`App\Enums\QuestionStatus`: Active/Inactive/Archived, replacing the M23
+`is_active` boolean) with unrestricted, freely-reversible transitions — a
+question's status only ever gates whether it can be **newly** attached to
+a future exam. Only `Active` questions may be newly attached, enforced at
+two independent layers (the attach picker's own filter, and
+`ExaminationQuestionService::attach()`'s own re-check) so a
+direct/tampered request is rejected server-side regardless of the UI.
+`App\Support\Cbt\CbtAuthorizer::canManageQuestionFor()` mirrors M23's own
+`canAuthorFor()` exam-authorship check exactly — a Teacher without
+`cbt.manage` may only create/edit/archive a question for a subject (+
+level/arm, if set) they hold an active M11 `TeacherAssignment` for; no
+second authorization system, and *viewing* the bank stays unscoped since
+it's a shared, reusable resource. Full detail in `docs/question-bank.md`.
+
+Deferred: tagging beyond the single `topic` field, question pools/
+randomised selection, versioning, bulk import/export, a shared
+cross-school library, a per-teacher "my questions" filtered view.
+
+## Milestone 25+ — Domain Modules
+
+Reporting.
 
 Each domain module checks its `App\Enums\Module` flag (`module:` middleware /
 `@module`) **and** its M4 permissions — the two stay orthogonal.
