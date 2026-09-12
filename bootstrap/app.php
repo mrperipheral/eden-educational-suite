@@ -25,6 +25,13 @@ return Application::configure(basePath: dirname(__DIR__))
             guests: '/login',
             users: '/dashboard',
         );
+
+        // Paystack's webhook (M20) is a server-to-server POST with no
+        // session/token — it is authenticated by signature verification in
+        // the controller instead (see PaystackWebhookController).
+        $middleware->validateCsrfTokens(except: [
+            'webhooks/paystack',
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

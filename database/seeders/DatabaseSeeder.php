@@ -713,6 +713,18 @@ class DatabaseSeeder extends Seeder
         $allocation->created_by = $admin->id;
         $allocation->save();
 
+        // Online payment / Paystack (M20) — enabled in test mode with
+        // placeholder test-style keys so the settings screen and the
+        // "Pay online" flow are demoable. These are not real credentials;
+        // an actual checkout attempt will fail contacting Paystack (the
+        // graceful "could not confirm payment" path handles that).
+        $settings->fill([
+            'paystack_enabled' => true,
+            'paystack_public_key' => 'pk_test_demo_0000000000000000000000',
+            'paystack_secret_key' => 'sk_test_demo_0000000000000000000000',
+            'paystack_test_mode' => true,
+        ])->save();
+
         $tenant->forget();
     }
 }

@@ -20,6 +20,16 @@ use Illuminate\Support\Facades\Storage;
  *   - `school_id`   — the tenant key (BelongsToSchool trait)
  *   - `completed_at`— onboarding review flag ({@see self::markReviewed()})
  *   - `logo_path`   — branding upload ({@see self::putLogo()} / {@see self::clearLogo()})
+ *
+ * `paystack_secret_key` (M20, `docs/paystack.md`) is cast `encrypted` —
+ * Laravel's native `Crypt` facade keyed by `APP_KEY`, no new infrastructure.
+ * It is genuinely `$fillable` (unlike the columns above, it has no separate
+ * lifecycle — it is edited the same way `brand_color` is): the write path is
+ * already gated by `school.settings.update` like every other setting, and
+ * the controller only overwrites it when a new, non-blank value is actually
+ * submitted (see `SchoolSettingsController::updatePayments()`) so re-saving
+ * the form never blanks a previously-stored key. It is never rendered back
+ * into a form field, logged, or exposed in any response.
  */
 class SchoolSetting extends Model
 {
@@ -51,6 +61,12 @@ class SchoolSetting extends Model
         'week_starts_on',
         // Academic calendar boundary
         'academic_year_start_month',
+        // Online payment (M20) — see the class docblock for why the secret
+        // key is fillable despite being sensitive.
+        'paystack_enabled',
+        'paystack_public_key',
+        'paystack_secret_key',
+        'paystack_test_mode',
     ];
 
     /**
@@ -79,7 +95,20 @@ class SchoolSetting extends Model
             'date_format' => DateFormat::class,
             'week_starts_on' => Weekday::class,
             'academic_year_start_month' => 'integer',
+            'paystack_enabled' => 'boolean',
+            'paystack_secret_key' => 'encrypted',
+            'paystack_test_mode' => 'boolean',
         ];
+    }
+
+    // -- Online payment (M20) -----------------------------------------------
+
+    /** Whether this school has both switched on and fully configured Paystack. */
+    public function paystackReady(): bool
+    {
+        return $this->paystack_enabled
+            && filled($this->paystack_public_key)
+            && filled($this->paystack_secret_key);
     }
 
     // -- Onboarding ---------------------------------------------------------

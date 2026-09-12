@@ -30,11 +30,13 @@ class ParentFeeController extends Controller
 
         $studentModel = $this->authorizer->authorizedStudent($request->user(), $student) ?? abort(404);
         $statement = $this->statements->statementFor($studentModel);
+        $settings = $studentModel->school->settings;
 
         return view('parent.fees.show', [
             'student' => $studentModel,
             'siblings' => $this->authorizer->studentsFor($request->user()),
             'modules' => $this->modules,
+            'payOnlineUrl' => $settings?->paystackReady() ? route('parent.fees.pay.create', $studentModel) : null,
             ...$statement,
         ]);
     }

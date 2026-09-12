@@ -34,6 +34,12 @@
     </x-card>
 </div>
 
+@if (! empty($payOnlineUrl) && bccomp($totalOutstanding, '0.00', 2) === 1)
+    <div>
+        <x-button :href="$payOnlineUrl">{{ __('Pay online') }}</x-button>
+    </div>
+@endif
+
 <x-card :title="__('Charges')" :padding="false">
     @if ($charges->isEmpty())
         <div class="p-6">

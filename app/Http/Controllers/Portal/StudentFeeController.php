@@ -29,10 +29,12 @@ class StudentFeeController extends Controller
 
         $student = $this->authorizer->studentFor($request->user()) ?? abort(404);
         $statement = $this->statements->statementFor($student);
+        $settings = $student->school->settings;
 
         return view('student.fees.show', [
             'student' => $student,
             'modules' => $this->modules,
+            'payOnlineUrl' => $settings?->paystackReady() ? route('student.fees.pay.create') : null,
             ...$statement,
         ]);
     }

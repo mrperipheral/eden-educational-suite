@@ -18,6 +18,11 @@ use Illuminate\Validation\Rules\Enum;
  * re-validated authoritatively (over-allocation, cross-student) by
  * `App\Services\Fees\FeePaymentService` inside a DB transaction — this
  * request only catches the obvious client-side mistakes early.
+ *
+ * `method` excludes {@see PaymentMethod::Paystack} — that value is written
+ * only by `App\Services\Paystack\PaymentVerificationService` once a
+ * transaction is independently verified (M20, `docs/paystack.md`); nobody
+ * manually recording a payment here may claim it was paid online.
  */
 class PaymentRequest extends FormRequest
 {
@@ -40,7 +45,7 @@ class PaymentRequest extends FormRequest
                 'required', 'string', 'max:60',
                 Rule::unique('fee_payments', 'reference')->where('school_id', $schoolId),
             ],
-            'method' => ['required', new Enum(PaymentMethod::class)],
+            'method' => ['required', new Enum(PaymentMethod::class), Rule::notIn([PaymentMethod::Paystack->value])],
             'payer_name' => ['nullable', 'string', 'max:150'],
             'payer_phone' => ['nullable', 'string', 'max:30'],
             'payer_email' => ['nullable', 'email', 'max:150'],

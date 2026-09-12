@@ -108,14 +108,14 @@ See `docs/architecture.md` for the full rationale. In short:
 
 ## Milestones
 
-Tracked in `PROJECT_STATUS.md` and `docs/roadmap.md`. **Milestones 1–19 (Platform
+Tracked in `PROJECT_STATUS.md` and `docs/roadmap.md`. **Milestones 1–20 (Platform
 Foundation, Authentication, Multi-School Tenant Isolation, Roles & Permissions,
 School Onboarding, School Settings & Configuration, Feature / Module Activation,
 Academic Foundation, Student Management, Guardian / Parent Management, Teacher
 Management, Timetable Management, Attendance Management, Assessment &
 Assignments, Results & Report Cards, Parent Portal, Student Portal,
-Communication & Notification Foundation, Fees & Fee Management) are
-complete.** School settings: `docs/school-settings.md`; module activation:
+Communication & Notification Foundation, Fees & Fee Management, Online Fee
+Payment / Paystack) are complete.** School settings: `docs/school-settings.md`; module activation:
 `docs/module-activation.md`; academic structure:
 `docs/academic-foundation.md`; students + enrollment:
 `docs/student-management.md`; guardians + student ↔ guardian links:
@@ -129,8 +129,9 @@ read-only window onto a child's own data: `docs/parent-portal.md`; the
 student-facing read-only window onto their own data: `docs/student-portal.md`;
 the Communication Hub, announcements and in-app notification foundation:
 `docs/communication.md`; fee categories/structures/charges, manual payments
-and the fee statement: `docs/fees.md`. Do not start any further domain module
-(CBT, promotion, …) without picking up the next milestone explicitly.
+and the fee statement: `docs/fees.md`; online fee payment through Paystack:
+`docs/paystack.md`. Do not start any further domain module (CBT, promotion,
+…) without picking up the next milestone explicitly.
 
 Module activation is **configuration, not authorization**: a domain route checks
 both its `App\Enums\Module` flag (`module:` middleware / `@module`) **and** its M4

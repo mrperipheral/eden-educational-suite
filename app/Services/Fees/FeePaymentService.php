@@ -92,4 +92,45 @@ class FeePaymentService
             }
         });
     }
+
+    /**
+     * A simple, safe default allocation plan for an amount with no
+     * manually chosen charges — used by the M20 online-payment flow, where
+     * a parent pays a total rather than picking individual charges: the
+     * student's own outstanding charges, oldest first, filled until the
+     * amount is exhausted. Purely a plan; it writes nothing. Pass the
+     * result to {@see self::allocate()} (still inside its own row-locked
+     * transaction, so it stays correct even if a charge was paid down by
+     * something else between planning and allocating).
+     *
+     * @return array<int, string> charge id => amount
+     */
+    public function planFifoAllocation(Student $student, string $amount): array
+    {
+        $remaining = $amount;
+        $plan = [];
+
+        $charges = StudentFeeCharge::query()
+            ->forStudent($student)
+            ->with(['allocations.payment:id,voided_at'])
+            ->orderBy('created_at')
+            ->get()
+            ->filter(fn (StudentFeeCharge $c) => ! $c->isFullyPaid());
+
+        foreach ($charges as $charge) {
+            if (bccomp($remaining, '0.00', 2) <= 0) {
+                break;
+            }
+
+            $outstanding = $charge->outstandingBalance();
+            $take = bccomp($remaining, $outstanding, 2) === 1 ? $outstanding : $remaining;
+
+            if (bccomp($take, '0.00', 2) > 0) {
+                $plan[$charge->getKey()] = $take;
+                $remaining = bcsub($remaining, $take, 2);
+            }
+        }
+
+        return $plan;
+    }
 }

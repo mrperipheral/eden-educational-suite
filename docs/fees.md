@@ -99,10 +99,15 @@ Returned totals: `totalCharged`, `totalDiscount`, `totalWaived`,
 `App\Enums\PaymentMethod`: `Cash`, `BankTransfer`, `Pos`, `Cheque`, `Other`
 — a closed, technical classification (unlike `FeeCategory`, which is a
 school's own naming choice), so a proper enum, extended the same way every
-other enum in this codebase is. **No Paystack, no online gateway, no
-provider code of any kind** — every payment here is recorded by a
-`fees.record-payment` holder after money already changed hands elsewhere
-(cash in hand, a bank transfer received, …). That integration is M20.
+other enum in this codebase is. **No online gateway integration, no
+provider code of any kind, in this milestone** — every payment here is
+recorded by a `fees.record-payment` holder after money already changed
+hands elsewhere (cash in hand, a bank transfer received, …).
+
+M20 (`docs/paystack.md`) later added a `Paystack` case to this same enum
+for its own verified online payments — the manual-entry form and
+`PaymentRequest` here explicitly exclude it: nobody recording a payment by
+hand may claim it was paid online.
 
 ## 5. Permissions
 
@@ -220,8 +225,11 @@ No Redis, no queue — every write here is synchronous and small.
 
 ## 11. Deferred
 
-Online payment / Paystack integration (M20, explicitly out of scope here);
-a full discount/waiver audit-log table (the current `discount_amount` +
+Online payment / Paystack integration was explicitly out of scope for this
+milestone and has since shipped in M20 (`docs/paystack.md`) — it extends
+this architecture (a verified online payment becomes an ordinary
+`FeePayment` with `method = paystack`) rather than replacing any of it.
+A full discount/waiver audit-log table (the current `discount_amount` +
 `waived_*` columns on the charge give a single-step audit — who/when/why —
 without a separate append-only ledger; a richer history is a reasonable
 future enhancement, not required by this milestone); bulk fee-structure

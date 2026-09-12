@@ -1,15 +1,16 @@
 # Database Design
 
-Status: Milestone 19. Tenant + roles + onboarding + school settings + module
+Status: Milestone 20. Tenant + roles + onboarding + school settings + module
 activation + academic foundation + student management + guardian management +
 teacher management + timetable management + attendance management + assessment &
 assignments + results & report cards + parent portal + student portal +
-communication & notification foundation + fees & fee management. School-owned
-tables: `school_settings` (M6), `school_modules` (M7), the academic structure —
-`academic_sessions`, `academic_periods`, `academic_levels`, `level_arms`,
-`subjects`, `level_subject` (M8) — `students` + `enrollments` (M9),
-`guardians` + `guardian_student` (M10), `teachers` + `teacher_assignments`
-(M11), `timetables` + `timetable_entries` (M12), `attendance_registers` +
+communication & notification foundation + fees & fee management + online fee
+payment (Paystack). School-owned tables: `school_settings` (M6),
+`school_modules` (M7), the academic structure — `academic_sessions`,
+`academic_periods`, `academic_levels`, `level_arms`, `subjects`,
+`level_subject` (M8) — `students` + `enrollments` (M9), `guardians` +
+`guardian_student` (M10), `teachers` + `teacher_assignments` (M11),
+`timetables` + `timetable_entries` (M12), `attendance_registers` +
 `attendance_records` (M13), `assessment_categories`, `assignments`,
 `assessments`, `assessment_scores`, `assignment_submissions` (M14),
 `grading_schemes`, `grading_scheme_grades`, `result_weighting_schemes`,
@@ -19,9 +20,9 @@ tables: `school_settings` (M6), `school_modules` (M7), the academic structure �
 (M16, additive), `students.user_id` (M17, additive),
 `communication_threads`, `communication_messages`, `announcements`,
 `user_notifications` (M18), `fee_categories`, `fee_structures`,
-`student_fee_charges`, `fee_payments`, `fee_payment_allocations` (M19). No
-online-payment/gateway tables yet (M20). This document records the
-conventions every future migration follows.
+`student_fee_charges`, `fee_payments`, `fee_payment_allocations` (M19),
+`school_settings.paystack_*` (M20, additive), `paystack_transactions` (M20).
+This document records the conventions every future migration follows.
 
 ## Current schema
 
@@ -470,6 +471,34 @@ See `docs/fees.md`.
 Every amount column across all five tables is `decimal(12,2)`; every
 calculation over them uses `bcmath`, never native float arithmetic — see
 `docs/fees.md` §2.
+
+### `2026_09_28_100000`–`100010` — Online Fee Payment / Paystack (Milestone 20)
+One additive migration + one new table. See `docs/paystack.md`.
+
+- **`school_settings.paystack_*`** (additive onto M6's table) —
+  `paystack_enabled` (bool, default `false`), `paystack_public_key`
+  (nullable `string(100)`), `paystack_secret_key` (nullable `text` —
+  ciphertext; cast `encrypted` at the model level via `App\Models\
+  SchoolSetting`), `paystack_test_mode` (bool, default `true`, display-only).
+- **`paystack_transactions`** — school-owned *and* student-scoped:
+  `student_id` (`cascadeOnDelete`), `initiated_by` FK to `users`
+  (`restrictOnDelete`, not mass-assignable), `fee_payment_id` (nullable,
+  **unique**, `nullOnDelete` — set exactly once, on success; its presence
+  is the idempotency guard), `reference` (`string(60)`, **globally**
+  unique — not school-scoped, since it doubles as the webhook lookup key
+  and a school-owned uniqueness constraint would be meaningless before the
+  owning school is even known), `amount` (`decimal(12,2)`), `currency`
+  (`string(3)`), `status` (`string(20)`, default `pending`, an
+  `App\Enums\PaystackTransactionStatus` value, not mass-assignable),
+  `authorization_url` / `access_code` (from Paystack's initialize
+  response), `provider_transaction_id` / `gateway_response` / `channel` /
+  `paid_at` (from verify), `failure_reason`.
+  `index(school_id, student_id)` (named
+  `paystack_transactions_school_student_idx`), `index(school_id, status)`.
+  Never hard-deleted; status changes only through the model's own
+  `markSuccessful()`/`markFailed()`/`markAbandoned()`/
+  `markVerificationFailed()`, each called from inside a row-locked DB
+  transaction by `App\Services\Paystack\PaymentVerificationService`.
 
 ### `2026_09_15_100000_create_school_modules_table`
 Milestone 7 — per-school feature/module activation. `module` (`string(40)`, an

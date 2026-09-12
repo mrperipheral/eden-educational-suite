@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\Settings\UpdateSchoolBrandingRequest;
+use App\Http\Requests\Settings\UpdateSchoolPaymentsRequest;
 use App\Http\Requests\Settings\UpdateSchoolProfileRequest;
 use App\Http\Requests\Settings\UpdateSchoolRegionalRequest;
 use App\Models\SchoolSetting;
@@ -113,6 +114,39 @@ class SchoolSettingsController extends Controller
         $this->save($request->validated());
 
         return to_route('settings.school.regional.edit')->with('status', __('Regional settings saved.'));
+    }
+
+    // -- Online payment (M20) -------------------------------------------
+
+    public function payments(): View
+    {
+        $this->authorize('school.settings.view');
+
+        return view('settings.school.payments', [
+            'settings' => $this->settings(),
+        ]);
+    }
+
+    public function updatePayments(UpdateSchoolPaymentsRequest $request): RedirectResponse
+    {
+        $settings = $this->settings();
+
+        $settings->fill([
+            'paystack_enabled' => $request->boolean('paystack_enabled'),
+            'paystack_public_key' => $request->publicKey(),
+            'paystack_test_mode' => $request->boolean('paystack_test_mode'),
+        ]);
+
+        // A blank secret field means "keep the existing key" — it is never
+        // rendered back into the form, so there is nothing to "clear" here.
+        if ($request->newSecretKey() !== null) {
+            $settings->paystack_secret_key = $request->newSecretKey();
+        }
+
+        $settings->save();
+        $settings->markReviewed();
+
+        return to_route('settings.school.payments.edit')->with('status', __('Payment settings saved.'));
     }
 
     // -- helpers ----------------------------------------------------

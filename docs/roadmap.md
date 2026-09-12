@@ -420,9 +420,46 @@ notification foundation could carry these later), refunds beyond voiding
 an unallocated/newly-allocated payment, receipts/PDF export beyond the
 browser-printable statement, multi-currency.
 
-## Milestone 20+ — Domain Modules
+## ✅ Milestone 20 — Online Fee Payment / Paystack (complete, 2026-09-28)
 
-Online Payments (Paystack) · CBT · Reporting · Promotion.
+Lets an authorised parent or student start an online fee payment through
+Paystack and have a genuinely verified successful payment recorded into
+M19's existing fee/payment system — extends it, never a parallel one.
+`App\Models\PaystackTransaction` (school-owned + student-scoped, its own
+table — an attempt can fail/be abandoned and must never become an
+authoritative payment; `App\Enums\PaystackTransactionStatus` not
+mass-assignable). `App\Services\Paystack\PaymentInitiationService`
+validates the amount against the student's *current* outstanding balance
+via M19's own `FeeStatementBuilder`, then calls Paystack's
+`/transaction/initialize` (redirect checkout — no card data ever touches
+this app); a failed call rolls the local row back too.
+`App\Services\Paystack\PaymentVerificationService::verifyAndRecord()` is
+the single idempotent core both the browser callback and the webhook call
+— resolves the transaction, anchors `TenantContext` to its own stored
+school, row-locks it, and (only if still `pending`) re-verifies with
+Paystack's own `/transaction/verify` (never trusting a webhook body or a
+browser query param alone) before calling M19's own
+`FeePaymentService::record()` (with a new `planFifoAllocation()` helper).
+A resolved row short-circuits every later call to a no-op — the guard
+against duplicate webhooks, a reloaded callback, or a webhook/callback
+race. `App\Http\Controllers\PaystackWebhookController` sits outside
+`auth`/`tenant`/`module` entirely, resolves *which* school's secret to
+verify the signature with from its own stored transaction data (never
+from the request), and checks `HMAC-SHA512` via `hash_equals()`.
+`SchoolSetting` gains `paystack_enabled`/`paystack_public_key`/
+`paystack_secret_key` (`encrypted` cast)/`paystack_test_mode`, edited
+under the existing `school.settings.*` permissions. No new permissions —
+reuses `portal.parent`/`portal.student` and `school.settings.*`. Full
+detail in `docs/paystack.md`.
+
+Deferred: a dedicated staff-facing list of online-payment attempts,
+refunds through Paystack's own API, recurring/subscription billing, an
+inline-JS/Popup checkout alternative, any payment channel other than
+Paystack.
+
+## Milestone 21+ — Domain Modules
+
+CBT · Reporting · Promotion.
 
 Each domain module checks its `App\Enums\Module` flag (`module:` middleware /
 `@module`) **and** its M4 permissions — the two stay orthogonal.

@@ -27,10 +27,12 @@ use App\Http\Controllers\Guardian\GuardianLinkController;
 use App\Http\Controllers\HealthController;
 use App\Http\Controllers\MemberController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\PaystackWebhookController;
 use App\Http\Controllers\Platform\SchoolController as PlatformSchoolController;
 use App\Http\Controllers\Portal\ParentAssignmentController;
 use App\Http\Controllers\Portal\ParentAttendanceController;
 use App\Http\Controllers\Portal\ParentFeeController;
+use App\Http\Controllers\Portal\ParentOnlinePaymentController;
 use App\Http\Controllers\Portal\ParentPortalController;
 use App\Http\Controllers\Portal\ParentProfileController;
 use App\Http\Controllers\Portal\ParentReportCardController;
@@ -40,6 +42,7 @@ use App\Http\Controllers\Portal\ParentTimetableController;
 use App\Http\Controllers\Portal\StudentAssignmentController;
 use App\Http\Controllers\Portal\StudentAttendanceController;
 use App\Http\Controllers\Portal\StudentFeeController;
+use App\Http\Controllers\Portal\StudentOnlinePaymentController;
 use App\Http\Controllers\Portal\StudentPortalController;
 use App\Http\Controllers\Portal\StudentProfileController;
 use App\Http\Controllers\Portal\StudentReportCardController;
@@ -72,6 +75,12 @@ Route::view('/', 'welcome')->name('home');
 // Application health probe for load balancers / uptime monitoring.
 // (Laravel's built-in `/up` covers framework boot; this also checks the database.)
 Route::get('/health', HealthController::class)->name('health');
+
+// Paystack webhook (M20, docs/paystack.md) — deliberately outside auth/tenant/
+// module entirely; protected by signature verification in the controller,
+// which also resolves the owning school from its own stored transaction data
+// (never from request input). CSRF-exempted in bootstrap/app.php.
+Route::post('/webhooks/paystack', [PaystackWebhookController::class, 'handle'])->name('webhooks.paystack');
 
 /*
 | Authenticated — account level (no school context required).
@@ -155,6 +164,12 @@ Route::middleware(['auth', 'verified', 'active'])->group(function () {
                 ->can('school.settings.view')->name('modules.edit');
             Route::patch('modules/{module}', [SchoolModuleController::class, 'update'])
                 ->can('school.settings.update')->name('modules.update');
+
+            // Online payment / Paystack configuration (M20, docs/paystack.md).
+            Route::get('payments', [SchoolSettingsController::class, 'payments'])
+                ->can('school.settings.view')->name('payments.edit');
+            Route::patch('payments', [SchoolSettingsController::class, 'updatePayments'])
+                ->can('school.settings.update')->name('payments.update');
         });
 
         /*
@@ -757,10 +772,21 @@ Route::middleware(['auth', 'verified', 'active'])->group(function () {
                 ->can('portal.parent')->name('profile.edit');
 
             // Fee statement (M19, docs/fees.md) — read-only, nested so both
-            // module gates apply. No route to create charges/payments here.
+            // module gates apply. Online payment (M20, docs/paystack.md) is
+            // the only write action this portal ever performs, and even
+            // that never creates a charge or allocation directly — it only
+            // ever starts a Paystack transaction; the verified callback is
+            // what eventually records the real payment.
             Route::middleware('module:fees')->group(function () {
                 Route::get('children/{student}/fees', [ParentFeeController::class, 'show'])
                     ->whereNumber('student')->can('portal.parent')->name('fees.show');
+
+                Route::get('children/{student}/fees/pay', [ParentOnlinePaymentController::class, 'create'])
+                    ->whereNumber('student')->can('portal.parent')->name('fees.pay.create');
+                Route::post('children/{student}/fees/pay', [ParentOnlinePaymentController::class, 'store'])
+                    ->whereNumber('student')->can('portal.parent')->name('fees.pay.store');
+                Route::get('children/{student}/fees/pay/callback', [ParentOnlinePaymentController::class, 'callback'])
+                    ->whereNumber('student')->can('portal.parent')->name('fees.pay.callback');
             });
 
             // Announcements & notifications (M18, docs/communication.md) —
@@ -817,10 +843,19 @@ Route::middleware(['auth', 'verified', 'active'])->group(function () {
                 ->can('portal.student')->name('timetable.index');
 
             // Fee statement (M19, docs/fees.md) — read-only, nested so both
-            // module gates apply. No route to create charges/payments here.
+            // module gates apply. Online payment (M20, docs/paystack.md) is
+            // the only write action this portal ever performs, and even
+            // that never creates a charge or allocation directly.
             Route::middleware('module:fees')->group(function () {
                 Route::get('fees', [StudentFeeController::class, 'show'])
                     ->can('portal.student')->name('fees.show');
+
+                Route::get('fees/pay', [StudentOnlinePaymentController::class, 'create'])
+                    ->can('portal.student')->name('fees.pay.create');
+                Route::post('fees/pay', [StudentOnlinePaymentController::class, 'store'])
+                    ->can('portal.student')->name('fees.pay.store');
+                Route::get('fees/pay/callback', [StudentOnlinePaymentController::class, 'callback'])
+                    ->can('portal.student')->name('fees.pay.callback');
             });
 
             // Announcements & notifications (M18, docs/communication.md) —

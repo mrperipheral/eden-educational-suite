@@ -38,7 +38,7 @@ class FeePaymentController extends Controller
         return view('fees.payments.create', [
             'student' => $student,
             'outstandingCharges' => $outstanding,
-            'methods' => PaymentMethod::all(),
+            'methods' => array_values(array_filter(PaymentMethod::all(), fn (PaymentMethod $m) => $m !== PaymentMethod::Paystack)),
         ]);
     }
 

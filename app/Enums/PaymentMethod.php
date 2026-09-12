@@ -18,6 +18,7 @@ enum PaymentMethod: string
     case BankTransfer = 'bank_transfer';
     case Pos = 'pos';
     case Cheque = 'cheque';
+    case Paystack = 'paystack';
     case Other = 'other';
 
     public function label(): string
@@ -27,6 +28,7 @@ enum PaymentMethod: string
             self::BankTransfer => __('Bank transfer'),
             self::Pos => __('POS'),
             self::Cheque => __('Cheque'),
+            self::Paystack => __('Paystack (online)'),
             self::Other => __('Other'),
         };
     }

@@ -1,14 +1,13 @@
 # Project Status
 
-_Last updated: 2026-09-27_
+_Last updated: 2026-09-28_
 
 ## Current milestone
 
-**Milestone 19 — Fees & Fee Management: COMPLETE.**
+**Milestone 20 — Online Fee Payment / Paystack: COMPLETE.**
 
-Next up: further **Domain Modules** — Online Payments (Paystack), CBT,
-Promotion. Not started — do not begin without picking one up explicitly.
-See `docs/roadmap.md`.
+Next up: further **Domain Modules** — CBT, Promotion. Not started — do not
+begin without picking one up explicitly. See `docs/roadmap.md`.
 
 ## What the application is
 
@@ -16,7 +15,7 @@ Multi-school School Management SaaS (management + portals only — no website
 features). PHP 8.3 · Laravel 13.31 · MySQL 8 · Blade + Tailwind v4 · Alpine.js ·
 Vite · PHPUnit · Pint.
 
-## Environment (verified 2026-09-27)
+## Environment (verified 2026-09-28)
 
 | Item | Value |
 |------|-------|
@@ -25,7 +24,7 @@ Vite · PHPUnit · Pint.
 | Node / npm | 22.x |
 | Database | MySQL 8 (app) · SQLite `:memory:` (tests) |
 | Local mail | Mailpit (`127.0.0.1:1025`, UI `:8025`) — `.env` only, not committed |
-| Tests | `php artisan test` — 894 passing |
+| Tests | `php artisan test` — 938 passing |
 | Build | `npm run build` — passing |
 | Formatting | `vendor/bin/pint --test` — passing |
 
@@ -51,8 +50,95 @@ Vite · PHPUnit · Pint.
 - **M16 — Parent Portal** (`parent-portal-complete`) — `docs/parent-portal.md`.
 - **M17 — Student Portal** (`student-portal-complete`) — `docs/student-portal.md`.
 - **M18 — Communication & Notification Foundation** (`communication-notifications-complete`) — `docs/communication.md`.
-- **M19 — Fees & Fee Management** (this milestone, `fees-management-complete`) —
-  `docs/fees.md`; see below.
+- **M19 — Fees & Fee Management** (`fees-management-complete`) — `docs/fees.md`.
+- **M20 — Online Fee Payment / Paystack** (this milestone,
+  `online-payment-paystack-complete`) — `docs/paystack.md`; see below.
+
+## Delivered in Milestone 20
+
+Lets an authorised parent or student start an online fee payment through
+Paystack and have a genuinely verified successful payment recorded into
+M19's existing fee/payment system — never a parallel one. Full detail in
+`docs/paystack.md`.
+
+- **`App\Models\PaystackTransaction`** (school-owned + student-scoped, its
+  own table — deliberately separate from `FeePayment`: an attempt can fail
+  or be abandoned and must never become an authoritative payment).
+  `App\Enums\PaystackTransactionStatus` (`pending` → `successful` /
+  `failed` / `abandoned` / `verification_failed`) is not mass-assignable —
+  only the model's own `markSuccessful()`/`markFailed()`/`markAbandoned()`/
+  `markVerificationFailed()`, called from inside a row-locked DB
+  transaction, ever move it.
+- **`App\Services\Paystack\PaymentInitiationService`** validates the
+  requested amount against the student's *current* outstanding balance via
+  M19's own `FeeStatementBuilder` (never a client-submitted total, never
+  more than actually owed), then initializes the transaction with
+  Paystack's `/transaction/initialize` (redirect/"Standard" checkout — the
+  app never collects, stores, or transmits raw card data). A failed
+  Paystack call rolls the local row back too — no orphan `pending` rows.
+- **`App\Services\Paystack\PaymentVerificationService::verifyAndRecord()`**
+  is the single idempotent core both the browser callback and the webhook
+  call: resolves the transaction by reference (bypassing tenant scope,
+  since neither caller has one yet), anchors `TenantContext` to *that row's
+  own* school, row-locks it inside a DB transaction, and — only if still
+  `pending` — re-verifies with Paystack's `/transaction/verify` (never
+  trusting a webhook body's own claims or a browser query parameter alone),
+  checks amount/currency/context match, and only then calls M19's own
+  `FeePaymentService::record()` (with a new `planFifoAllocation()` helper —
+  oldest outstanding charge first) to create the real payment. A resolved
+  (non-`pending`) row short-circuits to a no-op — the guard against
+  duplicate webhooks, a reloaded callback, or a webhook/callback race.
+- **`App\Http\Controllers\PaystackWebhookController`** — outside
+  `auth`/`tenant`/`module` entirely, CSRF-exempted. Determines *which*
+  school's secret key to verify the signature with by first looking up the
+  payload's `reference` against our own stored transactions (a plain read,
+  never a trust decision) — the school is always resolved from trusted
+  stored data, never from the request itself. `HMAC-SHA512` over the raw
+  body via `hash_equals()`, per Paystack's documented mechanism.
+- **`SchoolSetting`** gains `paystack_enabled` / `paystack_public_key` /
+  `paystack_secret_key` (`encrypted` cast — Laravel's native `Crypt`,
+  keyed by `APP_KEY`, no new infrastructure) / `paystack_test_mode`
+  (additive onto M6's table), edited at `/settings/school/payments` under
+  the *existing* `school.settings.view`/`.update` permissions. The secret
+  is never rendered back into the form; a blank field on save keeps the
+  existing key.
+- **No new permissions.** Reuses `portal.parent` / `portal.student` (M16/
+  M17) for initiation/receipt visibility and `school.settings.*` (M6) for
+  configuration — the M20 spec's suggested `fees.pay_online` /
+  `fees.payment_view` were considered and deliberately not added (see
+  `docs/paystack.md` §8 for the reasoning).
+- **Portal integration** — `ParentOnlinePaymentController` /
+  `StudentOnlinePaymentController` (create/store/callback), each resolving
+  its student through the same `ParentPortalAuthorizer` /
+  `StudentPortalAuthorizer` every other portal controller uses. A "Pay
+  online" button appears on the existing fee statement only when Paystack
+  is actually configured and something is outstanding. A receipt view
+  (school, student, payer, amount, date, internal + Paystack reference,
+  status, fee allocation) renders on successful callback.
+- **1 new table** (migration `2026_09_28_100010`): `paystack_transactions`
+  — `reference` unique, `fee_payment_id` nullable-unique (the idempotency
+  guard is an index lookup). 1 additive migration
+  (`2026_09_28_100000`) onto M6's `school_settings`.
+- **Seeder** — Alpha Academy has Paystack enabled in test mode with
+  placeholder (non-functional) test-style keys, so the settings screen and
+  the "Pay online" entry point are demoable; an actual checkout attempt
+  fails gracefully (the "could not confirm payment yet" path) since no
+  real Paystack account backs the demo keys.
+- **Docs** — new `docs/paystack.md`; `PROJECT_STATUS.md`, `docs/roadmap.md`,
+  `docs/database-design.md`, `docs/fees.md` updated.
+- **44 new tests** under `tests/Feature/Paystack/*` (extending M19's own
+  `FeesTestCase`) — configuration (encryption at rest, secret never
+  re-rendered, blank-keeps-existing), initiation (authorised parent/
+  student, unrelated student, wrong school, amount-exceeds-balance,
+  disabled config, orphan-row-on-API-failure, reference uniqueness),
+  verification (success/failed/abandoned, amount/currency mismatch,
+  unknown reference, repeated verification is a no-op, cross-school
+  attempt, unreachable API leaves it `pending`), webhook (valid/invalid/
+  missing signature, duplicate delivery, webhook-after-callback race,
+  unknown reference, wrong-school-secret forgery attempt), financial
+  integrity (FIFO allocation across multiple charges, statement/history
+  visibility, void behaves identically to a manual payment), and portal
+  isolation (parent/student IDOR attempts, module-off, role restrictions).
 
 ## Delivered in Milestone 19
 
@@ -775,14 +861,20 @@ check, DB duplicate prevention, assessment↔assignment link (same class only). 
 ## Known follow-ups / recommendations
 
 - Production env: `SESSION_SECURE_COOKIE=true`, real `MAIL_MAILER`, `APP_DEBUG=false`.
-- Next milestone: pick a further domain module (Online Payments/Paystack,
-  CBT, Promotion) — see `docs/roadmap.md`.
-- **Fees follow-ups** — Paystack / online payment integration (M20 — this
-  milestone is exactly the foundation it plugs into), a full discount/
-  waiver audit-log table, bulk fee-structure assignment/invoicing runs, fee
-  reminders (the M18 notification foundation could carry these), refunds
-  beyond voiding an unallocated/newly-allocated payment, receipts/PDF
-  export beyond the browser-printable statement, multi-currency.
+- Next milestone: pick a further domain module (CBT, Promotion) — see
+  `docs/roadmap.md`.
+- **Paystack follow-ups** — a dedicated staff-facing list of online-payment
+  attempts (successes already show in the ordinary statement; failed/
+  abandoned ones are only visible in `paystack_transactions` directly),
+  refunds through Paystack's own refund API (M19's manual `void()` covers
+  "this shouldn't count" today), recurring/subscription billing, an
+  inline-JS/Popup checkout as an alternative to the redirect flow, any
+  payment channel other than Paystack.
+- **Fees follow-ups** — a full discount/waiver audit-log table, bulk
+  fee-structure assignment/invoicing runs, fee reminders (the M18
+  notification foundation could carry these), refunds beyond voiding an
+  unallocated/newly-allocated payment, receipts/PDF export beyond the
+  browser-printable statement, multi-currency.
 - **Communication follow-ups** — WhatsApp/SMS/email provider integration
   behind `App\Enums\NotificationChannel`, two-way portal messaging (guardians/
   students can view announcements & their own notifications but do not reply
