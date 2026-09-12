@@ -5,6 +5,7 @@ use App\Http\Controllers\Academic\LevelController;
 use App\Http\Controllers\Academic\PeriodController;
 use App\Http\Controllers\Academic\SessionController as AcademicSessionController;
 use App\Http\Controllers\Academic\SubjectController;
+use App\Http\Controllers\Administration\AuditLogController;
 use App\Http\Controllers\Assessment\AssessmentCategoryController;
 use App\Http\Controllers\Assessment\AssessmentController;
 use App\Http\Controllers\Assessment\AssessmentScoreController;
@@ -147,6 +148,23 @@ Route::middleware(['auth', 'verified', 'active'])->group(function () {
             ->name('members.store');
         Route::patch('members/{user}', [MemberController::class, 'updateRole'])->name('members.update-role');
         Route::delete('members/{user}', [MemberController::class, 'destroy'])->name('members.destroy');
+
+        /*
+        | Audit Log (M26, docs/audit.md) — read-only, `audit.view` alone.
+        | Deliberately NOT behind a `module:` gate: audit accountability is
+        | core administration, not an optional domain feature a school opts
+        | into (the same reasoning Members/School Settings already follow).
+        | There is no edit/destroy route anywhere — that absence is what
+        | makes a record immutable from the UI.
+        */
+        Route::prefix('administration/audit-log')->name('audit-log.')->group(function () {
+            Route::get('/', [AuditLogController::class, 'index'])
+                ->can('audit.view')->name('index');
+            Route::get('export', [AuditLogController::class, 'export'])
+                ->can('audit.view')->name('export');
+            Route::get('{auditLog}', [AuditLogController::class, 'show'])
+                ->whereNumber('auditLog')->can('audit.view')->name('show');
+        });
 
         // School configuration — sectioned (see docs/school-settings.md).
         // `school.settings.view` reads; `school.settings.update` writes.

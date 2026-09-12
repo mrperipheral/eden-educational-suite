@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Academic;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Academic\SessionRequest;
 use App\Models\AcademicSession;
+use App\Services\Audit\AuditRecorder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
 
@@ -22,6 +23,8 @@ use Illuminate\View\View;
  */
 class SessionController extends Controller
 {
+    public function __construct(private readonly AuditRecorder $audit) {}
+
     public function index(): View
     {
         $this->authorize('academics.view');
@@ -49,6 +52,13 @@ class SessionController extends Controller
         if (($data['is_current'] ?? false) || AcademicSession::query()->count() === 1) {
             $session->makeCurrent();
         }
+
+        $this->audit->record(
+            event: 'academic_session.created',
+            summary: __(':actor created academic session ":name".', ['actor' => request()->user()->name, 'name' => $session->name]),
+            auditable: $session,
+            auditableLabel: $session->name,
+        );
 
         return to_route('academic.sessions.index')
             ->with('status', __('Academic session ":name" created.', ['name' => $session->name]));
@@ -100,6 +110,13 @@ class SessionController extends Controller
 
         $model = AcademicSession::query()->findOrFail($session);
         $model->makeCurrent();
+
+        $this->audit->record(
+            event: 'academic_session.made_current',
+            summary: __(':actor made ":name" the current academic session.', ['actor' => request()->user()->name, 'name' => $model->name]),
+            auditable: $model,
+            auditableLabel: $model->name,
+        );
 
         return back()->with('status', __('":name" is now the current session.', ['name' => $model->name]));
     }

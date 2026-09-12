@@ -62,6 +62,7 @@
             ['route' => 'announcements.index', 'label' => __('Announcements'), 'active' => 'announcements.*', 'allowed' => $moduleOn(\App\Enums\Module::Notifications) && auth()->user()->can('announcement.view')],
             ['route' => 'notifications.index', 'label' => $notificationLabel, 'active' => 'notifications.*', 'allowed' => $moduleOn(\App\Enums\Module::Notifications)],
             ['route' => 'settings.school.edit', 'label' => __('School settings'), 'active' => 'settings.school.*', 'allowed' => auth()->user()->can('school.settings.view')],
+            ['route' => 'audit-log.index', 'label' => __('Audit Log'), 'active' => 'audit-log.*', 'allowed' => auth()->user()->can('audit.view')],
             ['route' => 'admin.schools.index', 'label' => __('Schools'), 'active' => 'admin.schools.*', 'allowed' => auth()->user()->can('viewAny', \App\Models\School::class)],
             ['route' => 'settings.profile.edit', 'label' => __('Account settings'), 'active' => 'settings.profile.*', 'allowed' => true],
         ]),

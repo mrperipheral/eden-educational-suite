@@ -642,7 +642,57 @@ psychometric testing, proctoring, adaptive testing, question pools/
 randomisation, a second CBT engine, notifications, SMS/WhatsApp workflows,
 complex reporting/analytics, bulk import.
 
-## Milestone 26+ — Domain Modules
+## ✅ Milestone 26 — Administration & Audit (complete, 2026-10-04)
+
+A tenant-scoped, immutable audit trail for administrative and
+security-relevant events, a staff-facing Audit Log viewer, and a small
+administrative dashboard panel — accountability and traceability, not a
+SIEM. `App\Models\AuditLog` is written exclusively through `App\Services\
+Audit\AuditRecorder::record()` (the single seam every module uses,
+mirroring `NotificationDispatcher`'s role for M18); there is no edit/
+destroy route anywhere in the app, which is what makes a record immutable
+from the UI rather than a model-level guard. `school_id` is **nullable** —
+deliberately not `BelongsToSchool` — because a handful of genuine
+account-level security events (login, logout, password reset, email
+verification) run on routes with no `tenant` middleware and have no school
+to attribute to; they are recorded honestly with `school_id = null` and
+never appear in any school's filtered viewer, a documented scope boundary
+rather than a bug. Auth integration reuses Laravel's own already-fired
+events (`Login`/`Failed`/`Logout`/`PasswordReset`/`Verified`) via listeners
+under `App\Listeners\Audit\*` — no changes to the existing hand-rolled M2
+authentication, no auth package introduced. Every `changes` payload passes
+through a blanket, key-name-based redaction filter
+(`password`/`secret`/`token`/`api_key`/`private_key`-shaped keys become
+`[redacted]`), not a per-model allow-list; the Paystack secret key is
+additionally never included in its own settings-update audit payload at
+all. One new permission, `audit.view` (School Admin + Principal only —
+Teacher/Bursar/Staff hold it in no bundle, matching "no audit access
+unless explicitly granted"), gated by no `Module::` since audit
+accountability is core administration, not an optional domain feature.
+Every audited action is an explicit call at a genuine controller mutation
+point — not a magic model-event hook that would fire on every factory
+call across the existing test suite — covering every category the spec
+names by name: user/access administration (membership created/role-
+changed/removed), school administration (school created, settings/
+branding/regional/payments updated, module toggled), and a representative
+slice of academic/operational actions (students, guardians, teachers,
+academic sessions, result-run publish/lock, fee payments, CBT
+examinations, Question Bank lifecycle, Entry/Placement Assessment).
+Deliberately not built: account activation/deactivation/suspension admin
+UI (`User.status` is account-wide, not per-school — a cross-school-
+impacting action needing its own design, not a side effect of auditing),
+a scheduled retention command (no scheduler exists in this app to run
+one). Full detail in `docs/audit.md`.
+
+Deferred: a scheduled audit-retention/pruning command, a per-record "view
+this record's own audit history" panel (the `auditable_type`/
+`auditable_id` composite index is ready for it), account activation/
+deactivation/suspension admin UI, exhaustive field-level audit coverage of
+every edit to every business record (only creation and status/lifecycle
+changes are audited for most models — the moments with real
+accountability weight).
+
+## Milestone 27+ — Domain Modules
 
 Reporting.
 

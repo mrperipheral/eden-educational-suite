@@ -8,6 +8,7 @@ use App\Http\Requests\Fees\PaymentRequest;
 use App\Http\Requests\Fees\ReasonRequest;
 use App\Models\FeePayment;
 use App\Models\Student;
+use App\Services\Audit\AuditRecorder;
 use App\Services\Fees\FeePaymentService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
@@ -21,7 +22,7 @@ use Illuminate\View\View;
  */
 class FeePaymentController extends Controller
 {
-    public function __construct(private readonly FeePaymentService $payments) {}
+    public function __construct(private readonly FeePaymentService $payments, private readonly AuditRecorder $audit) {}
 
     public function create(int $student): View
     {
@@ -47,10 +48,19 @@ class FeePaymentController extends Controller
         $studentModel = Student::query()->findOrFail($student);
 
         try {
-            $this->payments->record($studentModel, $request->payload(), $request->allocations(), $request->user());
+            $payment = $this->payments->record($studentModel, $request->payload(), $request->allocations(), $request->user());
         } catch (\DomainException|\InvalidArgumentException $e) {
             return back()->withInput()->with('error', $e->getMessage());
         }
+
+        $this->audit->record(
+            event: 'fee_payment.recorded',
+            summary: __(':actor recorded a payment of :amount for :name (ref :reference).', [
+                'actor' => $request->user()->name, 'amount' => $payment->amount, 'name' => $studentModel->shortName(), 'reference' => $payment->reference,
+            ]),
+            auditable: $payment,
+            auditableLabel: $payment->reference,
+        );
 
         return to_route('fees.students.show', $studentModel)->with('status', __('Payment recorded.'));
     }
@@ -59,6 +69,14 @@ class FeePaymentController extends Controller
     {
         $payment = FeePayment::query()->findOrFail($payment);
         $payment->void($request->user(), $request->reason());
+
+        $this->audit->record(
+            event: 'fee_payment.voided',
+            summary: __(':actor voided payment :reference.', ['actor' => $request->user()->name, 'reference' => $payment->reference]),
+            auditable: $payment,
+            auditableLabel: $payment->reference,
+            after: ['void_reason' => $payment->void_reason],
+        );
 
         return to_route('fees.students.show', $payment->student_id)->with('status', __('Payment voided.'));
     }

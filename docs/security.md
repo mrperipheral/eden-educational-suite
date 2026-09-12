@@ -320,21 +320,43 @@ Full detail in `docs/parent-portal.md`. Summary of controls:
 | No premature exposure | the report card and results pages show only what M15's own configuration/publication rules already permit — the portal narrows visibility further (own child, published only), never widens it |
 | CSRF | every form; the portal itself has no state-changing forms beyond the shared M2 account settings it links out to |
 
+## Implemented in Milestone 26 (Administration & Audit)
+
+Full detail in `docs/audit.md`. Summary of controls:
+
+| Control | State |
+|---------|-------|
+| Audit trail | `App\Models\AuditLog`, written exclusively through `App\Services\Audit\AuditRecorder::record()` — no other write path exists |
+| Immutability | no edit/destroy route anywhere in the app for `AuditLog` — that absence, not a model guard, is what makes a record immutable from the UI; proven by an explicit test asserting PATCH/PUT/DELETE match no route action (405) |
+| Tenant isolation | `AuditLog` is not `BelongsToSchool` (`school_id` is nullable by design — see `docs/audit.md` §2); every query in `AuditLogController` explicitly filters `where('school_id', TenantContext::idOrFail())`; the `{auditLog}` route parameter 404s for another school's id; filter dropdowns (event/actor/type) are built from this school's own rows only |
+| Authorization | one permission, `audit.view` — School Admin (automatic) + Principal; Teacher/Bursar/Staff/Parent/Student hold it in no bundle, matching the spec's "no audit access unless explicitly granted" |
+| Sensitive data | `AuditRecorder::redact()` is a blanket key-name filter (`password`/`remember_token`/`secret`/`token`/`api_key`/`private_key` substrings) applied to every `changes` payload, not a per-model allow-list; the Paystack secret key is additionally never included in its own settings-update payload at all; `Failed` login's raw credentials (including the password) are never read, only the attempted email |
+| Auth integration | five Laravel-native events already fired by the existing M2 authentication (`Login`/`Failed`/`Logout`/`PasswordReset`/`Verified`) gained listeners under `App\Listeners\Audit\*` — no changes to the authentication mechanism itself, no new auth package |
+| Performance | synchronous single-row inserts; four `school_id`-leading composite indexes matching the viewer's actual query shapes; paginated (25/page) with eager-loaded `actor`; export uses `chunk()`, never `cursor()` (which would skip eager loading) |
+| Cross-school membership actions | every M4 Members write (`member.created`/`.role_changed`/`.removed`) is now audited, with the existing anti-escalation rules (self-modification block, tier-guarded role grants) completely unchanged |
+
 ## Deferred (with the milestone that owns them)
 
 - **Auth follow-ups:** 2FA, "log out other devices" on password change, session
-  listing, auth-event audit logging, templated transactional emails.
+  listing, templated transactional emails.
 - **Authz follow-ups:** multi-role per school, custom/runtime roles, invitations
-  / brand-new-account onboarding, admin UI for `status` / `is_platform_admin`,
-  audit logging of role & membership changes, enforcing the remaining dormant
-  domain permissions (each in its module — `academics.*` in M8, `student.*` in
-  M9, `guardian.*` in M10, `staff.*` in M11, `timetable.*` in M12,
-  `attendance.*` in M13, `assessment.*` in M14, `result.*` in M15,
-  `portal.parent` in M16).
+  / brand-new-account onboarding, admin UI for `status` / `is_platform_admin`
+  (deliberately not added in M26 either — see `docs/audit.md` §10, it is a
+  cross-school-impacting action that needs its own design, not a side effect of
+  adding auditing), enforcing the remaining dormant domain permissions (each in
+  its module — `academics.*` in M8, `student.*` in M9, `guardian.*` in M10,
+  `staff.*` in M11, `timetable.*` in M12, `attendance.*` in M13,
+  `assessment.*` in M14, `result.*` in M15, `portal.parent` in M16).
 - **Tenancy follow-ups:** queue-job tenant propagation, per-tenant rate limiting,
-  per-tenant cache keys, audit logging of context switches.
-- **Later:** audit logging (who did what, per school — incl. student record /
-  status changes), virus scanning of uploads (type/size/dimension validation and
+  per-tenant cache keys, audit logging of context switches (the tenant context
+  itself is not yet an audited event — only the actions taken once inside one).
+- **Audit follow-ups (M26):** a scheduled retention/pruning command (no
+  scheduler exists in this app yet to run one — see `docs/audit.md` §10), a
+  per-record "view this record's own audit history" panel (the
+  `auditable_type`/`auditable_id` index is ready for it, see `docs/audit.md`
+  §11), account activation/deactivation/suspension admin UI (still no such
+  feature exists anywhere in the app).
+- **Later:** virus scanning of uploads (type/size/dimension validation and
   out-of-webroot storage are done in M6 — see `docs/school-settings.md` §4),
   encryption of sensitive PII at rest, data export / erasure (GDPR-style)
   handling for student / guardian / teacher records, 2FA for admins, security

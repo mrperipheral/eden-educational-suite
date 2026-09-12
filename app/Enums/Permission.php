@@ -102,6 +102,9 @@ enum Permission: string
     case AnnouncementView = 'announcement.view';
     case AnnouncementManage = 'announcement.manage';
 
+    // ---- Administration & audit (enforced: Administration & Audit M26) ------
+    case AuditView = 'audit.view';
+
     // ---- Declared for later domain milestones (coarse; not yet enforced) -----
     case FinanceView = 'finance.view';
     case FinanceManage = 'finance.manage';

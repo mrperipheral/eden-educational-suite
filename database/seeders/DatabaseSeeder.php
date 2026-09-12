@@ -45,6 +45,7 @@ use App\Models\Subject;
 use App\Models\Teacher;
 use App\Models\Timetable;
 use App\Models\User;
+use App\Services\Audit\AuditRecorder;
 use App\Services\Cbt\ExamAttemptService;
 use App\Services\Cbt\ExaminationQuestionService;
 use App\Services\LearningMaterials\LearningMaterialUploadService;
@@ -1019,6 +1020,47 @@ class DatabaseSeeder extends Seeder
         $entryAssessmentArchived->assessor_id = $admin->id;
         $entryAssessmentArchived->save();
         $entryAssessmentArchived->archive();
+
+        // Administration & Audit (M26) — a small, representative slice of
+        // audit history through the real `AuditRecorder`, not direct table
+        // inserts, so the seeded rows have exactly the same shape a live
+        // action would produce. Mirrors a few of the actions already taken
+        // above by direct model manipulation (module activation, the
+        // Question Bank archive, the Entry Assessment archive) so the Audit
+        // Log page has real, readable history on a fresh install rather
+        // than being empty until the first live action.
+        $audit = app(AuditRecorder::class);
+        $audit->record(
+            event: 'module.toggled',
+            summary: __(':actor enabled the :module module.', ['actor' => $admin->name, 'module' => Module::Cbt->label()]),
+            auditableLabel: Module::Cbt->label(),
+            after: ['enabled' => true],
+            actor: $admin,
+        );
+        $audit->record(
+            event: 'member.created',
+            summary: __(':actor added :name as :role.', ['actor' => $admin->name, 'name' => $tomiwa->name, 'role' => Role::Teacher->label()]),
+            auditable: $tomiwa,
+            auditableLabel: $tomiwa->name,
+            after: ['role' => Role::Teacher->value],
+            actor: $admin,
+        );
+        $audit->record(
+            event: 'question.status_changed',
+            summary: __(':actor changed a question\'s status from :from to :to.', ['actor' => $tomiwa->name, 'from' => 'Active', 'to' => 'Archived']),
+            auditable: $retiredQuestion,
+            auditableLabel: $retiredQuestion->question_text,
+            before: ['status' => 'active'],
+            after: ['status' => 'archived'],
+            actor: $tomiwa,
+        );
+        $audit->record(
+            event: 'entry_assessment.archived',
+            summary: __(':actor archived the entry assessment record for :name.', ['actor' => $admin->name, 'name' => $entryAssessmentArchived->candidate_name]),
+            auditable: $entryAssessmentArchived,
+            auditableLabel: $entryAssessmentArchived->candidate_name,
+            actor: $admin,
+        );
 
         $tenant->forget();
     }

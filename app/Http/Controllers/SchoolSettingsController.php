@@ -7,6 +7,7 @@ use App\Http\Requests\Settings\UpdateSchoolPaymentsRequest;
 use App\Http\Requests\Settings\UpdateSchoolProfileRequest;
 use App\Http\Requests\Settings\UpdateSchoolRegionalRequest;
 use App\Models\SchoolSetting;
+use App\Services\Audit\AuditRecorder;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Response;
@@ -26,7 +27,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  */
 class SchoolSettingsController extends Controller
 {
-    public function __construct(private readonly TenantContext $tenant) {}
+    public function __construct(private readonly TenantContext $tenant, private readonly AuditRecorder $audit) {}
 
     // -- Profile ----------------------------------------------------------
 
@@ -42,7 +43,7 @@ class SchoolSettingsController extends Controller
 
     public function update(UpdateSchoolProfileRequest $request): RedirectResponse
     {
-        $this->save($request->validated());
+        $this->save($request->validated(), 'settings.profile_updated', __('School profile updated.'));
 
         return to_route('settings.school.edit')->with('status', __('School profile saved.'));
     }
@@ -61,6 +62,7 @@ class SchoolSettingsController extends Controller
     public function updateBranding(UpdateSchoolBrandingRequest $request): RedirectResponse
     {
         $settings = $this->settings();
+        $before = $settings->getAttributes();
         $settings->fill(['brand_color' => $request->validated()['brand_color'] ?? null])->save();
 
         if ($request->hasFile('logo')) {
@@ -74,6 +76,15 @@ class SchoolSettingsController extends Controller
 
         $settings->markReviewed();
 
+        $this->audit->record(
+            event: 'settings.branding_updated',
+            summary: __(':actor updated the school branding.', ['actor' => $request->user()->name]),
+            auditable: $settings,
+            auditableLabel: $this->tenant->schoolOrFail()->name,
+            before: $before,
+            after: $settings->getAttributes(),
+        );
+
         return to_route('settings.school.branding.edit')->with('status', __('Branding saved.'));
     }
 
@@ -81,7 +92,15 @@ class SchoolSettingsController extends Controller
     {
         $this->authorize('school.settings.update');
 
-        $this->settings()->clearLogo();
+        $settings = $this->settings();
+        $settings->clearLogo();
+
+        $this->audit->record(
+            event: 'settings.branding_updated',
+            summary: __(':actor removed the school logo.', ['actor' => request()->user()->name]),
+            auditable: $settings,
+            auditableLabel: $this->tenant->schoolOrFail()->name,
+        );
 
         return to_route('settings.school.branding.edit')->with('status', __('Logo removed.'));
     }
@@ -111,7 +130,7 @@ class SchoolSettingsController extends Controller
 
     public function updateRegional(UpdateSchoolRegionalRequest $request): RedirectResponse
     {
-        $this->save($request->validated());
+        $this->save($request->validated(), 'settings.regional_updated', __('School regional settings updated.'));
 
         return to_route('settings.school.regional.edit')->with('status', __('Regional settings saved.'));
     }
@@ -139,12 +158,32 @@ class SchoolSettingsController extends Controller
 
         // A blank secret field means "keep the existing key" — it is never
         // rendered back into the form, so there is nothing to "clear" here.
-        if ($request->newSecretKey() !== null) {
+        $secretChanged = $request->newSecretKey() !== null;
+        if ($secretChanged) {
             $settings->paystack_secret_key = $request->newSecretKey();
         }
 
         $settings->save();
         $settings->markReviewed();
+
+        // The secret key itself is never included, changed or not — left
+        // out of the payload entirely rather than relying solely on
+        // AuditRecorder's blanket redaction. `key_was_rotated` (not
+        // `..._secret_...`) is deliberately named to avoid tripping that
+        // same redaction filter — it is a boolean flag, not a value that
+        // needs masking, and redacting it would hide a true/false behind
+        // "[redacted]" for no protective benefit.
+        $this->audit->record(
+            event: 'settings.payments_updated',
+            summary: __(':actor updated the online payment settings.', ['actor' => $request->user()->name]),
+            auditable: $settings,
+            auditableLabel: $this->tenant->schoolOrFail()->name,
+            after: [
+                'paystack_enabled' => $settings->paystack_enabled,
+                'paystack_test_mode' => $settings->paystack_test_mode,
+                'paystack_key_was_rotated' => $secretChanged,
+            ],
+        );
 
         return to_route('settings.school.payments.edit')->with('status', __('Payment settings saved.'));
     }
@@ -161,10 +200,20 @@ class SchoolSettingsController extends Controller
     /**
      * @param  array<string, mixed>  $attributes
      */
-    private function save(array $attributes): void
+    private function save(array $attributes, string $event, string $summary): void
     {
         $settings = $this->settings();
+        $before = $settings->getAttributes();
         $settings->fill($attributes)->save();
         $settings->markReviewed();
+
+        $this->audit->record(
+            event: $event,
+            summary: __(':actor :summary', ['actor' => request()->user()->name, 'summary' => lcfirst($summary)]),
+            auditable: $settings,
+            auditableLabel: $this->tenant->schoolOrFail()->name,
+            before: $before,
+            after: $settings->getAttributes(),
+        );
     }
 }

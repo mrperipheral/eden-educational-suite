@@ -110,6 +110,7 @@ enum Role: string
                 Permission::EntryAssessmentView,
                 Permission::EntryAssessmentRecord,
                 Permission::EntryAssessmentManage,
+                Permission::AuditView,
             ],
 
             self::Bursar => [

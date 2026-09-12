@@ -1,10 +1,10 @@
 # Project Status
 
-_Last updated: 2026-10-03_
+_Last updated: 2026-10-04_
 
 ## Current milestone
 
-**Milestone 25 — Entry / Placement Assessment: COMPLETE.**
+**Milestone 26 — Administration & Audit: COMPLETE.**
 
 Next up: further **Domain Modules** — Reporting. Not started — do not
 begin without picking one up explicitly. See `docs/roadmap.md`.
@@ -24,7 +24,7 @@ Vite · PHPUnit · Pint.
 | Node / npm | 22.x |
 | Database | MySQL 8 (app) · SQLite `:memory:` (tests) |
 | Local mail | Mailpit (`127.0.0.1:1025`, UI `:8025`) — `.env` only, not committed |
-| Tests | `php artisan test` — 1138 passing |
+| Tests | `php artisan test` — 1242 passing |
 | Build | `npm run build` — passing |
 | Formatting | `vendor/bin/pint --test` — passing |
 
@@ -56,8 +56,118 @@ Vite · PHPUnit · Pint.
 - **M22 — Learning Materials** (`learning-materials-complete`) — `docs/learning-materials.md`.
 - **M23 — CBT / Online Examinations** (`cbt-online-examinations-complete`) — `docs/cbt.md`.
 - **M24 — Question Bank** (`question-bank-complete`) — `docs/question-bank.md`.
-- **M25 — Entry / Placement Assessment** (this milestone,
-  `entry-placement-assessment-complete`) — `docs/entry-placement-assessment.md`; see below.
+- **M25 — Entry / Placement Assessment** (`entry-placement-assessment-complete`) — `docs/entry-placement-assessment.md`.
+- **M26 — Administration & Audit** (this milestone,
+  `administration-audit-complete`) — `docs/audit.md`; see below.
+
+## Delivered in Milestone 26
+
+A tenant-scoped, immutable audit trail for administrative and
+security-relevant events, a staff-facing Audit Log viewer, and a small
+administrative panel on the existing dashboard — accountability and
+traceability, **not** a SIEM. Full detail in `docs/audit.md`.
+
+- **`App\Models\AuditLog`** — one central table, written exclusively
+  through **`App\Services\Audit\AuditRecorder::record()`** (the single
+  seam every module uses, mirroring `NotificationDispatcher`'s role for
+  M18). No `AuditLogRequest`, no edit/destroy route anywhere in the app —
+  that absence, not a model guard, is what makes a record immutable from
+  the UI.
+- **`school_id` is nullable — deliberately not `BelongsToSchool`.** Every
+  business/administrative event happens behind the `tenant` middleware and
+  carries the active `TenantContext`; a handful of genuine account-level
+  security events (login, logout, password reset, email verification —
+  their routes carry no `tenant` middleware at all) have none and are
+  recorded honestly with `school_id = null`, which also means they never
+  appear in any school's filtered Audit Log viewer (a deliberate scope
+  boundary — see `docs/audit.md` §2).
+- **Auth integration reuses Laravel's own already-fired events** —
+  `Illuminate\Auth\Events\{Login,Failed,Logout,PasswordReset,Verified}`
+  gained listeners under `App\Listeners\Audit\*`; no changes to the
+  existing hand-rolled M2 authentication mechanism, no auth package
+  introduced. `Failed`'s raw credentials (including the password) are
+  never read — only the attempted email, in the summary text only, never
+  a separate queryable column.
+- **Blanket, key-name-based redaction** (`AuditRecorder::redact()`) — any
+  attribute key containing `password`/`remember_token`/`secret`/`token`/
+  `api_key`/`private_key` (case-insensitive substring) becomes
+  `[redacted]` in any `changes` payload, not a per-model allow-list to keep
+  in sync. The Paystack secret key is additionally never included in its
+  own settings-update payload at all — only a `paystack_key_was_rotated`
+  boolean (deliberately not named with "secret" in it, so the same filter
+  doesn't also mask a harmless flag).
+- **One new permission, `audit.view`** — School Admin (automatic) +
+  Principal; Teacher/Bursar/Staff/Parent/Student hold it in no bundle,
+  matching the spec's "no audit access unless explicitly granted" exactly.
+  Not gated by any `Module::` — audit accountability is core
+  administration, like Members/School Settings, not an optional domain
+  feature a school opts into (and gating "what happened when a module was
+  toggled" behind a module would be self-defeating).
+- **Explicit call sites, not a magic model-event hook** — every audited
+  action is a one-line `AuditRecorder::record()` call at a genuine
+  controller mutation point, covering every category the spec names by
+  name at least once: membership created/role-changed/removed, school
+  created, school settings/branding/regional/payments updated, module
+  toggled, student/teacher/guardian created, student/teacher status
+  changed, academic session created/made current, result run published/
+  locked, fee payment recorded/voided, examination scheduled/closed,
+  Question Bank status changed, Entry Assessment created/archived/
+  restored. Deliberately not exhaustive field-level coverage of every
+  edit to every one of those models — see `docs/audit.md` §6 for why.
+- **Tenant isolation** — `AuditLogController` explicitly filters every
+  query `where('school_id', TenantContext::idOrFail())` (no global scope
+  exists to rely on); the `{auditLog}` route parameter 404s for another
+  school's id; the actor/event/type filter dropdowns are built from this
+  school's own rows only.
+- **Performance** — synchronous single-row inserts (no queue/Redis, per
+  the spec's own allowance); four `school_id`-leading composite indexes
+  matching the viewer's actual query shapes; paginated (25/page) with
+  eager-loaded `actor`; CSV export via `chunk()` (never `cursor()`, which
+  would skip eager loading).
+- **A small "Administration" dashboard panel** — active/suspended member
+  counts, enabled-module count, and the last 5 audit entries, visible only
+  to `audit.view` holders, built entirely from queries already cheap at
+  this scale (a handful of rows per school) — no new expensive
+  aggregation.
+- **Account activation/deactivation/suspension admin UI deliberately not
+  added** — `User.status` is account-wide, not per-school; a School Admin
+  toggling it would suspend that person's access to every school they
+  belong to, a cross-school-impacting action that needs its own design,
+  not a side effect of adding auditing. `docs/authentication.md` already
+  listed this as deferred since M2; still deferred.
+- **1 new table** (migration `2026_10_04_100000`): `audit_logs` —
+  `school_id`-leading indexed (4 composite indexes), no real FK on
+  `auditable_type`/`auditable_id` (deliberately, so a later hard-deleted
+  target never breaks the audit entry's meaning).
+- **2 new views** — `resources/views/administration/audit-log/*`
+  (`index.blade.php`: search + event/user/type/date-range filters, Export
+  CSV; `show.blade.php`: full detail + before/after diff). One new "Audit
+  Log" nav item, `audit.view` gated. The existing dashboard gained a small
+  administration card (see above).
+- **Seeder** — 4 representative audit entries written through the real
+  `AuditRecorder` (not direct table inserts) for Alpha Academy, so the
+  Audit Log page has genuine, readable history on a fresh install: a
+  module enable, a membership creation, a Question Bank archive, and an
+  Entry Assessment archive.
+- **Docs** — new `docs/audit.md`; `PROJECT_STATUS.md`, `docs/roadmap.md`,
+  `docs/database-design.md`, `docs/security.md`, `CLAUDE.md` updated.
+- **53 new tests** under `tests/Feature/Audit/*` (+ `AuditTestCase` base)
+  — creation basics (actor/school/affected-entity recorded correctly,
+  before/after captured, Paystack secret + any secret-shaped column
+  redacted, password never recorded anywhere), authentication (login
+  success/failed/blocked, logout, password change/reset, email
+  verification — all correctly schoolless), administration (member
+  created/role-changed/removed with before/after, teacher status change,
+  platform-admin school creation), tenant isolation (cross-school index/
+  show/export, a null-school event never leaking into any school's
+  viewer, the actor filter never listing a foreign school's users),
+  authorization (School Admin/Principal access, every other role
+  forbidden, and — critically — that PATCH/PUT/DELETE against an entry
+  match no route at all, proving there is no edit/delete feature to gate
+  in the first place), the viewer (search, event/actor/type/date-range
+  filters, pagination, detail view, empty state), export (CSV header +
+  rows, respects filters, never leaks secrets, unauthorized role
+  forbidden), and N+1 regression on the index (with and without filters).
 
 ## Delivered in Milestone 25
 
@@ -1330,6 +1440,11 @@ check, DB duplicate prevention, assessment↔assignment link (same class only). 
 - Production env: `SESSION_SECURE_COOKIE=true`, real `MAIL_MAILER`, `APP_DEBUG=false`.
 - Next milestone: pick a further domain module (Reporting) — see
   `docs/roadmap.md`.
+- **Audit follow-ups** — a scheduled retention/pruning command (no
+  scheduler exists in this app yet to run one), a per-record "view this
+  record's own audit history" panel (the `auditable_type`/`auditable_id`
+  index is ready for it), account activation/deactivation/suspension
+  admin UI (deliberately not built — see `docs/audit.md` §10).
 - **Entry / Placement Assessment follow-ups** — placement recommendation/
   decision workflow of any kind (deliberately not built — this stays a
   recording-only feature), an admissions CRM, application payment,

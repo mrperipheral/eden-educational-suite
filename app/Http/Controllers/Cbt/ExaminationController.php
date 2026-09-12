@@ -8,6 +8,7 @@ use App\Http\Requests\Cbt\ExaminationRequest;
 use App\Models\AcademicLevel;
 use App\Models\AcademicSession;
 use App\Models\Examination;
+use App\Services\Audit\AuditRecorder;
 use App\Support\Cbt\CbtAuthorizer;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -24,7 +25,7 @@ use RuntimeException;
  */
 class ExaminationController extends Controller
 {
-    public function __construct(private readonly CbtAuthorizer $authorizer) {}
+    public function __construct(private readonly CbtAuthorizer $authorizer, private readonly AuditRecorder $audit) {}
 
     public function index(Request $request): View
     {
@@ -149,6 +150,13 @@ class ExaminationController extends Controller
             return back()->with('error', $e->getMessage());
         }
 
+        $this->audit->record(
+            event: 'examination.scheduled',
+            summary: __(':actor scheduled examination ":title".', ['actor' => $request->user()->name, 'title' => $examination->title]),
+            auditable: $examination,
+            auditableLabel: $examination->title,
+        );
+
         return to_route('cbt.examinations.show', $examination->id)->with('status', __('Examination scheduled — it is now visible to its class.'));
     }
 
@@ -162,6 +170,13 @@ class ExaminationController extends Controller
         } catch (RuntimeException $e) {
             return back()->with('error', $e->getMessage());
         }
+
+        $this->audit->record(
+            event: 'examination.closed',
+            summary: __(':actor closed examination ":title".', ['actor' => $request->user()->name, 'title' => $examination->title]),
+            auditable: $examination,
+            auditableLabel: $examination->title,
+        );
 
         return to_route('cbt.examinations.show', $examination->id)->with('status', __('Examination closed.'));
     }

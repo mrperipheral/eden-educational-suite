@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Enums\Module;
 use App\Http\Requests\Settings\UpdateSchoolModuleRequest;
+use App\Services\Audit\AuditRecorder;
 use App\Support\Modules\SchoolModules;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Validation\ValidationException;
@@ -23,7 +24,7 @@ use Illuminate\View\View;
  */
 class SchoolModuleController extends Controller
 {
-    public function __construct(private readonly SchoolModules $modules) {}
+    public function __construct(private readonly SchoolModules $modules, private readonly AuditRecorder $audit) {}
 
     public function edit(): View
     {
@@ -62,7 +63,20 @@ class SchoolModuleController extends Controller
             $this->assertNoEnabledDependents($target, $states);
         }
 
+        $wasEnabled = $states[$target->value] ?? $target->enabledByDefault();
         $this->modules->set($target, $enabled);
+
+        $this->audit->record(
+            event: 'module.toggled',
+            summary: __(':actor :action the :module module.', [
+                'actor' => request()->user()->name,
+                'action' => $enabled ? __('enabled') : __('disabled'),
+                'module' => $target->label(),
+            ]),
+            auditableLabel: $target->label(),
+            before: ['enabled' => $wasEnabled],
+            after: ['enabled' => $enabled],
+        );
 
         return to_route('settings.school.modules.edit')->with('status', $enabled
             ? __(':module enabled.', ['module' => $target->label()])

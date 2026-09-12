@@ -1,12 +1,13 @@
 # Database Design
 
-Status: Milestone 25. Tenant + roles + onboarding + school settings + module
+Status: Milestone 26. Tenant + roles + onboarding + school settings + module
 activation + academic foundation + student management + guardian management +
 teacher management + timetable management + attendance management + assessment &
 assignments + results & report cards + parent portal + student portal +
 communication & notification foundation + fees & fee management + online fee
 payment (Paystack) + promotion & graduation + learning materials + CBT / online
-examinations + question bank + entry / placement assessment. School-owned tables: `school_settings` (M6),
+examinations + question bank + entry / placement assessment + administration &
+audit. School-owned tables: `school_settings` (M6),
 `school_modules` (M7), the academic structure — `academic_sessions`,
 `academic_periods`, `academic_levels`, `level_arms`, `subjects`,
 `level_subject` (M8) — `students` + `enrollments` (M9), `guardians` +
@@ -30,7 +31,8 @@ examinations + question bank + entry / placement assessment. School-owned tables
 `examination_question_options`, `exam_attempts`, `exam_answers` (M23),
 `questions.academic_level_id`/`.level_arm_id`/`.topic`/`.difficulty`/
 `.status` (M24, additive onto M23's own table — replaces `.is_active`),
-`entry_assessments` (M25).
+`entry_assessments` (M25), `audit_logs` (M26 — **not** school-owned in the
+`BelongsToSchool` sense; `school_id` is nullable, see below).
 This document records the conventions every future migration follows.
 
 ## Current schema
@@ -729,6 +731,46 @@ level_arm_id`), `index(school_id, subject_id)`, `index(school_id,
 student_id)`, `index(school_id, status)`, `index(school_id, assessed_on)`.
 
 See `docs/entry-placement-assessment.md` for the full design rationale.
+
+### `2026_10_04_100000_create_audit_logs_table` — Administration & Audit (Milestone 26)
+
+The one deliberate exception to "every school-owned table uses
+`BelongsToSchool`" in this schema:
+
+- `school_id` (**nullable**, `nullOnDelete`) — most events happen inside a
+  resolved tenant context and carry it; a handful of genuine account-level
+  security events (login, logout, password reset, email verification) run
+  on routes with no `tenant` middleware at all and have none. `nullOnDelete`
+  rather than `cascadeOnDelete`: a school disappearing must never silently
+  erase audit history.
+- `actor_id` (nullable, `nullOnDelete` onto `users`) + `actor_name` (a
+  **snapshot** `string(150)`, so the entry stays readable even if the user
+  row is later renamed/removed). An unauthenticated failed login has no
+  actor at all — both stay null, never a fake system user.
+- `event` (`string(60)`, e.g. `student.created`, `auth.login.failed`).
+- `auditable_type` (`string(150)`) + `auditable_id`
+  (`unsignedBigInteger`) — a lightweight polymorphic reference
+  **without** a real foreign key, unlike every other relationship in this
+  schema, because the referenced row may later be hard-deleted (e.g.
+  `LearningMaterial`, `ResultRun::destroy()`) and the audit entry must stay
+  meaningful regardless. `auditable_label` (`string(255)`) is a
+  human-readable snapshot for exactly that reason.
+- `summary` (`string(500)`) — the human-readable sentence.
+- `changes` (nullable `json`) — a redacted before/after diff
+  (`App\Services\Audit\AuditRecorder` strips password/secret/token-shaped
+  keys before this ever reaches the database).
+- `ip_address` (`string(45)`, IPv6-safe) + `user_agent` (`string(255)`).
+- `created_at` only — **no** `updated_at` column at all (`AuditLog::
+  UPDATED_AT = null`), since a row is never modified after it is written.
+
+Indexes, each matching an actual viewer query shape: `(school_id,
+created_at)` (the chronological list), `(school_id, event)` / `(school_id,
+actor_id)` (their respective filters), `(school_id, auditable_type,
+auditable_id)` (a future "this record's own audit history" lookup — not
+yet surfaced in the UI, see `docs/audit.md` §11).
+
+See `docs/audit.md` for the full design rationale, the audited-event
+catalogue, and why `school_id` is nullable.
 
 ### `2026_09_15_100000_create_school_modules_table`
 Milestone 7 — per-school feature/module activation. `module` (`string(40)`, an

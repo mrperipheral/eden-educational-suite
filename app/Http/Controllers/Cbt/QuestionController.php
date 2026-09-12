@@ -11,10 +11,12 @@ use App\Http\Requests\Cbt\QuestionRequest;
 use App\Models\AcademicLevel;
 use App\Models\Question;
 use App\Models\Subject;
+use App\Services\Audit\AuditRecorder;
 use App\Support\Cbt\CbtAuthorizer;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 use Illuminate\View\View;
 
 /**
@@ -30,7 +32,12 @@ use Illuminate\View\View;
  */
 class QuestionController extends Controller
 {
-    public function __construct(private readonly CbtAuthorizer $authorizer) {}
+    public function __construct(private readonly CbtAuthorizer $authorizer, private readonly AuditRecorder $audit) {}
+
+    private function questionLabel(Question $question): string
+    {
+        return Str::limit($question->question_text, 80);
+    }
 
     public function index(Request $request): View
     {
@@ -174,7 +181,9 @@ class QuestionController extends Controller
         $question = Question::query()->findOrFail($question);
         abort_unless($this->authorizer->canManageQuestion($request->user(), $question), 403);
 
+        $previousStatus = $question->status;
         $question->activate();
+        $this->recordStatusChange($request, $question, $previousStatus);
 
         return back()->with('status', __('Question activated.'));
     }
@@ -184,7 +193,9 @@ class QuestionController extends Controller
         $question = Question::query()->findOrFail($question);
         abort_unless($this->authorizer->canManageQuestion($request->user(), $question), 403);
 
+        $previousStatus = $question->status;
         $question->deactivate();
+        $this->recordStatusChange($request, $question, $previousStatus);
 
         return back()->with('status', __('Question deactivated.'));
     }
@@ -194,9 +205,25 @@ class QuestionController extends Controller
         $question = Question::query()->findOrFail($question);
         abort_unless($this->authorizer->canManageQuestion($request->user(), $question), 403);
 
+        $previousStatus = $question->status;
         $question->archive();
+        $this->recordStatusChange($request, $question, $previousStatus);
 
         return back()->with('status', __('Question archived.'));
+    }
+
+    private function recordStatusChange(Request $request, Question $question, QuestionStatus $previousStatus): void
+    {
+        $this->audit->record(
+            event: 'question.status_changed',
+            summary: __(':actor changed a question\'s status from :from to :to.', [
+                'actor' => $request->user()->name, 'from' => $previousStatus->label(), 'to' => $question->status->label(),
+            ]),
+            auditable: $question,
+            auditableLabel: $this->questionLabel($question),
+            before: ['status' => $previousStatus->value],
+            after: ['status' => $question->status->value],
+        );
     }
 
     /**

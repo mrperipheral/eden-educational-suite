@@ -10,6 +10,7 @@ use App\Models\AcademicLevel;
 use App\Models\EntryAssessment;
 use App\Models\Student;
 use App\Models\Subject;
+use App\Services\Audit\AuditRecorder;
 use App\Support\EntryAssessment\EntryAssessmentAuthorizer;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
@@ -35,7 +36,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  */
 class EntryAssessmentController extends Controller
 {
-    public function __construct(private readonly EntryAssessmentAuthorizer $authorizer) {}
+    public function __construct(private readonly EntryAssessmentAuthorizer $authorizer, private readonly AuditRecorder $audit) {}
 
     public function index(Request $request): View
     {
@@ -118,6 +119,13 @@ class EntryAssessmentController extends Controller
         $assessment->assessor_id = $request->user()->id;
         $assessment->save();
 
+        $this->audit->record(
+            event: 'entry_assessment.created',
+            summary: __(':actor recorded an entry assessment for :name.', ['actor' => $request->user()->name, 'name' => $assessment->candidate_name]),
+            auditable: $assessment,
+            auditableLabel: $assessment->candidate_name,
+        );
+
         return to_route('entry-assessments.index')->with('status', __('Entry / Placement Assessment record created.'));
     }
 
@@ -170,6 +178,13 @@ class EntryAssessmentController extends Controller
 
         $assessment->archive();
 
+        $this->audit->record(
+            event: 'entry_assessment.archived',
+            summary: __(':actor archived the entry assessment record for :name.', ['actor' => $request->user()->name, 'name' => $assessment->candidate_name]),
+            auditable: $assessment,
+            auditableLabel: $assessment->candidate_name,
+        );
+
         return back()->with('status', __('Record archived.'));
     }
 
@@ -179,6 +194,13 @@ class EntryAssessmentController extends Controller
         abort_unless($this->authorizer->canManage($request->user(), $assessment), 403);
 
         $assessment->restore();
+
+        $this->audit->record(
+            event: 'entry_assessment.restored',
+            summary: __(':actor restored the entry assessment record for :name.', ['actor' => $request->user()->name, 'name' => $assessment->candidate_name]),
+            auditable: $assessment,
+            auditableLabel: $assessment->candidate_name,
+        );
 
         return back()->with('status', __('Record restored.'));
     }

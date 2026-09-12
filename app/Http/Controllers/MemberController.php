@@ -8,6 +8,7 @@ use App\Http\Requests\AddMemberRequest;
 use App\Http\Requests\AssignMemberRoleRequest;
 use App\Models\SchoolUser;
 use App\Models\User;
+use App\Services\Audit\AuditRecorder;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -19,10 +20,14 @@ use Illuminate\View\View;
  * Tenant-scoped: `school_user` is not a `BelongsToSchool` model, so every query
  * here is explicitly constrained to `TenantContext::idOrFail()`. A member of
  * another school can never be listed or modified through these routes.
+ *
+ * Every write here is a M26 audit event (`docs/audit.md`) — membership
+ * created/removed and role changes are exactly the "user/access
+ * administration" accountability the audit trail exists for.
  */
 class MemberController extends Controller
 {
-    public function __construct(private readonly TenantContext $tenant) {}
+    public function __construct(private readonly TenantContext $tenant, private readonly AuditRecorder $audit) {}
 
     public function index(Request $request): View
     {
@@ -66,6 +71,14 @@ class MemberController extends Controller
 
         $target->joinSchool($this->tenant->schoolOrFail(), $role);
 
+        $this->audit->record(
+            event: 'member.created',
+            summary: __(':actor added :name as :role.', ['actor' => $request->user()->name, 'name' => $target->name, 'role' => $role->label()]),
+            auditable: $target,
+            auditableLabel: $target->name,
+            after: ['role' => $role->value],
+        );
+
         return to_route('members.index')
             ->with('status', __(':name has been added as :role.', [
                 'name' => $target->name,
@@ -77,10 +90,23 @@ class MemberController extends Controller
     {
         $membership = $this->membershipOrFail($user);
         $role = $request->role();
+        $previousRole = $membership->role;
 
         $this->authorize('assignRole', [$membership, $role]);
 
         $user->assignRoleInSchool($this->tenant->schoolOrFail(), $role);
+
+        $this->audit->record(
+            event: 'member.role_changed',
+            summary: __(':actor changed :name\'s role from :from to :to.', [
+                'actor' => $request->user()->name, 'name' => $user->name,
+                'from' => $previousRole?->label() ?? __('none'), 'to' => $role->label(),
+            ]),
+            auditable: $user,
+            auditableLabel: $user->name,
+            before: ['role' => $previousRole?->value],
+            after: ['role' => $role->value],
+        );
 
         return back()->with('status', __(':name is now :role.', [
             'name' => $user->name,
@@ -88,13 +114,22 @@ class MemberController extends Controller
         ]));
     }
 
-    public function destroy(User $user): RedirectResponse
+    public function destroy(Request $request, User $user): RedirectResponse
     {
         $membership = $this->membershipOrFail($user);
 
         $this->authorize('remove', $membership);
 
+        $previousRole = $membership->role;
         $user->leaveSchool($this->tenant->schoolOrFail());
+
+        $this->audit->record(
+            event: 'member.removed',
+            summary: __(':actor removed :name from this school.', ['actor' => $request->user()->name, 'name' => $user->name]),
+            auditable: $user,
+            auditableLabel: $user->name,
+            before: ['role' => $previousRole?->value],
+        );
 
         return back()->with('status', __(':name has been removed from this school.', ['name' => $user->name]));
     }

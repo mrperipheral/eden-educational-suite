@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Auth;
 
+use App\Services\Audit\AuditRecorder;
 use Illuminate\Auth\Events\Lockout;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
@@ -52,6 +53,16 @@ class LoginRequest extends FormRequest
 
         if (! $user->canAuthenticate()) {
             $message = $user->status->authenticationBlockedMessage();
+
+            // Recorded explicitly (distinct from the generic
+            // `auth.login.success` the `Login` event above already fired) —
+            // the account status is the security-relevant fact here, not
+            // just that a session briefly existed before being torn down.
+            app(AuditRecorder::class)->record(
+                event: 'auth.login.blocked',
+                summary: __(':name attempted to sign in while :status.', ['name' => $user->name, 'status' => $user->status->label()]),
+                actor: $user,
+            );
 
             Auth::logout();
             $this->session()->invalidate();

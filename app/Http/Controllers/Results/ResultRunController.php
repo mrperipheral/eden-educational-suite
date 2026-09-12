@@ -13,6 +13,7 @@ use App\Models\GradingScheme;
 use App\Models\ReportCardConfiguration;
 use App\Models\ResultRun;
 use App\Models\ResultWeightingScheme;
+use App\Services\Audit\AuditRecorder;
 use App\Services\Results\ResultCompiler;
 use App\Support\Results\ResultAuthorizer;
 use Illuminate\Http\RedirectResponse;
@@ -32,7 +33,14 @@ use Illuminate\View\View;
  */
 class ResultRunController extends Controller
 {
-    public function __construct(private readonly ResultCompiler $compiler) {}
+    public function __construct(private readonly ResultCompiler $compiler, private readonly AuditRecorder $audit) {}
+
+    private function runLabel(ResultRun $run): string
+    {
+        $run->loadMissing(['level', 'arm', 'period', 'session']);
+
+        return trim(($run->level?->name ?? '').' '.($run->arm?->name ?? '').' — '.($run->period?->name ?? $run->session?->name ?? ''));
+    }
 
     public function index(Request $request): View
     {
@@ -183,6 +191,13 @@ class ResultRunController extends Controller
         $run->publish($request->user());
         ReportCardConfiguration::snapshotForRun($run);
 
+        $this->audit->record(
+            event: 'result_run.published',
+            summary: __(':actor published the result run for :run.', ['actor' => $request->user()->name, 'run' => $this->runLabel($run)]),
+            auditable: $run,
+            auditableLabel: $this->runLabel($run),
+        );
+
         return to_route('results.runs.show', $run)->with('status', __('Published — report cards are now available.'));
     }
 
@@ -196,6 +211,13 @@ class ResultRunController extends Controller
         }
 
         $run->lock($request->user());
+
+        $this->audit->record(
+            event: 'result_run.locked',
+            summary: __(':actor locked the result run for :run.', ['actor' => $request->user()->name, 'run' => $this->runLabel($run)]),
+            auditable: $run,
+            auditableLabel: $this->runLabel($run),
+        );
 
         return to_route('results.runs.show', $run)->with('status', __('Locked.'));
     }

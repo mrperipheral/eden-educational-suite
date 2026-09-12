@@ -5,11 +5,14 @@ namespace App\Http\Controllers;
 use App\Enums\Module;
 use App\Enums\Permission;
 use App\Enums\Role;
+use App\Enums\UserStatus;
+use App\Models\AuditLog;
 use App\Models\School;
 use App\Support\Modules\SchoolModules;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\View\View;
 
 class DashboardController extends Controller
@@ -38,7 +41,42 @@ class DashboardController extends Controller
         return view('dashboard', [
             'school' => $school,
             'onboarding' => $this->onboarding($request, $school),
+            'administration' => $this->administration($request, $school, $modules),
         ]);
+    }
+
+    /**
+     * A small, cheap "what's going on administratively" panel (M26,
+     * `docs/audit.md`) — only for `audit.view` holders. Every figure here
+     * comes from a query already cheap at this scale (a handful of rows per
+     * school): the last 5 audit entries, a single grouped member-status
+     * count, and the module states `SchoolModules` already memoised for
+     * this request. No new expensive aggregation is introduced.
+     *
+     * @return array{recentActivity: Collection, activeMembers: int, suspendedMembers: int, modulesEnabled: int, modulesTotal: int}|null
+     */
+    private function administration(Request $request, School $school, SchoolModules $modules): ?array
+    {
+        if (! $request->user()->hasPermission(Permission::AuditView)) {
+            return null;
+        }
+
+        $members = $school->users()->get(['users.id', 'users.status']);
+        $activeMembers = $members->filter(fn ($u) => $u->status === UserStatus::Active)->count();
+
+        $states = $modules->states();
+
+        return [
+            'recentActivity' => AuditLog::query()
+                ->where('school_id', $school->id)
+                ->ordered()
+                ->limit(5)
+                ->get(),
+            'activeMembers' => $activeMembers,
+            'suspendedMembers' => $members->count() - $activeMembers,
+            'modulesEnabled' => count(array_filter($states)),
+            'modulesTotal' => count($states),
+        ];
     }
 
     /**

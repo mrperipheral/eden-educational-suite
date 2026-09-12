@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Guardian\GuardianRequest;
 use App\Http\Requests\Guardian\LinkGuardianUserRequest;
 use App\Models\Guardian;
+use App\Services\Audit\AuditRecorder;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -25,7 +26,7 @@ use Illuminate\View\View;
  */
 class GuardianController extends Controller
 {
-    public function __construct(private readonly TenantContext $tenant) {}
+    public function __construct(private readonly TenantContext $tenant, private readonly AuditRecorder $audit) {}
 
     public function index(Request $request): View
     {
@@ -56,6 +57,13 @@ class GuardianController extends Controller
     public function store(GuardianRequest $request): RedirectResponse
     {
         $guardian = Guardian::create($request->validated());
+
+        $this->audit->record(
+            event: 'guardian.created',
+            summary: __(':actor added guardian :name.', ['actor' => $request->user()->name, 'name' => $guardian->shortName()]),
+            auditable: $guardian,
+            auditableLabel: $guardian->shortName(),
+        );
 
         return to_route('guardians.show', $guardian)
             ->with('status', __(':name has been added.', ['name' => $guardian->shortName()]));

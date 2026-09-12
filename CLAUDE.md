@@ -108,7 +108,7 @@ See `docs/architecture.md` for the full rationale. In short:
 
 ## Milestones
 
-Tracked in `PROJECT_STATUS.md` and `docs/roadmap.md`. **Milestones 1–25 (Platform
+Tracked in `PROJECT_STATUS.md` and `docs/roadmap.md`. **Milestones 1–26 (Platform
 Foundation, Authentication, Multi-School Tenant Isolation, Roles & Permissions,
 School Onboarding, School Settings & Configuration, Feature / Module Activation,
 Academic Foundation, Student Management, Guardian / Parent Management, Teacher
@@ -116,7 +116,8 @@ Management, Timetable Management, Attendance Management, Assessment &
 Assignments, Results & Report Cards, Parent Portal, Student Portal,
 Communication & Notification Foundation, Fees & Fee Management, Online Fee
 Payment / Paystack, Promotion & Graduation, Learning Materials, CBT / Online
-Examinations, Question Bank, Entry / Placement Assessment) are complete.** School settings: `docs/school-settings.md`; module activation:
+Examinations, Question Bank, Entry / Placement Assessment, Administration &
+Audit) are complete.** School settings: `docs/school-settings.md`; module activation:
 `docs/module-activation.md`; academic structure:
 `docs/academic-foundation.md`; students + enrollment:
 `docs/student-management.md`; guardians + student ↔ guardian links:
@@ -138,7 +139,9 @@ exam lifecycle, snapshots, timed attempts, marking, result release:
 `docs/cbt.md`; the reusable Question Bank — fields, lifecycle,
 authorization, exam-attach compatibility: `docs/question-bank.md`; Entry /
 Placement Assessment — recording (not deciding) an assessment for a
-prospective or newly admitted student: `docs/entry-placement-assessment.md`.
+prospective or newly admitted student: `docs/entry-placement-assessment.md`;
+the central audit trail, its viewer, redaction rules and authorization:
+`docs/audit.md`.
 Do not start any further domain module (reporting, …) without picking up
 the next milestone explicitly.
 
@@ -153,3 +156,16 @@ optional nullable `user_id` linked only to an **existing member of the active
 school**, set via a dedicated endpoint (never mass-assigned, never an auto-created
 login). Lifecycle `status` columns stay out of `$fillable` and change only
 through their own endpoint, as `Student` (M9) and `Teacher` (M11) do.
+
+**`App\Models\AuditLog` (M26) is the one deliberate exception to "every
+school-owned model uses `BelongsToSchool`"** — its `school_id` is nullable,
+since a handful of genuine account-level security events (login, logout,
+password reset, email verification) run on routes with no `tenant`
+middleware and have no school to attribute to (see `docs/audit.md` §2).
+Every other query against it filters `school_id` explicitly; do not add a
+`SchoolScope`-style global scope to it. Write an audit event only through
+**`App\Services\Audit\AuditRecorder::record()`** — never a direct
+`AuditLog::create()` from application code — and never store a password,
+API secret, or auth token in its `changes` payload (the recorder's blanket
+redaction filter is a safety net, not a license to pass raw secrets into
+it).

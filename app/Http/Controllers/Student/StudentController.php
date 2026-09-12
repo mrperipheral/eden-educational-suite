@@ -9,6 +9,7 @@ use App\Http\Requests\Student\LinkStudentUserRequest;
 use App\Http\Requests\Student\StudentRequest;
 use App\Http\Requests\Student\UpdateStudentStatusRequest;
 use App\Models\Student;
+use App\Services\Audit\AuditRecorder;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -25,7 +26,7 @@ use Illuminate\View\View;
  */
 class StudentController extends Controller
 {
-    public function __construct(private readonly TenantContext $tenant) {}
+    public function __construct(private readonly TenantContext $tenant, private readonly AuditRecorder $audit) {}
 
     public function index(Request $request): View
     {
@@ -59,6 +60,13 @@ class StudentController extends Controller
     public function store(StudentRequest $request): RedirectResponse
     {
         $student = Student::create($request->validated());
+
+        $this->audit->record(
+            event: 'student.created',
+            summary: __(':actor added student :name.', ['actor' => $request->user()->name, 'name' => $student->shortName()]),
+            auditable: $student,
+            auditableLabel: $student->shortName(),
+        );
 
         return to_route('students.show', $student)
             ->with('status', __(':name has been added.', ['name' => $student->shortName()]));
@@ -106,10 +114,23 @@ class StudentController extends Controller
     public function updateStatus(UpdateStudentStatusRequest $request, int $student): RedirectResponse
     {
         $model = Student::query()->findOrFail($student);
+        $previousStatus = $model->status;
 
         // `status` is deliberately not mass-assignable — set it directly.
         $model->status = $request->status();
         $model->save();
+
+        $this->audit->record(
+            event: 'student.status_changed',
+            summary: __(':actor changed :name\'s status from :from to :to.', [
+                'actor' => $request->user()->name, 'name' => $model->shortName(),
+                'from' => $previousStatus->label(), 'to' => $request->status()->label(),
+            ]),
+            auditable: $model,
+            auditableLabel: $model->shortName(),
+            before: ['status' => $previousStatus->value],
+            after: ['status' => $request->status()->value],
+        );
 
         return to_route('students.show', $model)
             ->with('status', __('Status set to :status.', ['status' => $request->status()->label()]));

@@ -6,6 +6,7 @@ use App\Enums\Role;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Platform\StoreSchoolRequest;
 use App\Models\School;
+use App\Services\Audit\AuditRecorder;
 use App\Services\SchoolProvisioner;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -47,13 +48,24 @@ class SchoolController extends Controller
         return view('platform.schools.create');
     }
 
-    public function store(StoreSchoolRequest $request, SchoolProvisioner $provisioner): RedirectResponse
+    public function store(StoreSchoolRequest $request, SchoolProvisioner $provisioner, AuditRecorder $audit): RedirectResponse
     {
         $validated = $request->validated();
 
         $school = $provisioner->provision(
             name: $validated['name'],
             slug: $validated['slug'] ?? null,
+        );
+
+        // No tenant context exists yet — the school was just created — so
+        // the audit entry's school_id is this new school's id explicitly,
+        // not read from TenantContext (which is unset on this route).
+        $audit->record(
+            event: 'school.created',
+            summary: __(':actor created school ":name".', ['actor' => $request->user()->name, 'name' => $school->name]),
+            auditable: $school,
+            auditableLabel: $school->name,
+            schoolId: $school->id,
         );
 
         if ($initialAdmin = $request->initialAdmin()) {
@@ -64,6 +76,15 @@ class SchoolController extends Controller
             abort_unless($request->user()->canGrantRole(Role::SchoolAdmin, $school), 403);
 
             $initialAdmin->joinSchool($school, Role::SchoolAdmin);
+
+            $audit->record(
+                event: 'member.created',
+                summary: __(':actor added :name as School Admin of ":school".', ['actor' => $request->user()->name, 'name' => $initialAdmin->name, 'school' => $school->name]),
+                auditable: $initialAdmin,
+                auditableLabel: $initialAdmin->name,
+                after: ['role' => Role::SchoolAdmin->value],
+                schoolId: $school->id,
+            );
         }
 
         return redirect()
