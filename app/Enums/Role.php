@@ -101,6 +101,9 @@ enum Role: string
                 Permission::PromotionView,
                 Permission::PromotionManage,
                 Permission::GraduationManage,
+                Permission::LearningMaterialView,
+                Permission::LearningMaterialUpload,
+                Permission::LearningMaterialManage,
             ],
 
             self::Bursar => [
@@ -138,6 +141,8 @@ enum Role: string
                 Permission::CommunicationEscalate,
                 Permission::AnnouncementView,
                 Permission::PromotionView,
+                Permission::LearningMaterialView,
+                Permission::LearningMaterialUpload,
             ],
 
             self::Staff => [
@@ -153,6 +158,7 @@ enum Role: string
                 Permission::CommunicationCreate,
                 Permission::AnnouncementView,
                 Permission::PromotionView,
+                Permission::LearningMaterialView,
             ],
 
             self::Parent => [

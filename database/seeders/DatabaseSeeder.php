@@ -40,11 +40,13 @@ use App\Models\Subject;
 use App\Models\Teacher;
 use App\Models\Timetable;
 use App\Models\User;
+use App\Services\LearningMaterials\LearningMaterialUploadService;
 use App\Services\Promotion\GraduationService;
 use App\Services\Promotion\PromotionService;
 use App\Services\Results\ResultCompiler;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Database\Seeder;
+use Illuminate\Http\UploadedFile;
 
 class DatabaseSeeder extends Seeder
 {
@@ -118,10 +120,12 @@ class DatabaseSeeder extends Seeder
         ])->save();
         $settings->markReviewed();
 
-        // Alpha has tweaked one module away from the catalogue defaults; every
-        // other module (and all of Beta) simply uses the default — including
-        // Fees (M19), on by default, so the fee statement has real data to show.
+        // Alpha has tweaked two modules away from the catalogue defaults;
+        // every other module (and all of Beta) simply uses the default —
+        // including Fees (M19), on by default, so the fee statement has
+        // real data to show.
         SchoolModule::create(['module' => Module::Timetable->value, 'enabled' => true]);
+        SchoolModule::create(['module' => Module::LearningMaterials->value, 'enabled' => true]);
 
         // Academic foundation — a current session with three terms, a handful of
         // levels + arms, and a starter subject list. All school-configured;
@@ -776,6 +780,35 @@ class DatabaseSeeder extends Seeder
         if ($graduate) {
             app(GraduationService::class)->graduate($graduate, $session, 'Completed Basic Education at Alpha Academy.', $admin);
         }
+
+        // Learning materials (M22) — uploaded through the real service (not
+        // a direct insert) so the stored file and its row are genuinely
+        // linked. The Mathematics note is uploaded by Tomiwa Teacher, who
+        // holds an active M11 assignment for Primary 1 / Gold / Mathematics
+        // (seeded above) — a real demonstration of a Teacher's upload being
+        // scoped to a class they actually teach, not a bypass. The second
+        // material has no arm (`level_arm_id` null) — visible to the whole
+        // of Primary 1, both arms — uploaded by the School Admin, who is
+        // unrestricted.
+        app(LearningMaterialUploadService::class)->upload([
+            'academic_session_id' => $session->id,
+            'academic_period_id' => null,
+            'academic_level_id' => $primary1->id,
+            'level_arm_id' => $primary1Gold->id,
+            'subject_id' => $subjects->firstWhere('code', 'MTH')->id,
+            'title' => 'Term 1 Mathematics Notes',
+            'description' => 'Chapter 1-3 summary notes for the term.',
+        ], UploadedFile::fake()->create('term-1-mathematics-notes.pdf', 120, 'application/pdf'), $tomiwa);
+
+        app(LearningMaterialUploadService::class)->upload([
+            'academic_session_id' => $session->id,
+            'academic_period_id' => null,
+            'academic_level_id' => $primary1->id,
+            'level_arm_id' => null,
+            'subject_id' => $subjects->firstWhere('code', 'ENG')->id,
+            'title' => 'Alphabet Chart',
+            'description' => null,
+        ], UploadedFile::fake()->create('alphabet-chart.png', 80, 'image/png'), $admin);
 
         $tenant->forget();
     }

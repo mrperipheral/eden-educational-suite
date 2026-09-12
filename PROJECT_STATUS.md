@@ -1,10 +1,10 @@
 # Project Status
 
-_Last updated: 2026-09-29_
+_Last updated: 2026-09-30_
 
 ## Current milestone
 
-**Milestone 21 — Promotion & Graduation: COMPLETE.**
+**Milestone 22 — Learning Materials: COMPLETE.**
 
 Next up: further **Domain Modules** — CBT, Reporting. Not started — do not
 begin without picking one up explicitly. See `docs/roadmap.md`.
@@ -15,7 +15,7 @@ Multi-school School Management SaaS (management + portals only — no website
 features). PHP 8.3 · Laravel 13.31 · MySQL 8 · Blade + Tailwind v4 · Alpine.js ·
 Vite · PHPUnit · Pint.
 
-## Environment (verified 2026-09-29)
+## Environment (verified 2026-09-30)
 
 | Item | Value |
 |------|-------|
@@ -24,7 +24,7 @@ Vite · PHPUnit · Pint.
 | Node / npm | 22.x |
 | Database | MySQL 8 (app) · SQLite `:memory:` (tests) |
 | Local mail | Mailpit (`127.0.0.1:1025`, UI `:8025`) — `.env` only, not committed |
-| Tests | `php artisan test` — 988 passing |
+| Tests | `php artisan test` — 1027 passing |
 | Build | `npm run build` — passing |
 | Formatting | `vendor/bin/pint --test` — passing |
 
@@ -52,10 +52,90 @@ Vite · PHPUnit · Pint.
 - **M18 — Communication & Notification Foundation** (`communication-notifications-complete`) — `docs/communication.md`.
 - **M19 — Fees & Fee Management** (`fees-management-complete`) — `docs/fees.md`.
 - **M20 — Online Fee Payment / Paystack** (`online-payment-paystack-complete`) — `docs/paystack.md`.
-- **M21 — Promotion & Graduation** (this milestone,
-  `promotion-graduation-complete`) — `docs/promotion.md`; see below.
+- **M21 — Promotion & Graduation** (`promotion-graduation-complete`) — `docs/promotion.md`.
+- **M22 — Learning Materials** (this milestone,
+  `learning-materials-complete`) — `docs/learning-materials.md`; see below.
 
-## Delivered in Milestone 21
+## Delivered in Milestone 22
+
+Lets a teacher or admin upload a single file (PDF, image or audio — video
+declared but disabled) for a subject + class; students in that class
+view/download it. Deliberately small: no drafts, autosave, versioning or
+approval workflow. Full detail in `docs/learning-materials.md`.
+
+- **`App\Models\LearningMaterial`** (school-owned; `academic_session_id` +
+  optional `academic_period_id` + `academic_level_id` + optional
+  `level_arm_id` + required `subject_id`; `type`/`file_path`/`file_name`/
+  `file_size`/`mime_type`/`extension`/`uploaded_by` not mass-assignable,
+  derived from the uploaded file itself). No status/draft column — a row is
+  live the moment it exists. Deleting one is a genuine hard delete of the
+  row **and** its stored file together (`deleteWithFile()`) — nothing else
+  references a material, unlike `FeePayment`/`Enrollment`.
+- **`App\Enums\LearningMaterialType`** (`document`/`image`/`audio`/`video`)
+  is the single source of truth for supported extensions/MIME types.
+  `video` is declared with real extensions/MIME types but
+  `isEnabled()` excludes it everywhere — the Form Request's `mimetypes:`
+  whitelist (content-sniffed, so a video file renamed with a `.pdf`
+  extension still fails), the create-form's hint text, and the service's
+  own independent `isEnabled()` check. Enabling video later is flipping one
+  boolean — no migration, no model change, no new storage mechanism.
+- **`App\Services\LearningMaterials\LearningMaterialUploadService`** stores
+  the file **first** (a Laravel-generated name, school-id-prefixed folder,
+  private `local` disk — same one M6/M15 already use, never a public URL),
+  then creates the row inside a `DB::transaction()`; a failure after the
+  file is written deletes the orphan file before rethrowing — never a row
+  without a file or a file without a row.
+- **`App\Support\LearningMaterials\LearningMaterialAuthorizer`** mirrors
+  `AssessmentAuthorizer` (M14) exactly: `material.manage` (School Admin,
+  Principal) → any class/subject and may delete anything; `material.upload`
+  without `.manage` (Teacher) → only a `(level, subject)` they hold an
+  active M11 `TeacherAssignment` for, and may delete only their own
+  uploads. The create-form itself only offers a Teacher's own assigned
+  classes — not a free picker they'd then get rejected from.
+- **New permissions** `material.view` / `.upload` / `.manage`, slotted into
+  the existing role tiers: School Admin + Principal → full; Teacher →
+  `.view` + `.upload` (scoped); Staff → `.view` only; Bursar/Parent/Student
+  → none. A student reaches their own current class's materials through
+  the existing `portal.student` permission — no new one needed.
+- **Reuses `Module::LearningMaterials`** (declared since M7, flipped
+  available this milestone) — off by default (a specialised opt-in, like
+  Timetable/CBT), depends on `Module::Academics` only.
+- **1 new table** (migration `2026_09_30_100000`): `learning_materials`,
+  `school_id`-leading indexed.
+- **6 new views** — `resources/views/learning-materials/*` (list with
+  level/subject filters, a single-page upload form — full cascade for
+  `.manage` holders, a pre-filtered "your classes" picker for scoped
+  Teachers) + `resources/views/student/learning-materials/index.blade.php`
+  (Student Portal, degrades to an empty state when the module is off or the
+  student has no current enrollment, like Assignments/Timetable); one new
+  staff nav link and one new Student Portal tab, both module + permission
+  gated.
+- **Seeder** — Alpha Academy's Learning Materials module is explicitly
+  turned on (off by default); Tomiwa Teacher uploads a Mathematics PDF for
+  Primary 1 Gold specifically (his real M11 assignment — a genuine
+  demonstration of the scoping, not a bypass), and the School Admin uploads
+  an image for the whole of Primary 1 (`level_arm_id` null). Both go
+  through the real upload service, not direct inserts.
+- **Docs** — new `docs/learning-materials.md`; `PROJECT_STATUS.md`,
+  `docs/roadmap.md`, `docs/database-design.md`, `CLAUDE.md` updated.
+- **39 new tests** under `tests/Feature/LearningMaterials/*` (+
+  `LearningMaterialTestCase` base) and `tests/Unit/Enums/
+  LearningMaterialTypeTest` — type resolution + enabled/disabled sets;
+  upload service (PDF/image/audio succeed, an honest video is rejected and
+  never stored, a video disguised with a `.pdf` extension is still
+  rejected, an unrecognised extension is rejected, a DB failure after the
+  file is stored removes the orphan file); HTTP authorization (all 7 roles
+  + role-less, module-off 404, a Teacher can upload only for their own
+  assigned class and not another, an arm-agnostic assignment covers every
+  arm of that level, a tampered video upload is rejected server-side even
+  with a disguised extension, tenant isolation on view/upload/delete,
+  `school_id` from the browser ignored, a Teacher can delete only their own
+  upload while a `.manage` holder can delete any, subject-not-offered-at-
+  level rejected); Student Portal (sees only their current class's
+  materials, whole-level materials visible regardless of arm, a different
+  arm's/session's material never leaks, module-off and unlinked-student
+  safe empty states, non-student role forbidden, download scoped to the
+  student's own class — cross-class and cross-school ids 404).
 
 A safe, auditable academic progression workflow built entirely on M9's
 existing `Student`/`Enrollment` architecture — promoting a student never
@@ -949,6 +1029,11 @@ check, DB duplicate prevention, assessment↔assignment link (same class only). 
 - Production env: `SESSION_SECURE_COOKIE=true`, real `MAIL_MAILER`, `APP_DEBUG=false`.
 - Next milestone: pick a further domain module (CBT, Reporting) — see
   `docs/roadmap.md`.
+- **Learning Materials follow-ups** — Parent Portal visibility, editing an
+  uploaded material (delete + re-upload covers a correction today),
+  multiple files per material, video upload/streaming/transcoding/
+  thumbnails/player (declared but intentionally not built), download
+  analytics, notification (M18) hooks, bulk upload.
 - **Promotion follow-ups** — automatic pass/fail promotion rules of any
   kind (deliberately not built — promotion stays an authorised
   administrative decision), a promotion approval step distinct from

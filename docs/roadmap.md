@@ -487,7 +487,40 @@ Deferred: automatic pass/fail promotion rules of any kind, a promotion
 approval step distinct from running the batch, bulk import, bulk-undo of a
 completed batch, notification (M18) hooks on promotion/graduation.
 
-## Milestone 22+ — Domain Modules
+## ✅ Milestone 22 — Learning Materials (complete, 2026-09-30)
+
+A teacher or admin uploads a single file (PDF, image or audio — video is
+declared in `App\Enums\LearningMaterialType` but disabled) for a subject +
+class; students in that class view/download it. Intentionally small: no
+drafts, autosave, versioning or approval workflow.
+`App\Models\LearningMaterial` (school-owned; `type`/`file_*`/`uploaded_by`
+not mass-assignable, derived from the file itself) is stored on the same
+private `local` disk M6/M15 already use, never a public URL.
+`App\Services\LearningMaterials\LearningMaterialUploadService` stores the
+file **first**, then creates the row inside a `DB::transaction()` — a
+failure after the file is written deletes the orphan file before rethrowing,
+so there's never a row without a file or a file without a row. Video is
+rejected at two independent layers: the Form Request's `mimetypes:`
+whitelist (real content-sniffed, so a video file renamed with a `.pdf`
+extension still fails) and the service's own
+`LearningMaterialType::isEnabled()` check (a defence-in-depth gate that
+doesn't depend on the Form Request having run). New permissions
+`material.view` / `.upload` / `.manage` — School Admin + Principal full;
+Teacher `.upload` scoped to classes/subjects they hold an active M11
+`TeacherAssignment` for (`App\Support\LearningMaterials\
+LearningMaterialAuthorizer`, mirrors `AssessmentAuthorizer`); Staff view-
+only; Bursar/Parent/Student none — a student reaches their own current
+class's materials through the existing `portal.student` permission, no new
+one needed. `Module::LearningMaterials`, off by default (a specialised
+opt-in), depends on `Academics` only. Full detail in
+`docs/learning-materials.md`.
+
+Deferred: Parent Portal visibility, editing an uploaded material (delete +
+re-upload covers a correction), multiple files per material, video
+upload/streaming/transcoding/thumbnails/player, download analytics,
+notification (M18) hooks, bulk upload.
+
+## Milestone 23+ — Domain Modules
 
 CBT · Reporting.
 

@@ -25,6 +25,7 @@ use App\Http\Controllers\Fees\FeeStructureController;
 use App\Http\Controllers\Guardian\GuardianController;
 use App\Http\Controllers\Guardian\GuardianLinkController;
 use App\Http\Controllers\HealthController;
+use App\Http\Controllers\LearningMaterials\LearningMaterialController;
 use App\Http\Controllers\MemberController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PaystackWebhookController;
@@ -42,6 +43,7 @@ use App\Http\Controllers\Portal\ParentTimetableController;
 use App\Http\Controllers\Portal\StudentAssignmentController;
 use App\Http\Controllers\Portal\StudentAttendanceController;
 use App\Http\Controllers\Portal\StudentFeeController;
+use App\Http\Controllers\Portal\StudentLearningMaterialController;
 use App\Http\Controllers\Portal\StudentOnlinePaymentController;
 use App\Http\Controllers\Portal\StudentPortalController;
 use App\Http\Controllers\Portal\StudentProfileController;
@@ -702,6 +704,30 @@ Route::middleware(['auth', 'verified', 'active'])->group(function () {
         });
 
         /*
+        | Learning Materials (see docs/learning-materials.md). Two gates:
+        |   module:learning-materials  — is the feature on for this school?
+        |   ->can('material.view')  — staff read access.
+        |   ->can('material.upload')  — create/delete; a Teacher
+        |     holding this without `.manage` is further scoped to classes/
+        |     subjects they teach by LearningMaterialAuthorizer, re-checked
+        |     inside the controller (the route gate alone can't express it).
+        | {material} is resolved by tenant-scoped `findOrFail`, so another
+        | school's id 404s.
+        */
+        Route::middleware('module:learning-materials')->prefix('learning-materials')->name('learning-materials.')->group(function () {
+            Route::get('/', [LearningMaterialController::class, 'index'])
+                ->can('material.view')->name('index');
+            Route::get('create', [LearningMaterialController::class, 'create'])
+                ->can('material.upload')->name('create');
+            Route::post('/', [LearningMaterialController::class, 'store'])
+                ->can('material.upload')->name('store');
+            Route::get('{material}/download', [LearningMaterialController::class, 'download'])
+                ->whereNumber('material')->can('material.view')->name('download');
+            Route::delete('{material}', [LearningMaterialController::class, 'destroy'])
+                ->whereNumber('material')->can('material.upload')->name('destroy');
+        });
+
+        /*
         | Communication Hub, Announcements & Notifications (see
         | docs/communication.md). module:notifications gates all of it.
         |   ->can('communication.view' | '.create' | '.manage' | '.resolve' |
@@ -891,6 +917,17 @@ Route::middleware(['auth', 'verified', 'active'])->group(function () {
                 Route::get('fees/pay/callback', [StudentOnlinePaymentController::class, 'callback'])
                     ->can('portal.student')->name('fees.pay.callback');
             });
+
+            // Learning materials (M22, docs/learning-materials.md) —
+            // read-only, scoped to the student's own current class. Not
+            // middleware-gated by module:learning-materials (like
+            // .assignments/.timetable above, unlike .fees below) — the
+            // controller checks the module itself and degrades to an empty
+            // state, so the portal's own nav never 404s.
+            Route::get('learning-materials', [StudentLearningMaterialController::class, 'index'])
+                ->can('portal.student')->name('learning-materials.index');
+            Route::get('learning-materials/{material}/download', [StudentLearningMaterialController::class, 'download'])
+                ->whereNumber('material')->can('portal.student')->name('learning-materials.download');
 
             // Announcements & notifications (M18, docs/communication.md) —
             // AnnouncementController/NotificationController shared with staff

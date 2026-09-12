@@ -1,11 +1,11 @@
 # Database Design
 
-Status: Milestone 21. Tenant + roles + onboarding + school settings + module
+Status: Milestone 22. Tenant + roles + onboarding + school settings + module
 activation + academic foundation + student management + guardian management +
 teacher management + timetable management + attendance management + assessment &
 assignments + results & report cards + parent portal + student portal +
 communication & notification foundation + fees & fee management + online fee
-payment (Paystack) + promotion & graduation. School-owned tables: `school_settings` (M6),
+payment (Paystack) + promotion & graduation + learning materials. School-owned tables: `school_settings` (M6),
 `school_modules` (M7), the academic structure — `academic_sessions`,
 `academic_periods`, `academic_levels`, `level_arms`, `subjects`,
 `level_subject` (M8) — `students` + `enrollments` (M9), `guardians` +
@@ -24,7 +24,7 @@ payment (Paystack) + promotion & graduation. School-owned tables: `school_settin
 `school_settings.paystack_*` (M20, additive), `paystack_transactions` (M20),
 `promotion_batches`, `promotion_records` (M21),
 `students.graduated_at`/`.graduated_academic_session_id`/`.graduation_notes`/
-`.graduated_by` (M21, additive).
+`.graduated_by` (M21, additive), `learning_materials` (M22).
 This document records the conventions every future migration follows.
 
 ## Current schema
@@ -546,6 +546,38 @@ added for promotion's own duplicate/concurrency protection — it would have
 broken M9's own `test_historical_enrollments_are_preserved`, which
 legitimately creates two enrollment rows with identical (session, level,
 arm) for one student. See `docs/promotion.md` §4.
+
+### `2026_09_30_100000_create_learning_materials_table` — Learning Materials (Milestone 22)
+
+- **`learning_materials`** — school-owned: `academic_session_id`
+  (`cascadeOnDelete`), `academic_period_id` (nullable, `nullOnDelete` — a
+  material can target a whole session, not one term), `academic_level_id`
+  (`cascadeOnDelete`), `level_arm_id` (nullable, `nullOnDelete` — a whole
+  level, every arm), `subject_id` (`cascadeOnDelete`, required — every
+  material belongs to exactly one subject label). `title` (`string(150)`),
+  `description` (nullable `text`), `type` (`string(20)`, an
+  `App\Enums\LearningMaterialType` value — `document`/`image`/`audio`;
+  `video` is declared but never written here), `file_path`, `file_name`,
+  `file_size` (`unsignedBigInteger`, bytes), `mime_type` (`string(100)`),
+  `extension` (`string(10)`), `uploaded_by` (nullable FK `users`,
+  `nullOnDelete`). None of `type`/`file_*`/`uploaded_by` are
+  mass-assignable — set only by `App\Services\LearningMaterials\
+  LearningMaterialUploadService`, from the uploaded file itself.
+  `index(school_id, academic_session_id, academic_period_id)` (named
+  `learning_materials_scope_index`), `index(school_id, academic_level_id,
+  level_arm_id)` (named `learning_materials_class_index`),
+  `index(school_id, subject_id)`, `index(school_id, type)`. No `status` /
+  draft column — a row is live the moment it exists (M22 spec: "no drafts,
+  autosave or temporary database records"). Deleting one is a genuine hard
+  delete of the row **and** its stored file together
+  (`LearningMaterial::deleteWithFile()`) — nothing else in the schema
+  references a material, unlike `FeePayment`/`Enrollment`, so there is no
+  historical-integrity reason to keep a soft-deleted husk.
+
+`academic_period_id`/`level_arm_id` nullable mirrors `promotion_batches`'
+source/target nullability, not `assessments`' always-fully-scoped shape —
+a deliberate choice for this milestone's coarser-grained content. See
+`docs/learning-materials.md` §2.
 
 ### `2026_09_15_100000_create_school_modules_table`
 Milestone 7 — per-school feature/module activation. `module` (`string(40)`, an

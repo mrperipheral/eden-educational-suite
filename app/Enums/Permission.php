@@ -77,6 +77,11 @@ enum Permission: string
     case FeesAdjust = 'fees.adjust';
     case FeesReport = 'fees.report';
 
+    // ---- Learning materials (enforced: Learning Materials M22) --------------
+    case LearningMaterialView = 'material.view';
+    case LearningMaterialUpload = 'material.upload';
+    case LearningMaterialManage = 'material.manage';
+
     // ---- Communication & notifications (enforced: Communication & Notification Foundation M18) ----
     case CommunicationView = 'communication.view';
     case CommunicationCreate = 'communication.create';

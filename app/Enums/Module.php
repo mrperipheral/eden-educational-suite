@@ -184,11 +184,16 @@ enum Module: string
      *     (`docs/promotion.md`). No automatic pass/fail rules — every
      *     promotion/graduation is an authorised administrative decision.
      *     Depends on `students` only — not fees, CBT or learning materials.
+     *   - `learning-materials` — Learning Materials (M22): a teacher/admin
+     *     uploads a single file (PDF, image or audio — video is declared but
+     *     disabled) for a subject + class, students in that class can view
+     *     and download it (`docs/learning-materials.md`). No drafts,
+     *     versioning or approval workflow. Depends on `academics` only.
      */
     public function isAvailable(): bool
     {
         return match ($this) {
-            self::Academics, self::Students, self::Guardians, self::Staff, self::Timetable, self::Attendance, self::Assessments, self::Results, self::Notifications, self::Fees, self::Promotion, self::ParentPortal, self::StudentPortal => true,
+            self::Academics, self::Students, self::Guardians, self::Staff, self::Timetable, self::Attendance, self::Assessments, self::Results, self::Notifications, self::Fees, self::Promotion, self::LearningMaterials, self::ParentPortal, self::StudentPortal => true,
             default => false,
         };
     }

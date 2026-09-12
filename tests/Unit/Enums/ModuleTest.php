@@ -74,16 +74,17 @@ class ModuleTest extends TestCase
 
     public function test_only_shipped_modules_report_as_available(): void
     {
-        // Each domain milestone flips its own module to available. As of M21:
+        // Each domain milestone flips its own module to available. As of M22:
         // Academic Foundation (M8), Student Management (M9), Guardian Management
         // (M10), Teacher Management (M11), Timetable Management (M12),
         // Attendance Management (M13), Assessment & Assignments (M14),
         // Results & Report Cards (M15), Parent Portal (M16), Student Portal
         // (M17), Communication & Notification Foundation (M18), Fees & Fee
-        // Management (M19, M20's Paystack integration reuses it) and
-        // Promotion & Graduation (M21); the rest Planned. (Timetable is
-        // available but still off by default.)
-        $available = ['academics', 'students', 'guardians', 'staff', 'timetable', 'attendance', 'assessments', 'results', 'notifications', 'fees', 'promotion', 'parent-portal', 'student-portal'];
+        // Management (M19, M20's Paystack integration reuses it),
+        // Promotion & Graduation (M21) and Learning Materials (M22); the rest
+        // Planned. (Timetable and Learning Materials are available but still
+        // off by default.)
+        $available = ['academics', 'students', 'guardians', 'staff', 'timetable', 'attendance', 'assessments', 'results', 'notifications', 'fees', 'promotion', 'learning-materials', 'parent-portal', 'student-portal'];
 
         foreach (Module::cases() as $module) {
             $this->assertSame(
