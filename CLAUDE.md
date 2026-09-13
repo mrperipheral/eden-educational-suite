@@ -108,7 +108,7 @@ See `docs/architecture.md` for the full rationale. In short:
 
 ## Milestones
 
-Tracked in `PROJECT_STATUS.md` and `docs/roadmap.md`. **Milestones 1–26 (Platform
+Tracked in `PROJECT_STATUS.md` and `docs/roadmap.md`. **Milestones 1–27 (Platform
 Foundation, Authentication, Multi-School Tenant Isolation, Roles & Permissions,
 School Onboarding, School Settings & Configuration, Feature / Module Activation,
 Academic Foundation, Student Management, Guardian / Parent Management, Teacher
@@ -117,7 +117,7 @@ Assignments, Results & Report Cards, Parent Portal, Student Portal,
 Communication & Notification Foundation, Fees & Fee Management, Online Fee
 Payment / Paystack, Promotion & Graduation, Learning Materials, CBT / Online
 Examinations, Question Bank, Entry / Placement Assessment, Administration &
-Audit) are complete.** School settings: `docs/school-settings.md`; module activation:
+Audit, Advanced Reporting & Analytics) are complete.** School settings: `docs/school-settings.md`; module activation:
 `docs/module-activation.md`; academic structure:
 `docs/academic-foundation.md`; students + enrollment:
 `docs/student-management.md`; guardians + student ↔ guardian links:
@@ -141,9 +141,10 @@ authorization, exam-attach compatibility: `docs/question-bank.md`; Entry /
 Placement Assessment — recording (not deciding) an assessment for a
 prospective or newly admitted student: `docs/entry-placement-assessment.md`;
 the central audit trail, its viewer, redaction rules and authorization:
-`docs/audit.md`.
-Do not start any further domain module (reporting, …) without picking up
-the next milestone explicitly.
+`docs/audit.md`; the consolidated reporting/analytics layer — dashboard KPIs,
+per-domain reports, CSV export, platform reporting: `docs/reporting.md`.
+Do not start any further domain module without picking up the next
+milestone explicitly.
 
 Module activation is **configuration, not authorization**: a domain route checks
 both its `App\Enums\Module` flag (`module:` middleware / `@module`) **and** its M4
@@ -169,3 +170,21 @@ Every other query against it filters `school_id` explicitly; do not add a
 API secret, or auth token in its `changes` payload (the recorder's blanket
 redaction filter is a safety net, not a license to pass raw secrets into
 it).
+
+**Reporting (M27) lives in `app/Reports/*`** — one plain, constructor-injected
+class per domain, never a generic reporting-engine abstraction. `reports.view` /
+`reports.export` are coarse gates always **composed with**, never a substitute
+for, the report's own pre-existing domain permission (`result.view`,
+`fees.report`, …) — a controller action checks both. A report/export route
+additionally requires its own underlying domain module (`module:results` on
+`/reports/academic`, `module:fees` on `/reports/fees`, …) layered on top of
+`module:reports`, mirroring every other feature area's own routes. A Teacher's
+own-classes-only scoping goes through the shared `App\Support\Reports\
+ReportAuthorizer` (generalises the `(level, subject)` active-`TeacherAssignment`
+pattern every other module's own authorizer already implements), applied only
+when the acting user lacks that domain's own "manage" permission. **Grouping a
+query by an enum-cast column and `pluck()`-ing it throws** — Eloquent casts the
+plucked array key to the enum instance, which cannot be a PHP array key; insert
+`->toBase()` immediately before `.pluck(...)` (it preserves the already-applied
+`SchoolScope`, since `toBase()` calls `applyScopes()` first). See
+`docs/reporting.md` for the full architecture.

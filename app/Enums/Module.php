@@ -34,6 +34,7 @@ enum Module: string
     case LearningMaterials = 'learning-materials';
     case Cbt = 'cbt';
     case EntryAssessment = 'entry-assessment';
+    case Reports = 'reports';
     case Notifications = 'notifications';
     case ParentPortal = 'parent-portal';
     case StudentPortal = 'student-portal';
@@ -54,6 +55,7 @@ enum Module: string
             self::LearningMaterials => __('Learning Materials'),
             self::Cbt => __('CBT / Online Examinations'),
             self::EntryAssessment => __('Entry / Placement Assessment'),
+            self::Reports => __('Reporting & Analytics'),
             self::Notifications => __('Notifications'),
             self::ParentPortal => __('Parent Portal'),
             self::StudentPortal => __('Student Portal'),
@@ -76,6 +78,7 @@ enum Module: string
             self::LearningMaterials => __('Notes, documents and resources shared with classes.'),
             self::Cbt => __('Computer-based tests sat online by students.'),
             self::EntryAssessment => __('Records assessments conducted for prospective or newly admitted students — not a placement decision.'),
+            self::Reports => __('Dashboard analytics and administrative reports drawn from the school\'s own enabled modules.'),
             self::Notifications => __('Communication threads, announcements and in-app notices to staff, parents and students.'),
             self::ParentPortal => __('The portal parents sign in to for their children.'),
             self::StudentPortal => __('The portal students sign in to for their own records.'),
@@ -92,6 +95,7 @@ enum Module: string
             self::Academics, self::Timetable, self::Attendance, self::LearningMaterials => __('Academics'),
             self::Assessments, self::Results, self::Cbt, self::EntryAssessment => __('Assessment'),
             self::Fees => __('Finance'),
+            self::Reports => __('Reporting'),
             self::Notifications => __('Communication'),
             self::ParentPortal, self::StudentPortal => __('Portals'),
         };
@@ -119,6 +123,7 @@ enum Module: string
             self::LearningMaterials => [self::Academics],
             self::Cbt => [self::Assessments],
             self::EntryAssessment => [self::Academics],
+            self::Reports => [self::Academics],
             self::ParentPortal => [self::Guardians],
             self::StudentPortal => [self::Students],
             default => [],
@@ -208,11 +213,21 @@ enum Module: string
      *     placement decision or change a student's enrolment — recording
      *     only. Depends on `academics` only; a linked `Student` record is
      *     optional, not required.
+     *   - `reports` — Reporting & Analytics (M27): dashboard KPI cards plus
+     *     staff-facing academic/attendance/fee/student/staff/CBT/promotion/
+     *     learning-material/communication reports, all read-only aggregates
+     *     over each module's own existing data (`docs/reporting.md`). A
+     *     report whose underlying module is off (or has no data yet) shows
+     *     an explicit empty state, never a broken query or a misleading
+     *     zero. Depends on `academics` only — every report's filters
+     *     (session/period/level/arm/subject) are academic-structure
+     *     concepts, but a report itself never requires any *other* domain
+     *     module to be on.
      */
     public function isAvailable(): bool
     {
         return match ($this) {
-            self::Academics, self::Students, self::Guardians, self::Staff, self::Timetable, self::Attendance, self::Assessments, self::Results, self::Notifications, self::Fees, self::Promotion, self::LearningMaterials, self::Cbt, self::EntryAssessment, self::ParentPortal, self::StudentPortal => true,
+            self::Academics, self::Students, self::Guardians, self::Staff, self::Timetable, self::Attendance, self::Assessments, self::Results, self::Notifications, self::Fees, self::Promotion, self::LearningMaterials, self::Cbt, self::EntryAssessment, self::Reports, self::ParentPortal, self::StudentPortal => true,
             default => false,
         };
     }
@@ -239,7 +254,7 @@ enum Module: string
      */
     public static function grouped(): array
     {
-        $order = [__('People'), __('Academics'), __('Assessment'), __('Finance'), __('Communication'), __('Portals')];
+        $order = [__('People'), __('Academics'), __('Assessment'), __('Finance'), __('Reporting'), __('Communication'), __('Portals')];
 
         $groups = array_fill_keys($order, []);
 

@@ -105,6 +105,14 @@ enum Permission: string
     // ---- Administration & audit (enforced: Administration & Audit M26) ------
     case AuditView = 'audit.view';
 
+    // ---- Reporting & analytics (enforced: Advanced Reporting & Analytics M27) ----
+    // Coarse "may open the Reports area at all" gate, composed with each
+    // report's own existing domain permission (result.view, attendance.view,
+    // fees.report, cbt.view, …) — reports.view alone never unlocks a
+    // specific report's data; see docs/reporting.md.
+    case ReportsView = 'reports.view';
+    case ReportsExport = 'reports.export';
+
     // ---- Declared for later domain milestones (coarse; not yet enforced) -----
     case FinanceView = 'finance.view';
     case FinanceManage = 'finance.manage';

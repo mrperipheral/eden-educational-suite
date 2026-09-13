@@ -35,6 +35,7 @@ use App\Http\Controllers\LearningMaterials\LearningMaterialController;
 use App\Http\Controllers\MemberController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PaystackWebhookController;
+use App\Http\Controllers\Platform\ReportController as PlatformReportController;
 use App\Http\Controllers\Platform\SchoolController as PlatformSchoolController;
 use App\Http\Controllers\Portal\ParentAssignmentController;
 use App\Http\Controllers\Portal\ParentAttendanceController;
@@ -60,6 +61,16 @@ use App\Http\Controllers\Portal\StudentResultController;
 use App\Http\Controllers\Portal\StudentTimetableController;
 use App\Http\Controllers\Promotion\GraduationController;
 use App\Http\Controllers\Promotion\PromotionController;
+use App\Http\Controllers\Reports\AcademicReportController;
+use App\Http\Controllers\Reports\AttendanceReportController;
+use App\Http\Controllers\Reports\CbtReportController;
+use App\Http\Controllers\Reports\CommunicationReportController;
+use App\Http\Controllers\Reports\FeeReportController;
+use App\Http\Controllers\Reports\LearningMaterialReportController;
+use App\Http\Controllers\Reports\PromotionReportController;
+use App\Http\Controllers\Reports\ReportsHomeController;
+use App\Http\Controllers\Reports\StaffReportController;
+use App\Http\Controllers\Reports\StudentReportController;
 use App\Http\Controllers\Results\GradingSchemeController;
 use App\Http\Controllers\Results\GradingSchemeGradeController;
 use App\Http\Controllers\Results\ReportCardConfigurationController;
@@ -125,6 +136,13 @@ Route::middleware(['auth', 'verified', 'active'])->group(function () {
         Route::get('schools/create', [PlatformSchoolController::class, 'create'])->name('schools.create');
         Route::post('schools', [PlatformSchoolController::class, 'store'])->name('schools.store');
         Route::get('schools/{school}', [PlatformSchoolController::class, 'show'])->name('schools.show');
+
+        // Platform-level cross-school reporting (M27, docs/reporting.md) —
+        // school overview, module adoption, platform usage. Gated exactly
+        // like the Schools screen above (SchoolPolicy::viewAny), not a new
+        // permission — this is the same "may you administer the platform"
+        // question, not a separate reporting capability.
+        Route::get('reports', [PlatformReportController::class, 'index'])->name('reports.index');
     });
 
     /*
@@ -164,6 +182,78 @@ Route::middleware(['auth', 'verified', 'active'])->group(function () {
                 ->can('audit.view')->name('export');
             Route::get('{auditLog}', [AuditLogController::class, 'show'])
                 ->whereNumber('auditLog')->can('audit.view')->name('show');
+        });
+
+        /*
+        | Reporting & Analytics (M27, docs/reporting.md). Every route sits
+        | behind `module:reports` (the Reports area on for this school?)
+        | **and** `->can('reports.view' | '.export')` (the coarse "may you
+        | open the Reports area at all" gate). Each sub-area additionally
+        | requires its OWN underlying domain module (`module:results` for
+        | `/reports/academic`, `module:fees` for `/reports/fees`, …) —
+        | mirrors every other feature area's own routes (`module:attendance`
+        | on `/attendance`, `module:fees` on `/fees`, …) so a school that has
+        | turned a domain module off can't be reached through the reporting
+        | back door even though `reports` itself stays on; ReportsHomeController
+        | already hides the link for exactly this reason, this is the same
+        | rule enforced at the route the link points to. Each controller
+        | action *additionally* re-checks the report's own existing domain
+        | permission (`result.view`, `attendance.view`, `fees.report`,
+        | `cbt.view`, `student.view`, `staff.view`, `promotion.view`,
+        | `material.view`, `communication.view`) — `reports.view` alone never
+        | unlocks a specific report's data. A Teacher is further scoped to
+        | their own assigned classes/subjects inside the report classes
+        | themselves.
+        */
+        Route::middleware('module:reports')->prefix('reports')->name('reports.')->group(function () {
+            Route::get('/', [ReportsHomeController::class, 'index'])->can('reports.view')->name('index');
+
+            Route::middleware('module:results')->prefix('academic')->name('academic.')->group(function () {
+                Route::get('/', [AcademicReportController::class, 'index'])->can('reports.view')->name('index');
+                Route::get('export', [AcademicReportController::class, 'export'])->can('reports.export')->name('export');
+            });
+
+            Route::middleware('module:attendance')->prefix('attendance')->name('attendance.')->group(function () {
+                Route::get('/', [AttendanceReportController::class, 'index'])->can('reports.view')->name('index');
+                Route::get('export', [AttendanceReportController::class, 'export'])->can('reports.export')->name('export');
+            });
+
+            Route::middleware('module:fees')->prefix('fees')->name('fees.')->group(function () {
+                Route::get('/', [FeeReportController::class, 'index'])->can('reports.view')->name('index');
+                Route::get('export', [FeeReportController::class, 'export'])->can('reports.export')->name('export');
+            });
+
+            Route::middleware('module:students')->prefix('students')->name('students.')->group(function () {
+                Route::get('/', [StudentReportController::class, 'index'])->can('reports.view')->name('index');
+                Route::get('export', [StudentReportController::class, 'export'])->can('reports.export')->name('export');
+            });
+
+            Route::middleware('module:staff')->prefix('staff')->name('staff.')->group(function () {
+                Route::get('/', [StaffReportController::class, 'index'])->can('reports.view')->name('index');
+                Route::get('export', [StaffReportController::class, 'export'])->can('reports.export')->name('export');
+            });
+
+            Route::middleware('module:cbt')->prefix('cbt')->name('cbt.')->group(function () {
+                Route::get('/', [CbtReportController::class, 'index'])->can('reports.view')->name('index');
+                Route::get('export', [CbtReportController::class, 'export'])->can('reports.export')->name('export');
+                Route::get('{examination}/attempts', [CbtReportController::class, 'attempts'])
+                    ->whereNumber('examination')->can('reports.view')->name('attempts');
+            });
+
+            Route::middleware('module:promotion')->prefix('promotion')->name('promotion.')->group(function () {
+                Route::get('/', [PromotionReportController::class, 'index'])->can('reports.view')->name('index');
+                Route::get('export', [PromotionReportController::class, 'export'])->can('reports.export')->name('export');
+            });
+
+            Route::middleware('module:learning-materials')->prefix('learning-materials')->name('learning-materials.')->group(function () {
+                Route::get('/', [LearningMaterialReportController::class, 'index'])->can('reports.view')->name('index');
+                Route::get('export', [LearningMaterialReportController::class, 'export'])->can('reports.export')->name('export');
+            });
+
+            Route::middleware('module:notifications')->prefix('communication')->name('communication.')->group(function () {
+                Route::get('/', [CommunicationReportController::class, 'index'])->can('reports.view')->name('index');
+                Route::get('export', [CommunicationReportController::class, 'export'])->can('reports.export')->name('export');
+            });
         });
 
         // School configuration — sectioned (see docs/school-settings.md).

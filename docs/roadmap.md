@@ -692,9 +692,59 @@ every edit to every business record (only creation and status/lifecycle
 changes are audited for most models — the moments with real
 accountability weight).
 
-## Milestone 27+ — Domain Modules
+## ✅ Milestone 27 — Advanced Reporting & Analytics (complete, 2026-09-13)
 
-Reporting.
+A consolidated reporting/analytics layer over the data M9–M26 already
+produce — school dashboard KPI cards, a Reports hub with nine domain report
+areas, CSV export, and a separate Platform Reports screen for platform
+administrators. Reporting on existing data, not a BI platform: no data
+warehouse, ETL, Elasticsearch/OpenSearch, Redis, queues, scheduled report
+delivery, or user-built report designer. `app/Reports/*` — one plain,
+constructor-injected class per domain (`AcademicReport`, `AttendanceReport`,
+`FeeReport`, `StudentReport`, `StaffReport`, `CbtReport`, `PromotionReport`,
+`LearningMaterialReport`, `CommunicationReport`, `DashboardReport`,
+`PlatformReport`), each returning a `LengthAwarePaginator` or a small
+`Collection`/array — never a bespoke "report engine" abstraction. Every
+total is a SQL aggregate (`SUM`/`COUNT`/`AVG`/`GROUP BY`), indexed
+`whereIn`, eager loading, and pagination — never a per-student/per-class
+query loop. `App\Support\Reports\ReportAuthorizer` is the one shared helper
+generalising the `(level, subject)` active-`TeacherAssignment` scoping
+pattern every other module's own authorizer (`AssessmentAuthorizer`/
+`CbtAuthorizer`/`LearningMaterialAuthorizer`/`ResultAuthorizer`) already
+implements independently — a Teacher without a domain's own "manage"
+permission is scoped to only their own assigned classes/subjects, bypassed
+entirely for a "manage" holder.
+
+Two new, deliberately coarse permissions — `reports.view`/`reports.export`
+— are always **composed with**, never a substitute for, each report's own
+pre-existing domain permission (Academic reports require both
+`reports.view` **and** `result.view`; Fee reports require both
+`reports.view` **and** `fees.report`) — this is why a Bursar (who holds
+`reports.view`) still cannot open Academic reports. Every report/export
+route additionally requires its own underlying domain module
+(`module:results` on `/reports/academic`, `module:fees` on
+`/reports/fees`, …) on top of `module:reports`, mirroring every other
+feature area's own routes, so a school that has turned a domain module off
+cannot reach it through the reporting back door. Platform Reports
+(`/admin/reports`) reuses the exact same `SchoolPolicy::viewAny`
+(`isPlatformAdmin()`) check `Platform\SchoolController` already uses — not
+a new permission, not a tenant bypass — with its two genuinely cross-school
+counts wrapped in `TenantContext::runWithoutScope()`, the one sanctioned
+escape hatch. Every report with a meaningful tabular export streams CSV via
+`response()->streamDownload()` + `chunk(200, ...)` against the exact same
+filtered/scoped query the page itself uses — never loading a whole school's
+data into memory, never exposing a secret/token/password. Full detail in
+`docs/reporting.md`.
+
+Deferred (explicitly out of scope per spec): a data warehouse, BI platform,
+Power BI integration, Elasticsearch/OpenSearch, Redis for analytics,
+complex ETL, real-time streaming analytics, predictive/AI/ML analytics,
+advanced anomaly detection, subscription billing/entitlement engines,
+scheduled report delivery or email automation, a drag-and-drop report/
+dashboard builder, a complex charting framework, HR/payroll analytics, any
+new third-party reporting package.
+
+## Milestone 28+ — Domain Modules
 
 Each domain module checks its `App\Enums\Module` flag (`module:` middleware /
 `@module`) **and** its M4 permissions — the two stay orthogonal.

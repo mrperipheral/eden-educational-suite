@@ -74,7 +74,7 @@ class ModuleTest extends TestCase
 
     public function test_only_shipped_modules_report_as_available(): void
     {
-        // Each domain milestone flips its own module to available. As of M23:
+        // Each domain milestone flips its own module to available. As of M27:
         // Academic Foundation (M8), Student Management (M9), Guardian Management
         // (M10), Teacher Management (M11), Timetable Management (M12),
         // Attendance Management (M13), Assessment & Assignments (M14),
@@ -83,10 +83,12 @@ class ModuleTest extends TestCase
         // Management (M19, M20's Paystack integration reuses it),
         // Promotion & Graduation (M21), Learning Materials (M22), CBT /
         // Online Examinations (M23), Question Bank (M24, reuses the `cbt`
-        // module) and Entry / Placement Assessment (M25); the rest Planned.
-        // (Timetable, Learning Materials, CBT and Entry Assessment are
-        // available but still off by default.)
-        $available = ['academics', 'students', 'guardians', 'staff', 'timetable', 'attendance', 'assessments', 'results', 'notifications', 'fees', 'promotion', 'learning-materials', 'cbt', 'entry-assessment', 'parent-portal', 'student-portal'];
+        // module), Entry / Placement Assessment (M25), Administration &
+        // Audit (M26, reuses no module — see docs/audit.md) and Advanced
+        // Reporting & Analytics (M27); the rest Planned. (Timetable,
+        // Learning Materials, CBT and Entry Assessment are available but
+        // still off by default.)
+        $available = ['academics', 'students', 'guardians', 'staff', 'timetable', 'attendance', 'assessments', 'results', 'notifications', 'fees', 'promotion', 'learning-materials', 'cbt', 'entry-assessment', 'reports', 'parent-portal', 'student-portal'];
 
         foreach (Module::cases() as $module) {
             $this->assertSame(

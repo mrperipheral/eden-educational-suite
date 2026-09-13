@@ -77,15 +77,74 @@
             </x-card>
         @endisset
 
-        <x-empty-state
-            :title="__('Nothing to show yet')"
-            :description="__('This is a placeholder dashboard. Once the school modules are built, this area will show what needs your attention in :school.', ['school' => $school->name])"
-        >
-            <x-slot:actions>
-                <x-button :href="route('settings.profile.edit')" variant="secondary" size="sm">
-                    {{ __('Account settings') }}
-                </x-button>
-            </x-slot:actions>
-        </x-empty-state>
+        @if (! empty($kpis))
+            <div class="space-y-4">
+                @can('reports.view')
+                    <p class="text-sm">
+                        <a href="{{ route('reports.index') }}" class="font-medium text-brand-600 hover:text-brand-700">{{ __('View all reports →') }}</a>
+                    </p>
+                @endcan
+
+                @if (isset($kpis['students']))
+                    <x-card :title="__('Students')">
+                        <div class="grid gap-4 sm:grid-cols-5">
+                            <div><p class="text-2xl font-semibold text-gray-900">{{ $kpis['students']['total'] }}</p><p class="text-xs text-gray-500">{{ __('Total') }}</p></div>
+                            <div><p class="text-2xl font-semibold text-green-700">{{ $kpis['students']['active'] }}</p><p class="text-xs text-gray-500">{{ __('Active') }}</p></div>
+                            <div><p class="text-2xl font-semibold text-gray-900">{{ $kpis['students']['inactive'] }}</p><p class="text-xs text-gray-500">{{ __('Inactive') }}</p></div>
+                            <div><p class="text-2xl font-semibold text-gray-900">{{ $kpis['students']['withdrawn'] }}</p><p class="text-xs text-gray-500">{{ __('Withdrawn') }}</p></div>
+                            <div><p class="text-2xl font-semibold text-gray-900">{{ $kpis['students']['graduated'] }}</p><p class="text-xs text-gray-500">{{ __('Graduated') }}</p></div>
+                        </div>
+                    </x-card>
+                @endif
+
+                <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    @if (isset($kpis['staff']))
+                        <x-card :title="__('Staff')">
+                            <p class="text-2xl font-semibold text-gray-900">{{ $kpis['staff']['active'] }} <span class="text-sm font-normal text-gray-500">/ {{ $kpis['staff']['total'] }}</span></p>
+                            <p class="text-xs text-gray-500">{{ __('Active teachers') }}</p>
+                        </x-card>
+                    @endif
+
+                    @if (isset($kpis['attendance']))
+                        <x-card :title="__('Attendance (last 30 days)')">
+                            <p class="text-2xl font-semibold text-gray-900">{{ $kpis['attendance']['attendance_percentage'] ?? '—' }}{{ $kpis['attendance']['attendance_percentage'] !== null ? '%' : '' }}</p>
+                            <p class="text-xs text-gray-500">{{ __(':n registers submitted', ['n' => $kpis['attendance']['registers_submitted']]) }}</p>
+                        </x-card>
+                    @endif
+
+                    @if (isset($kpis['results']))
+                        <x-card :title="__('Results')">
+                            <p class="text-2xl font-semibold text-gray-900">{{ $kpis['results']['runs'] }}</p>
+                            <p class="text-xs text-gray-500">{{ __(':published published · :locked locked', ['published' => $kpis['results']['published'], 'locked' => $kpis['results']['locked']]) }}</p>
+                        </x-card>
+                    @endif
+
+                    @if (isset($kpis['fees']))
+                        <x-card :title="__('Fees')">
+                            <p class="text-2xl font-semibold text-red-700">{{ $kpis['fees']['total_outstanding'] }}</p>
+                            <p class="text-xs text-gray-500">{{ __('Outstanding') }} · {{ __('Collected') }}: {{ $kpis['fees']['total_collected'] }}</p>
+                        </x-card>
+                    @endif
+
+                    @if (isset($kpis['cbt']))
+                        <x-card :title="__('CBT')">
+                            <p class="text-2xl font-semibold text-gray-900">{{ $kpis['cbt']['completed'] }} <span class="text-sm font-normal text-gray-500">/ {{ $kpis['cbt']['attempts'] }}</span></p>
+                            <p class="text-xs text-gray-500">{{ __(':n examinations · :p passed', ['n' => $kpis['cbt']['examinations'], 'p' => $kpis['cbt']['passed']]) }}</p>
+                        </x-card>
+                    @endif
+                </div>
+            </div>
+        @else
+            <x-empty-state
+                :title="__('Nothing to show yet')"
+                :description="__('This is a placeholder dashboard. Once the school modules are built, this area will show what needs your attention in :school.', ['school' => $school->name])"
+            >
+                <x-slot:actions>
+                    <x-button :href="route('settings.profile.edit')" variant="secondary" size="sm">
+                        {{ __('Account settings') }}
+                    </x-button>
+                </x-slot:actions>
+            </x-empty-state>
+        @endif
     </div>
 </x-layouts.authenticated>

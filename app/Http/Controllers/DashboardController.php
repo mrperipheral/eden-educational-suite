@@ -8,6 +8,7 @@ use App\Enums\Role;
 use App\Enums\UserStatus;
 use App\Models\AuditLog;
 use App\Models\School;
+use App\Reports\DashboardReport;
 use App\Support\Modules\SchoolModules;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Http\RedirectResponse;
@@ -25,7 +26,7 @@ class DashboardController extends Controller
      * and a Student-role member, sent to their own Student Portal (M17,
      * `docs/student-portal.md`): the admin dashboard has nothing for them.
      */
-    public function __invoke(Request $request, TenantContext $tenant, SchoolModules $modules): View|RedirectResponse
+    public function __invoke(Request $request, TenantContext $tenant, SchoolModules $modules, DashboardReport $dashboardReport): View|RedirectResponse
     {
         $school = $tenant->schoolOrFail();
         $role = $request->user()->roleIn($school);
@@ -42,6 +43,11 @@ class DashboardController extends Controller
             'school' => $school,
             'onboarding' => $this->onboarding($request, $school),
             'administration' => $this->administration($request, $school, $modules),
+            // M27 KPI cards — each card is independently module- and
+            // permission-gated inside DashboardReport::kpis(); an empty
+            // array here just means "nothing this viewer may see yet",
+            // never a misleading zero for a disabled module.
+            'kpis' => $modules->enabled(Module::Reports) ? $dashboardReport->kpis($request->user()) : [],
         ]);
     }
 

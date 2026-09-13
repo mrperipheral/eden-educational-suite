@@ -1,13 +1,14 @@
 # Database Design
 
-Status: Milestone 26. Tenant + roles + onboarding + school settings + module
+Status: Milestone 27. Tenant + roles + onboarding + school settings + module
 activation + academic foundation + student management + guardian management +
 teacher management + timetable management + attendance management + assessment &
 assignments + results & report cards + parent portal + student portal +
 communication & notification foundation + fees & fee management + online fee
 payment (Paystack) + promotion & graduation + learning materials + CBT / online
 examinations + question bank + entry / placement assessment + administration &
-audit. School-owned tables: `school_settings` (M6),
+audit + advanced reporting & analytics (M27 adds **no new tables** — it reads
+existing data only; see `docs/reporting.md`). School-owned tables: `school_settings` (M6),
 `school_modules` (M7), the academic structure — `academic_sessions`,
 `academic_periods`, `academic_levels`, `level_arms`, `subjects`,
 `level_subject` (M8) — `students` + `enrollments` (M9), `guardians` +

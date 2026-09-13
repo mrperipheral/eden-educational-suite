@@ -335,6 +335,21 @@ Full detail in `docs/audit.md`. Summary of controls:
 | Performance | synchronous single-row inserts; four `school_id`-leading composite indexes matching the viewer's actual query shapes; paginated (25/page) with eager-loaded `actor`; export uses `chunk()`, never `cursor()` (which would skip eager loading) |
 | Cross-school membership actions | every M4 Members write (`member.created`/`.role_changed`/`.removed`) is now audited, with the existing anti-escalation rules (self-modification block, tier-guarded role grants) completely unchanged |
 
+## Implemented in Milestone 27 (Advanced Reporting & Analytics)
+
+Full detail in `docs/reporting.md`. Summary of controls:
+
+| Control | How |
+|---------|-----|
+| Coarse gate composed with domain permission | every report/export route checks `reports.view`/`reports.export` **and** the report's own pre-existing domain permission (`result.view`, `fees.report`, `cbt.view`, …) — neither alone unlocks a specific report's data (a Bursar holding `reports.view` still cannot open Academic reports, since Bursar never holds `result.view`) |
+| Domain-module gate on every report route | `module:results` on `/reports/academic`, `module:fees` on `/reports/fees`, `module:cbt` on `/reports/cbt`, … — layered on top of `module:reports`, so a school with a domain module turned off cannot reach it through the reporting back door |
+| Tenant isolation | every report relies on the ordinary `SchoolScope` global scope already applied by `BelongsToSchool` — no report ever writes a manual `where('school_id', …)` or reads a school id from the request; `CbtReportController::attempts({examination})` resolves its route parameter through a tenant-scoped `findOrFail` (another school's id 404s) |
+| Teacher scoping | a Teacher without a domain's own "manage" permission is scoped to only the classes/subjects they hold an active M11 `TeacherAssignment` for, via the shared `App\Support\Reports\ReportAuthorizer` — never a separate authorization system |
+| Platform reporting is not a tenant bypass | `/admin/reports` reuses `SchoolPolicy::viewAny` (`isPlatformAdmin()`), the exact same check `Platform\SchoolController` already uses — not a new permission; its two genuinely cross-school counts are the only queries wrapped in `TenantContext::runWithoutScope()` |
+| Export authorization matches the page | every export action independently re-checks `reports.export` **and** the domain permission — an export URL is never reachable with looser authorization than the page it exports |
+| No secrets in reports or exports | no report, dashboard card, or CSV export ever includes a Paystack secret key, password, or auth token — proven by an explicit test scanning exported content for secret-shaped substrings |
+| Query-string injection has no effect | every report's filter array is built entirely from named, typed request fields (`session`, `level`, `status`, …) — a `?school_id=`/`?school=` parameter is simply never read by any filter, proven by an explicit test |
+
 ## Deferred (with the milestone that owns them)
 
 - **Auth follow-ups:** 2FA, "log out other devices" on password change, session

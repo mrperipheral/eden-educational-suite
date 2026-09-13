@@ -57,6 +57,7 @@
             ['route' => 'learning-materials.index', 'label' => __('Learning Materials'), 'active' => 'learning-materials.*', 'allowed' => $moduleOn(\App\Enums\Module::LearningMaterials) && auth()->user()->can('material.view')],
             ['route' => 'cbt.examinations.index', 'label' => __('CBT'), 'active' => 'cbt.*', 'allowed' => $moduleOn(\App\Enums\Module::Cbt) && auth()->user()->can('cbt.view')],
             ['route' => 'entry-assessments.index', 'label' => __('Entry Assessment'), 'active' => 'entry-assessments.*', 'allowed' => $moduleOn(\App\Enums\Module::EntryAssessment) && auth()->user()->can('placement.view')],
+            ['route' => 'reports.index', 'label' => __('Reports'), 'active' => 'reports.*', 'allowed' => $moduleOn(\App\Enums\Module::Reports) && auth()->user()->can('reports.view')],
             ['route' => 'academic.sessions.index', 'label' => __('Academic'), 'active' => 'academic.*', 'allowed' => $moduleOn(\App\Enums\Module::Academics) && auth()->user()->can('academics.view')],
             ['route' => 'communication.threads.index', 'label' => __('Communication'), 'active' => 'communication.*', 'allowed' => $moduleOn(\App\Enums\Module::Notifications) && auth()->user()->can('communication.view')],
             ['route' => 'announcements.index', 'label' => __('Announcements'), 'active' => 'announcements.*', 'allowed' => $moduleOn(\App\Enums\Module::Notifications) && auth()->user()->can('announcement.view')],
@@ -64,6 +65,7 @@
             ['route' => 'settings.school.edit', 'label' => __('School settings'), 'active' => 'settings.school.*', 'allowed' => auth()->user()->can('school.settings.view')],
             ['route' => 'audit-log.index', 'label' => __('Audit Log'), 'active' => 'audit-log.*', 'allowed' => auth()->user()->can('audit.view')],
             ['route' => 'admin.schools.index', 'label' => __('Schools'), 'active' => 'admin.schools.*', 'allowed' => auth()->user()->can('viewAny', \App\Models\School::class)],
+            ['route' => 'admin.reports.index', 'label' => __('Platform Reports'), 'active' => 'admin.reports.*', 'allowed' => auth()->user()->can('viewAny', \App\Models\School::class)],
             ['route' => 'settings.profile.edit', 'label' => __('Account settings'), 'active' => 'settings.profile.*', 'allowed' => true],
         ]),
     };

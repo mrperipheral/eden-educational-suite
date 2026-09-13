@@ -1,13 +1,13 @@
 # Project Status
 
-_Last updated: 2026-10-04_
+_Last updated: 2026-09-13_
 
 ## Current milestone
 
-**Milestone 26 — Administration & Audit: COMPLETE.**
+**Milestone 27 — Advanced Reporting & Analytics: COMPLETE.**
 
-Next up: further **Domain Modules** — Reporting. Not started — do not
-begin without picking one up explicitly. See `docs/roadmap.md`.
+Next up: further **Domain Modules**. Not started — do not begin without
+picking one up explicitly. See `docs/roadmap.md`.
 
 ## What the application is
 
@@ -24,7 +24,7 @@ Vite · PHPUnit · Pint.
 | Node / npm | 22.x |
 | Database | MySQL 8 (app) · SQLite `:memory:` (tests) |
 | Local mail | Mailpit (`127.0.0.1:1025`, UI `:8025`) — `.env` only, not committed |
-| Tests | `php artisan test` — 1242 passing |
+| Tests | `php artisan test` — 1311 passing |
 | Build | `npm run build` — passing |
 | Formatting | `vendor/bin/pint --test` — passing |
 
@@ -57,8 +57,112 @@ Vite · PHPUnit · Pint.
 - **M23 — CBT / Online Examinations** (`cbt-online-examinations-complete`) — `docs/cbt.md`.
 - **M24 — Question Bank** (`question-bank-complete`) — `docs/question-bank.md`.
 - **M25 — Entry / Placement Assessment** (`entry-placement-assessment-complete`) — `docs/entry-placement-assessment.md`.
-- **M26 — Administration & Audit** (this milestone,
-  `administration-audit-complete`) — `docs/audit.md`; see below.
+- **M26 — Administration & Audit** (`administration-audit-complete`) —
+  `docs/audit.md`.
+- **M27 — Advanced Reporting & Analytics** (this milestone,
+  `advanced-reporting-analytics-complete`) — `docs/reporting.md`; see below.
+
+## Delivered in Milestone 27
+
+A consolidated reporting/analytics layer over the data M9–M26 already
+produce: school dashboard KPI cards, a Reports hub with nine domain report
+areas, CSV export, and a separate Platform Reports screen for platform
+administrators — reporting on existing data, not a BI platform. Full detail
+in `docs/reporting.md`.
+
+- **`app/Reports/*`** — one plain, constructor-injected class per domain
+  (`AcademicReport`, `AttendanceReport`, `FeeReport`, `StudentReport`,
+  `StaffReport`, `CbtReport`, `PromotionReport`, `LearningMaterialReport`,
+  `CommunicationReport`, `DashboardReport`, `PlatformReport`), each
+  returning a `LengthAwarePaginator` or a small `Collection`/array — never
+  a bespoke "report engine" abstraction. Thin controllers under
+  `app/Http/Controllers/Reports/*`, one per domain, each a `?tab=` switch
+  where a domain names more than one report (Academic: runs/student/
+  subject/class; Attendance: student/class/trend; Fees: summary/
+  outstanding/payments; Promotion: batches/graduation) — 21 routes total
+  rather than one per named sub-report.
+- **`App\Support\Reports\ReportAuthorizer`** — one shared helper
+  generalising the `(level, subject)` active-`TeacherAssignment` scoping
+  pattern `AssessmentAuthorizer`/`CbtAuthorizer`/
+  `LearningMaterialAuthorizer`/`ResultAuthorizer` each already implement
+  independently. A Teacher without a domain's own "manage" permission
+  (`result.manage`, `attendance.manage`, `cbt.manage`) is scoped to only
+  their own assigned classes/subjects; a "manage" holder bypasses scoping
+  entirely, matching the rule every other manage-tier permission already
+  follows elsewhere in this app.
+- **Every export streams CSV** via `response()->streamDownload()` +
+  `chunk(200, ...)` against the exact same filtered/tenant/teacher-scoped
+  query the report page itself paginates (every paginated Report method has
+  a sibling `*Query()` method returning the raw `Builder`) — never loading
+  a whole school's result set into memory. `FeeReport::
+  outstandingBalancesQuery()` folds the allocated-amount-per-charge in as a
+  correlated SQL subquery and filters with `HAVING total_outstanding > 0`
+  in the database itself, rather than a second batched per-page lookup.
+- **Two new, deliberately coarse permissions** — `reports.view` /
+  `reports.export` — always composed with, never a substitute for, each
+  report's own pre-existing domain permission (Academic reports require
+  both `reports.view` **and** `result.view`; Fee reports require both
+  `reports.view` **and** `fees.report`) — a Bursar (who holds
+  `reports.view`) still cannot open Academic reports, since Bursar never
+  holds `result.view`. Granted: Principal/Bursar → both; Teacher/Staff →
+  `reports.view` only; Parent/Student → neither.
+- **Every report/export route additionally requires its own underlying
+  domain module** (`module:results` on `/reports/academic`, `module:fees`
+  on `/reports/fees`, `module:cbt` on `/reports/cbt`, …) layered on top of
+  `module:reports` — mirrors every other feature area's own routes, so a
+  school that has turned a domain module off cannot reach it through the
+  reporting back door even with the Reports module itself still on.
+- **Platform Reports** (`/admin/reports`,
+  `App\Reports\PlatformReport` + `Platform\ReportController`) reuses the
+  exact same `SchoolPolicy::viewAny` (`isPlatformAdmin()`) check
+  `Platform\SchoolController` already uses — not a new permission, not a
+  tenant bypass. School overview, module adoption (derived from the
+  override-only `school_modules` table plus each `Module::
+  enabledByDefault()`, never a per-school loop), and platform usage (its
+  two genuinely cross-school counts wrapped in
+  `TenantContext::runWithoutScope()`, the one sanctioned escape hatch).
+- **Dashboard KPI cards** (`DashboardReport::kpis()`) — Students, Staff,
+  Attendance, Results, Fees, CBT — each independently gated by its own
+  module **and** the viewer's permission; a disabled module or lacking
+  permission omits the card entirely rather than showing a misleading zero.
+- **The `->toBase()` enum-pluck fix** — grouping by an enum-cast column
+  (`status`/`gender`/`category`/`type`) and calling `->pluck(...)` throws,
+  since Eloquent casts the plucked array key to the enum instance; every
+  one of the nine call sites this milestone introduced inserts `->toBase()`
+  immediately before `.pluck(...)`, which strips the cast while still
+  preserving the already-applied `SchoolScope` — a documented gotcha for
+  any future report grouping by an enum-cast column.
+- **No CSV export, dashboard card, or audit record ever includes a
+  Paystack secret, password, or token** — proven by an explicit test
+  scanning exported content for secret-shaped substrings.
+- **0 new tables** — this milestone reads existing M9–M26 data only.
+- **12 new views** under `resources/views/reports/*` +
+  `resources/views/platform/reports/index.blade.php` — existing
+  Blade+Tailwind+Alpine components throughout (`<x-card>`, `<x-badge>`,
+  `<x-empty-state>`, `<x-button>`), a `?tab=` query-param switch, an Alpine
+  `x-model` level→arm cascading filter, pagination via the existing
+  paginator views. No chart library — a trend/percentage renders as a
+  plain CSS width bar. Two new nav links ("Reports", "Platform Reports"),
+  both module + permission gated.
+- **Docs** — new `docs/reporting.md`; `PROJECT_STATUS.md`,
+  `docs/roadmap.md` updated.
+- **69 new tests** under `tests/Feature/Reports/*` (+ `ReportsTestCase`
+  base) — report calculations and filters per domain (Academic, Attendance,
+  Fee, Student/Staff, CBT, Promotion, Communication/Learning Materials,
+  Dashboard, Platform), Teacher-scoping (own assigned classes only, empty
+  when unassigned), a full role-matrix authorization suite (School Admin/
+  Principal full access, Bursar fees-only, Teacher never-fees, Staff
+  view-not-export, Parent/Student fully forbidden, platform-admin-only
+  platform reports, disabled-module 404s for both the Reports module
+  itself and an individual domain module), tenant isolation (another
+  school's students/results never appearing, `?school_id=`/`?school=`
+  query-string injection having no effect, a same-school-only fee balance,
+  a cross-school CBT-attempt IDOR 404, platform reports unreachable from a
+  normal school-user context), export (CSV header/filter-correctness,
+  Paystack-secret-never-leaked, a Teacher flatly forbidden from exporting
+  even with real data to view), and N+1 performance regressions (dashboard,
+  student enrollment report, admin's-eye and Teacher's-eye academic
+  report — all flat as row counts grow).
 
 ## Delivered in Milestone 26
 
