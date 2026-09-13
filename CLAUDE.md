@@ -108,7 +108,7 @@ See `docs/architecture.md` for the full rationale. In short:
 
 ## Milestones
 
-Tracked in `PROJECT_STATUS.md` and `docs/roadmap.md`. **Milestones 1–27 (Platform
+Tracked in `PROJECT_STATUS.md` and `docs/roadmap.md`. **Milestones 1–29 (Platform
 Foundation, Authentication, Multi-School Tenant Isolation, Roles & Permissions,
 School Onboarding, School Settings & Configuration, Feature / Module Activation,
 Academic Foundation, Student Management, Guardian / Parent Management, Teacher
@@ -117,7 +117,8 @@ Assignments, Results & Report Cards, Parent Portal, Student Portal,
 Communication & Notification Foundation, Fees & Fee Management, Online Fee
 Payment / Paystack, Promotion & Graduation, Learning Materials, CBT / Online
 Examinations, Question Bank, Entry / Placement Assessment, Administration &
-Audit, Advanced Reporting & Analytics) are complete.** School settings: `docs/school-settings.md`; module activation:
+Audit, Advanced Reporting & Analytics, Platform Security Hardening,
+Performance / Scalability / Reliability Validation) are complete.** School settings: `docs/school-settings.md`; module activation:
 `docs/module-activation.md`; academic structure:
 `docs/academic-foundation.md`; students + enrollment:
 `docs/student-management.md`; guardians + student ↔ guardian links:
@@ -142,7 +143,10 @@ Placement Assessment — recording (not deciding) an assessment for a
 prospective or newly admitted student: `docs/entry-placement-assessment.md`;
 the central audit trail, its viewer, redaction rules and authorization:
 `docs/audit.md`; the consolidated reporting/analytics layer — dashboard KPIs,
-per-domain reports, CSV export, platform reporting: `docs/reporting.md`.
+per-domain reports, CSV export, platform reporting: `docs/reporting.md`;
+the M28 security-hardening review — findings, fixes, deferred items:
+`docs/security-hardening.md`; the M29 performance/scalability validation —
+large-data fixture, benchmarks, known limits: `docs/performance-scalability.md`.
 Do not start any further domain module without picking up the next
 milestone explicitly.
 
@@ -188,3 +192,21 @@ plucked array key to the enum instance, which cannot be a PHP array key; insert
 `->toBase()` immediately before `.pluck(...)` (it preserves the already-applied
 `SchoolScope`, since `toBase()` calls `applyScopes()` first). See
 `docs/reporting.md` for the full architecture.
+
+**Every CSV export sanitizes each data-row cell through
+`App\Support\Csv\CsvSanitizer::row()`** (M28) before `fputcsv()` — a cell
+whose text starts with `=`, `+`, `-`, `@`, a tab, or a carriage return is
+prefixed with a leading single quote, the standard mitigation for
+spreadsheet formula injection. Any new export of user-controlled free text
+(a name, a note, a reference) must go through it; static header rows and
+closed-enum-keyed metric rows don't need it. See `docs/security-hardening.md`.
+
+**Large-dataset / performance-validation fixtures are separate, manually-
+invoked Artisan commands (M29) — never wired into `DatabaseSeeder` or
+`migrate:fresh --seed`.** `performance:seed-dataset` is the first of these;
+a future one should follow the same shape — a dedicated command, bulk
+`DB::table()->insert()` in chunks for its high-volume tables (never one
+Eloquent `::create()` per row), and a `--fresh` cleanup path that accounts
+for any deliberate `restrictOnDelete()` FKs it needs to work around (e.g.
+`fee_payment_allocations.student_fee_charge_id`). See
+`docs/performance-scalability.md`.

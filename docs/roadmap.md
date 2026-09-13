@@ -744,7 +744,82 @@ scheduled report delivery or email automation, a drag-and-drop report/
 dashboard builder, a complex charting framework, HR/payroll analytics, any
 new third-party reporting package.
 
-## Milestone 28+ — Domain Modules
+## ✅ Milestone 28 — Platform Security Hardening (complete, 2026-09-13)
+
+A consolidated security-hardening pass across M1–M27, via seven parallel
+read-only research passes (tenant isolation, authorization/mass
+assignment, file/payment security, CBT integrity, results/audit/reporting
+security, authentication/XSS/CSRF, headers/secrets/rate-limiting/config),
+each briefed on the existing architecture and existing ~1300-test suite so
+they hunted for genuine gaps rather than re-proving what already worked.
+**One real, exploitable vulnerability found and fixed**: CSV/formula
+injection across every report/audit-log export — untrusted free-text
+fields (student names, fee references, graduation notes) reached
+`fputcsv()` with no neutralization of a leading `=`/`+`/`-`/`@`; fixed with
+a shared `App\Support\Csv\CsvSanitizer` applied at all 11 export call
+sites. Two hardening gaps closed: no security-header middleware existed
+(`App\Http\Middleware\SecurityHeaders` — `X-Content-Type-Options`,
+`X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy`, prod-gated
+HSTS — added globally); no rate limiting existed on CSV exports or
+Paystack payment initiation (named `exports`/`payment-initiation`
+limiters added). One coverage gap closed: the report-card signature
+routes had zero tests despite being structurally identical to the
+well-tested logo feature — 9 tests added proving the existing (already
+correct) implementation. Every other area audited (tenant isolation,
+privilege escalation, mass assignment, payment/CBT/results/audit
+integrity, auth/session security, XSS/CSRF) came back clean — no fix, no
+new test, documented as reviewed. 16 new tests total; 1 weak pre-existing
+test replaced (it claimed to prove CSV-injection safety but never parsed
+actual cell content or exercised a vulnerable code path). Full detail in
+`docs/security-hardening.md`.
+
+Deferred (per the milestone's own scope boundary): a SIEM, SOC, WAF,
+IDS/IPS, a new authentication framework, SSO, enterprise IAM, MFA/2FA as a
+new feature, a secrets-management platform, cloud security architecture,
+infrastructure firewall configuration, any compliance certification, VAPT
+automation, and a dedicated Content-Security-Policy (considered, deferred —
+Alpine.js's inline-expression model needs its own scoped effort to
+reconcile with a strict CSP without breaking the existing UI).
+
+## ✅ Milestone 29 — Performance, Scalability & Reliability Validation (complete, 2026-09-13)
+
+Answers one question: is there any meaningful performance, scalability or
+reliability problem in the existing platform that should be fixed before
+production? **Headline finding: no genuine bottleneck or reliability gap
+was found.** A quick audit of the priority screens (dashboards, student
+lists, attendance, assessments/results, report cards, fees, portals, CBT,
+audit logs, M27 reports, CSV exports, promotion/graduation) confirmed what
+was already in place: every list controller paginates, every high-traffic
+table already carries a `school_id`-leading index matching its real query
+shape, every CSV export already chunks, and every reliability-sensitive
+write (Paystack payments, fee allocation, result publish/lock, CBT
+submission, promotion/graduation, audit recording) already has
+`DB::transaction()`/`lockForUpdate()` protection. A new standalone
+fixture command, `php artisan performance:seed-dataset` (`App\Console\
+Commands\SeedPerformanceDataset`), seeds a 250-student "Performance
+Academy A" (~8× the normal demo school) plus a 15-student "Performance
+Academy B" for multi-school comparison — **deliberately never wired into
+`DatabaseSeeder`/`migrate:fresh --seed`**, a lasting convention now
+documented in `CLAUDE.md`. Empirical measurements against this fixture
+(development-machine numbers, not production capacity guarantees) showed
+every screen/report/export staying fast and query-count-flat at 10×
+normal data volume, and School B's query counts staying identical
+regardless of School A's much larger size — confirming `SchoolScope`'s
+tenant predicate keeps schools' performance mutually independent. Because
+no genuine issue was found, **no code was optimized and no new regression
+tests were added** — a deliberate, honest outcome rather than a
+manufactured fix. Full detail in `docs/performance-scalability.md`.
+
+Deferred to production infrastructure or a future milestone: true
+concurrent load testing (needs a real tool — k6/JMeter/Artillery — against
+a staging environment, not something to fake in PHPUnit), a caching layer,
+queues/Horizon (nothing measured demonstrated a need for either), a
+benchmark of `ResultCompiler`/`RankingCalculator` against a full
+assessment-score-backed fixture (reviewed by code inspection instead, since
+it already uses the same proven bulk-insert technique as the rest of the
+codebase), database read replicas / connection pooling / opcache tuning.
+
+## Milestone 30+ — Domain Modules
 
 Each domain module checks its `App\Enums\Module` flag (`module:` middleware /
 `@module`) **and** its M4 permissions — the two stay orthogonal.

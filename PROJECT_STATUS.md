@@ -4,7 +4,7 @@ _Last updated: 2026-09-13_
 
 ## Current milestone
 
-**Milestone 27 — Advanced Reporting & Analytics: COMPLETE.**
+**Milestone 29 — Performance, Scalability & Reliability Validation: COMPLETE.**
 
 Next up: further **Domain Modules**. Not started — do not begin without
 picking one up explicitly. See `docs/roadmap.md`.
@@ -24,7 +24,7 @@ Vite · PHPUnit · Pint.
 | Node / npm | 22.x |
 | Database | MySQL 8 (app) · SQLite `:memory:` (tests) |
 | Local mail | Mailpit (`127.0.0.1:1025`, UI `:8025`) — `.env` only, not committed |
-| Tests | `php artisan test` — 1311 passing |
+| Tests | `php artisan test` — 1326 passing |
 | Build | `npm run build` — passing |
 | Formatting | `vendor/bin/pint --test` — passing |
 
@@ -59,8 +59,99 @@ Vite · PHPUnit · Pint.
 - **M25 — Entry / Placement Assessment** (`entry-placement-assessment-complete`) — `docs/entry-placement-assessment.md`.
 - **M26 — Administration & Audit** (`administration-audit-complete`) —
   `docs/audit.md`.
-- **M27 — Advanced Reporting & Analytics** (this milestone,
-  `advanced-reporting-analytics-complete`) — `docs/reporting.md`; see below.
+- **M27 — Advanced Reporting & Analytics** (`advanced-reporting-analytics-complete`) — `docs/reporting.md`.
+- **M28 — Platform Security Hardening** (`platform-security-hardening-complete`) — `docs/security-hardening.md`.
+- **M29 — Performance, Scalability & Reliability Validation** (this
+  milestone, `performance-scalability-complete`) —
+  `docs/performance-scalability.md`; see below.
+
+## Delivered in Milestone 29
+
+A quick, focused performance/scalability/reliability audit across the
+priority screens (dashboards, student lists, attendance, assessments/
+results, report cards, fees, portals, CBT, audit logs, M27 reports, CSV
+exports, promotion/graduation) — **not** a repeat of M1–M28's functional/
+security testing. Full detail in `docs/performance-scalability.md`.
+
+- **Headline finding: no genuine bottleneck or reliability gap found.**
+  Every list controller already paginates; every high-traffic table
+  already carries a `school_id`-leading index matching its real query
+  shape; every reliability-sensitive write (Paystack payments, fee
+  allocation, result publish/lock, CBT submission, promotion/graduation,
+  audit recording) already has transaction/lock protection. No code
+  optimization was needed.
+- **New large-data fixture** — `php artisan performance:seed-dataset
+  [--fresh]` (`app/Console/Commands/SeedPerformanceDataset.php`), a
+  standalone command seeding a 250-student "Performance Academy A" (~8×
+  the normal demo school) plus a 15-student "Performance Academy B" for
+  multi-school comparison. **Deliberately not wired into `DatabaseSeeder`/
+  `migrate:fresh --seed`** — a lasting convention now documented in
+  `CLAUDE.md`. High-volume rows (attendance, results) are bulk-inserted
+  in chunks so the command finishes in ~6 seconds.
+- **Multi-school verification** — the same representative queries (
+  dashboard, student list, academic/fee/audit reports) against both
+  schools show **identical query counts** regardless of School A's much
+  larger size — `SchoolScope`'s tenant predicate keeps School B's screens
+  unaffected by School A's data volume.
+- **Benchmark evidence recorded** (development-machine measurements, not
+  production capacity guarantees) — e.g. the 250-row academic CSV export
+  streams via `chunk(200)` at 1.17MB peak memory in 33.5ms/6 queries; the
+  dashboard's fixed KPI-card query set runs in 84.2ms/11 queries at
+  250-student scale. See `docs/performance-scalability.md` §4–§5 for the
+  full table.
+- **Reliability review (code inspection, no new framework)** — confirmed
+  existing `DB::transaction()`/`lockForUpdate()` protection on
+  `PaymentVerificationService::verifyAndRecord()`, `FeePaymentService::
+  allocate()`, `ResultRun` lifecycle transitions, `ExamAttemptService::
+  finalize()`/`start()`, and `PromotionService`/`GraduationService`'s
+  per-student row locks. No gap found; no new regression test needed.
+- **No optimizations were made** — nothing found warranted one. This is a
+  deliberate, honest outcome: the milestone's job was to check whether a
+  fix was needed, not to manufacture one.
+- **0 new PHPUnit tests** — per the spec's own instruction not to inflate
+  the test count; no genuine performance regression, newly-fixed N+1, or
+  newly-fixed reliability issue was found to write a targeted regression
+  test for.
+- **Docs** — new `docs/performance-scalability.md`; `PROJECT_STATUS.md`,
+  `docs/roadmap.md`, `CLAUDE.md` updated (the large-data-fixture-stays-
+  separate rule).
+
+## Delivered in Milestone 28
+
+A consolidated security-hardening pass across M1–M27, via seven parallel
+read-only research passes covering tenant isolation, authorization, mass
+assignment, file/payment/CBT/results/audit/reporting security,
+authentication, XSS/CSRF, headers, rate limiting, secrets and
+configuration. Full detail in `docs/security-hardening.md`.
+
+- **One real, exploitable vulnerability found and fixed: CSV/formula
+  injection** across every report/audit-log export — `fputcsv()` wrote
+  untrusted free-text fields (student names, fee references, graduation
+  notes) with no neutralization of a leading `=`/`+`/`-`/`@`. Fixed with
+  a shared `App\Support\Csv\CsvSanitizer` applied at all 11 export call
+  sites, plus regression tests that actually parse the returned CSV
+  (the test this replaced never did, and exercised an export that didn't
+  even render the vulnerable field).
+- **Two hardening gaps closed**: no security-header middleware existed at
+  all (added `App\Http\Middleware\SecurityHeaders` — `X-Content-Type-
+  Options`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy`,
+  prod-gated HSTS, registered globally); no rate limiting existed on CSV
+  exports or Paystack payment initiation (added named `exports`/
+  `payment-initiation` limiters + `throttle:` middleware on all 11 export
+  routes and both payment-initiation routes).
+- **One coverage gap closed**: the report-card principal/class-teacher
+  signature routes had zero test coverage despite being structurally
+  identical to the well-tested school-logo feature — added 9 tests
+  proving the existing (already-correct) implementation.
+- **Every other area audited came back clean** — tenant isolation,
+  authorization/privilege escalation, mass assignment, payment integrity
+  (M20), CBT integrity (M23/M24), results integrity, audit-log integrity
+  (M26), authentication/session security (M2), XSS/CSRF — no fix, no new
+  test, documented as reviewed.
+- **16 new tests** (2 CSV-injection, 9 signature routes, 2 rate-limiting,
+  3 security headers); 1 weak pre-existing test replaced. 1321/1321
+  passing after this milestone.
+- **Docs** — new `docs/security-hardening.md`.
 
 ## Delivered in Milestone 27
 
