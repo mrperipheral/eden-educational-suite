@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Reports;
 use App\Http\Controllers\Controller;
 use App\Models\AcademicSession;
 use App\Reports\PromotionReport;
+use App\Support\Csv\CsvSanitizer;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -56,21 +57,21 @@ class PromotionReportController extends Controller
                 fputcsv($handle, ['Student', 'Admission number', 'Graduated on', 'Session', 'Notes']);
                 $this->report->graduationHistoryQuery($filters)->chunk(200, function ($chunk) use ($handle) {
                     foreach ($chunk as $student) {
-                        fputcsv($handle, [$student->fullName(), $student->admission_number, $student->graduated_at?->toDateString(), $student->graduatedSession?->name, $student->graduation_notes]);
+                        fputcsv($handle, CsvSanitizer::row([$student->fullName(), $student->admission_number, $student->graduated_at?->toDateString(), $student->graduatedSession?->name, $student->graduation_notes]));
                     }
                 });
             } else {
                 fputcsv($handle, ['Source', 'Target', 'Status', 'Students', 'Created by', 'Created at']);
                 $this->report->batchesQuery($filters)->chunk(200, function ($chunk) use ($handle) {
                     foreach ($chunk as $batch) {
-                        fputcsv($handle, [
+                        fputcsv($handle, CsvSanitizer::row([
                             trim(($batch->sourceLevel?->name ?? '').' '.($batch->sourceArm?->name ?? '').' ('.($batch->sourceSession?->name ?? '').')'),
                             trim(($batch->targetLevel?->name ?? '').' '.($batch->targetArm?->name ?? '').' ('.($batch->targetSession?->name ?? '').')'),
                             $batch->status?->label(),
                             $batch->records_count,
                             $batch->createdBy?->name,
                             $batch->created_at?->toDateTimeString(),
-                        ]);
+                        ]));
                     }
                 });
             }

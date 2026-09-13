@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Controllers\Reports\Concerns\BuildsReportFilterOptions;
 use App\Models\User;
 use App\Reports\AttendanceReport;
+use App\Support\Csv\CsvSanitizer;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -78,7 +79,7 @@ class AttendanceReportController extends Controller
 
         $this->report->studentAttendanceQuery($filters, $user)->chunk(200, function ($chunk) use ($handle) {
             foreach ($chunk as $row) {
-                fputcsv($handle, [
+                fputcsv($handle, CsvSanitizer::row([
                     $row->student?->fullName(),
                     $row->student?->admission_number,
                     $row->days_marked,
@@ -86,7 +87,7 @@ class AttendanceReportController extends Controller
                     $row->days_absent,
                     $row->days_late,
                     $row->days_excused,
-                ]);
+                ]));
             }
         });
     }
@@ -99,10 +100,10 @@ class AttendanceReportController extends Controller
         fputcsv($handle, ['Level', 'Arm', 'Registers submitted', 'Total marks', 'Present marks', 'Absence marks', 'Attendance %']);
 
         foreach ($this->report->classAttendance($filters, $user) as $row) {
-            fputcsv($handle, [
+            fputcsv($handle, CsvSanitizer::row([
                 $row['level_name'], $row['arm_name'], $row['registers_submitted'],
                 $row['total_marks'], $row['present_marks'], $row['absence_marks'], $row['attendance_percentage'],
-            ]);
+            ]));
         }
     }
 
@@ -114,7 +115,7 @@ class AttendanceReportController extends Controller
         fputcsv($handle, ['Date', 'Total marks', 'Present marks', 'Attendance %']);
 
         foreach ($this->report->trend($filters, $user) as $row) {
-            fputcsv($handle, [$row['attendance_date'], $row['total_marks'], $row['present_marks'], $row['attendance_percentage']]);
+            fputcsv($handle, CsvSanitizer::row([$row['attendance_date'], $row['total_marks'], $row['present_marks'], $row['attendance_percentage']]));
         }
     }
 

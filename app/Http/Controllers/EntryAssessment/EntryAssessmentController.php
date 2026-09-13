@@ -11,6 +11,7 @@ use App\Models\EntryAssessment;
 use App\Models\Student;
 use App\Models\Subject;
 use App\Services\Audit\AuditRecorder;
+use App\Support\Csv\CsvSanitizer;
 use App\Support\EntryAssessment\EntryAssessmentAuthorizer;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
@@ -70,7 +71,7 @@ class EntryAssessmentController extends Controller
             $query->chunk(200, function (Collection $chunk) use ($handle) {
                 foreach ($chunk as $assessment) {
                     /** @var EntryAssessment $assessment */
-                    fputcsv($handle, [
+                    fputcsv($handle, CsvSanitizer::row([
                         $assessment->candidate_name,
                         $assessment->admission_reference,
                         $assessment->assessed_on->toDateString(),
@@ -84,7 +85,7 @@ class EntryAssessmentController extends Controller
                         $assessment->status->label(),
                         $assessment->assessor?->name,
                         $assessment->notes,
-                    ]);
+                    ]));
                 }
             });
 

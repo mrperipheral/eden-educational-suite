@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Controllers\Reports\Concerns\BuildsReportFilterOptions;
 use App\Models\Examination;
 use App\Reports\CbtReport;
+use App\Support\Csv\CsvSanitizer;
 use App\Support\Reports\ReportAuthorizer;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -80,11 +81,11 @@ class CbtReportController extends Controller
 
             $this->report->examinationSummaryQuery($filters, $user)->chunk(200, function ($chunk) use ($handle) {
                 foreach ($chunk as $exam) {
-                    fputcsv($handle, [
+                    fputcsv($handle, CsvSanitizer::row([
                         $exam->title, $exam->session?->name, $exam->level?->name, $exam->arm?->name, $exam->subject?->name,
                         $exam->status?->label(), $exam->attempts_count, $exam->completed_attempts_count, $exam->passed_attempts_count,
                         $exam->average_percentage !== null ? round((float) $exam->average_percentage, 2) : null,
-                    ]);
+                    ]));
                 }
             });
 

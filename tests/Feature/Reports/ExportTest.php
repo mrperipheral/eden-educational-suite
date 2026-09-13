@@ -3,6 +3,7 @@
 namespace Tests\Feature\Reports;
 
 use App\Enums\Role;
+use App\Models\AuditLog;
 use App\Models\FeePayment;
 use App\Models\Student;
 
@@ -106,28 +107,63 @@ class ExportTest extends ReportsTestCase
         $this->get(route('reports.promotion.export'))->assertForbidden();
     }
 
-    public function test_export_csv_rows_are_safely_escaped_against_formula_injection_style_content(): void
+    /**
+     * M28 security hardening — CSV/formula-injection regression. A cell
+     * whose text starts with `=`, `+`, `-`, or `@` is read as a formula by
+     * Excel/Sheets/LibreOffice on open; a school-controlled free-text field
+     * (here, a student's name and a graduation note — both genuinely
+     * attacker-reachable by any staff member who can edit a student record)
+     * must never reach the exported CSV unneutralized. Unlike the test this
+     * replaced, this one actually parses the returned CSV row with
+     * `str_getcsv()` and asserts the malicious cell was prefixed — not just
+     * that the response didn't crash — and exercises an export that
+     * genuinely renders the tampered field (the aggregate-only student
+     * enrollment export never did).
+     */
+    public function test_export_csv_rows_neutralize_formula_injection_payloads(): void
     {
-        // A student whose name starts with a formula-trigger character must
-        // still round-trip as plain CSV text, never break the stream.
         $school = $this->newSchool();
         $scaffold = $this->scaffold($school);
         $this->enterSchool($school);
-        Student::factory()->create([
-            'first_name' => '=SUM(1+1)', 'last_name' => 'Test',
-        ])->enrollments()->create([
-            'academic_session_id' => $scaffold['session']->id,
-            'academic_level_id' => $scaffold['level']->id,
-            'level_arm_id' => $scaffold['arm']->id,
-            'status' => 'active',
-            'started_on' => $scaffold['session']->starts_on->toDateString(),
+        $student = Student::factory()->create([
+            'first_name' => '=SUM(1+1)', 'last_name' => 'Attacker', 'status' => 'graduated',
+            'graduated_academic_session_id' => $scaffold['session']->id,
+            'graduated_at' => now(),
+            'graduation_notes' => '+cmd|\'/c calc\'!A0',
         ]);
         $this->app->forgetScopedInstances();
 
         $this->actingAsMemberOf($school, Role::SchoolAdmin);
 
-        $response = $this->get(route('reports.students.export'));
-        $response->assertOk();
-        $this->assertNotEmpty($response->streamedContent());
+        $csv = $this->get(route('reports.promotion.export', ['tab' => 'graduation']))->streamedContent();
+        $lines = array_values(array_filter(explode("\n", trim($csv))));
+        $this->assertCount(2, $lines, 'header + exactly the one graduated student');
+
+        $cells = str_getcsv($lines[1]);
+        $this->assertStringStartsWith("'=SUM(1+1)", $cells[0], 'the student name cell must be prefixed to defuse the leading =');
+        $this->assertStringContainsString('Attacker', $cells[0]);
+        $this->assertSame("'+cmd|'/c calc'!A0", $cells[4], 'the graduation-notes cell must be prefixed to defuse the leading +');
+    }
+
+    public function test_audit_log_export_neutralizes_formula_injection_in_the_summary_cell(): void
+    {
+        $school = $this->newSchool();
+        $this->actingAsMemberOf($school, Role::SchoolAdmin);
+
+        $this->enterSchool($school);
+        AuditLog::query()->create([
+            'school_id' => $school->id,
+            'actor_id' => null,
+            'actor_name' => 'Tester',
+            'event' => 'test.formula_injection',
+            'summary' => '=HYPERLINK("http://attacker.example")',
+        ]);
+        $this->app->forgetScopedInstances();
+
+        $csv = $this->get(route('audit-log.export'))->streamedContent();
+        $lines = array_values(array_filter(explode("\n", trim($csv))));
+        $row = str_getcsv(end($lines));
+
+        $this->assertSame("'=HYPERLINK(\"http://attacker.example\")", $row[4]);
     }
 }

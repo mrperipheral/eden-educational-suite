@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Reports;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Reports\Concerns\BuildsReportFilterOptions;
 use App\Reports\FeeReport;
+use App\Support\Csv\CsvSanitizer;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -84,14 +85,14 @@ class FeeReportController extends Controller
         fputcsv($handle, ['Student', 'Admission number', 'Total charged', 'Discount', 'Waived', 'Outstanding balance']);
 
         $this->report->exportOutstandingBalances($filters, function ($row) use ($handle) {
-            fputcsv($handle, [
+            fputcsv($handle, CsvSanitizer::row([
                 $row->student?->fullName(),
                 $row->student?->admission_number,
                 $row->total_amount,
                 $row->total_discount,
                 $row->total_waived,
                 $row->outstanding_balance,
-            ]);
+            ]));
         });
     }
 
@@ -104,14 +105,14 @@ class FeeReportController extends Controller
 
         $this->report->paymentActivityQuery($filters)->chunk(200, function ($chunk) use ($handle) {
             foreach ($chunk as $payment) {
-                fputcsv($handle, [
+                fputcsv($handle, CsvSanitizer::row([
                     $payment->payment_date?->toDateString(),
                     $payment->student?->fullName(),
                     $payment->student?->admission_number,
                     $payment->amount,
                     $payment->method?->label(),
                     $payment->reference,
-                ]);
+                ]));
             }
         });
     }

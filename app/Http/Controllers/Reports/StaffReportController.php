@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Reports;
 
 use App\Http\Controllers\Controller;
 use App\Reports\StaffReport;
+use App\Support\Csv\CsvSanitizer;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -46,13 +47,13 @@ class StaffReportController extends Controller
             fputcsv($handle, []);
             fputcsv($handle, ['Subject', 'Active assignments']);
             foreach ($summary['by_subject'] as $row) {
-                fputcsv($handle, [$row->subject?->name, $row->total]);
+                fputcsv($handle, CsvSanitizer::row([$row->subject?->name, $row->total]));
             }
 
             fputcsv($handle, []);
             fputcsv($handle, ['Teacher', 'Active assignment count']);
             foreach ($summary['workload'] as $row) {
-                fputcsv($handle, [$row->teacher?->fullName(), $row->assignment_count]);
+                fputcsv($handle, CsvSanitizer::row([$row->teacher?->fullName(), $row->assignment_count]));
             }
 
             fclose($handle);

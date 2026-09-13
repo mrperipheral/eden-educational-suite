@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Reports;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Reports\Concerns\BuildsReportFilterOptions;
 use App\Reports\StudentReport;
+use App\Support\Csv\CsvSanitizer;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -57,13 +58,13 @@ class StudentReportController extends Controller
             fputcsv($handle, []);
             fputcsv($handle, ['Level', 'Students']);
             foreach ($summary['by_level'] as $row) {
-                fputcsv($handle, [$row->level?->name, $row->total]);
+                fputcsv($handle, CsvSanitizer::row([$row->level?->name, $row->total]));
             }
 
             fputcsv($handle, []);
             fputcsv($handle, ['Level', 'Arm', 'Students']);
             foreach ($summary['by_arm'] as $row) {
-                fputcsv($handle, [$row->level?->name, $row->arm?->name, $row->total]);
+                fputcsv($handle, CsvSanitizer::row([$row->level?->name, $row->arm?->name, $row->total]));
             }
 
             fclose($handle);

@@ -5,8 +5,10 @@ namespace App\Providers;
 use App\Enums\Module;
 use App\Support\Modules\SchoolModules;
 use App\Support\Tenancy\TenantContext;
+use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Blade;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
@@ -65,5 +67,15 @@ class AppServiceProvider extends ServiceProvider
                 ? $rule->min(10)->mixedCase()->uncompromised()
                 : $rule;
         });
+
+        // M28: named rate limiters for the two classes of route the security
+        // review flagged as expensive/sensitive and unthrottled — CSV/report
+        // exports (potentially wide, unbounded-by-page queries) and Paystack
+        // payment initiation (an external API call + a new DB row per hit).
+        // Keyed by user id — every route these guard sits behind `auth`
+        // already, so there is always one.
+        RateLimiter::for('exports', fn ($request) => Limit::perMinute(20)->by($request->user()?->getAuthIdentifier()));
+
+        RateLimiter::for('payment-initiation', fn ($request) => Limit::perMinute(10)->by($request->user()?->getAuthIdentifier()));
     }
 }

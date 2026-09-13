@@ -179,7 +179,7 @@ Route::middleware(['auth', 'verified', 'active'])->group(function () {
             Route::get('/', [AuditLogController::class, 'index'])
                 ->can('audit.view')->name('index');
             Route::get('export', [AuditLogController::class, 'export'])
-                ->can('audit.view')->name('export');
+                ->middleware('throttle:exports')->can('audit.view')->name('export');
             Route::get('{auditLog}', [AuditLogController::class, 'show'])
                 ->whereNumber('auditLog')->can('audit.view')->name('show');
         });
@@ -210,49 +210,49 @@ Route::middleware(['auth', 'verified', 'active'])->group(function () {
 
             Route::middleware('module:results')->prefix('academic')->name('academic.')->group(function () {
                 Route::get('/', [AcademicReportController::class, 'index'])->can('reports.view')->name('index');
-                Route::get('export', [AcademicReportController::class, 'export'])->can('reports.export')->name('export');
+                Route::get('export', [AcademicReportController::class, 'export'])->middleware('throttle:exports')->can('reports.export')->name('export');
             });
 
             Route::middleware('module:attendance')->prefix('attendance')->name('attendance.')->group(function () {
                 Route::get('/', [AttendanceReportController::class, 'index'])->can('reports.view')->name('index');
-                Route::get('export', [AttendanceReportController::class, 'export'])->can('reports.export')->name('export');
+                Route::get('export', [AttendanceReportController::class, 'export'])->middleware('throttle:exports')->can('reports.export')->name('export');
             });
 
             Route::middleware('module:fees')->prefix('fees')->name('fees.')->group(function () {
                 Route::get('/', [FeeReportController::class, 'index'])->can('reports.view')->name('index');
-                Route::get('export', [FeeReportController::class, 'export'])->can('reports.export')->name('export');
+                Route::get('export', [FeeReportController::class, 'export'])->middleware('throttle:exports')->can('reports.export')->name('export');
             });
 
             Route::middleware('module:students')->prefix('students')->name('students.')->group(function () {
                 Route::get('/', [StudentReportController::class, 'index'])->can('reports.view')->name('index');
-                Route::get('export', [StudentReportController::class, 'export'])->can('reports.export')->name('export');
+                Route::get('export', [StudentReportController::class, 'export'])->middleware('throttle:exports')->can('reports.export')->name('export');
             });
 
             Route::middleware('module:staff')->prefix('staff')->name('staff.')->group(function () {
                 Route::get('/', [StaffReportController::class, 'index'])->can('reports.view')->name('index');
-                Route::get('export', [StaffReportController::class, 'export'])->can('reports.export')->name('export');
+                Route::get('export', [StaffReportController::class, 'export'])->middleware('throttle:exports')->can('reports.export')->name('export');
             });
 
             Route::middleware('module:cbt')->prefix('cbt')->name('cbt.')->group(function () {
                 Route::get('/', [CbtReportController::class, 'index'])->can('reports.view')->name('index');
-                Route::get('export', [CbtReportController::class, 'export'])->can('reports.export')->name('export');
+                Route::get('export', [CbtReportController::class, 'export'])->middleware('throttle:exports')->can('reports.export')->name('export');
                 Route::get('{examination}/attempts', [CbtReportController::class, 'attempts'])
                     ->whereNumber('examination')->can('reports.view')->name('attempts');
             });
 
             Route::middleware('module:promotion')->prefix('promotion')->name('promotion.')->group(function () {
                 Route::get('/', [PromotionReportController::class, 'index'])->can('reports.view')->name('index');
-                Route::get('export', [PromotionReportController::class, 'export'])->can('reports.export')->name('export');
+                Route::get('export', [PromotionReportController::class, 'export'])->middleware('throttle:exports')->can('reports.export')->name('export');
             });
 
             Route::middleware('module:learning-materials')->prefix('learning-materials')->name('learning-materials.')->group(function () {
                 Route::get('/', [LearningMaterialReportController::class, 'index'])->can('reports.view')->name('index');
-                Route::get('export', [LearningMaterialReportController::class, 'export'])->can('reports.export')->name('export');
+                Route::get('export', [LearningMaterialReportController::class, 'export'])->middleware('throttle:exports')->can('reports.export')->name('export');
             });
 
             Route::middleware('module:notifications')->prefix('communication')->name('communication.')->group(function () {
                 Route::get('/', [CommunicationReportController::class, 'index'])->can('reports.view')->name('index');
-                Route::get('export', [CommunicationReportController::class, 'export'])->can('reports.export')->name('export');
+                Route::get('export', [CommunicationReportController::class, 'export'])->middleware('throttle:exports')->can('reports.export')->name('export');
             });
         });
 
@@ -927,7 +927,7 @@ Route::middleware(['auth', 'verified', 'active'])->group(function () {
             Route::get('/', [EntryAssessmentController::class, 'index'])
                 ->can('placement.view')->name('index');
             Route::get('export', [EntryAssessmentController::class, 'export'])
-                ->can('placement.view')->name('export');
+                ->middleware('throttle:exports')->can('placement.view')->name('export');
             Route::get('create', [EntryAssessmentController::class, 'create'])
                 ->can('placement.record')->name('create');
             Route::post('/', [EntryAssessmentController::class, 'store'])
@@ -1061,7 +1061,7 @@ Route::middleware(['auth', 'verified', 'active'])->group(function () {
                 Route::get('children/{student}/fees/pay', [ParentOnlinePaymentController::class, 'create'])
                     ->whereNumber('student')->can('portal.parent')->name('fees.pay.create');
                 Route::post('children/{student}/fees/pay', [ParentOnlinePaymentController::class, 'store'])
-                    ->whereNumber('student')->can('portal.parent')->name('fees.pay.store');
+                    ->whereNumber('student')->middleware('throttle:payment-initiation')->can('portal.parent')->name('fees.pay.store');
                 Route::get('children/{student}/fees/pay/callback', [ParentOnlinePaymentController::class, 'callback'])
                     ->whereNumber('student')->can('portal.parent')->name('fees.pay.callback');
             });
@@ -1130,7 +1130,7 @@ Route::middleware(['auth', 'verified', 'active'])->group(function () {
                 Route::get('fees/pay', [StudentOnlinePaymentController::class, 'create'])
                     ->can('portal.student')->name('fees.pay.create');
                 Route::post('fees/pay', [StudentOnlinePaymentController::class, 'store'])
-                    ->can('portal.student')->name('fees.pay.store');
+                    ->middleware('throttle:payment-initiation')->can('portal.student')->name('fees.pay.store');
                 Route::get('fees/pay/callback', [StudentOnlinePaymentController::class, 'callback'])
                     ->can('portal.student')->name('fees.pay.callback');
             });

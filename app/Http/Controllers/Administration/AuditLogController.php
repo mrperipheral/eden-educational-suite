@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Administration;
 
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
+use App\Support\Csv\CsvSanitizer;
 use App\Support\Tenancy\TenantContext;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -70,14 +71,14 @@ class AuditLogController extends Controller
             $query->chunk(200, function (Collection $chunk) use ($handle) {
                 foreach ($chunk as $log) {
                     /** @var AuditLog $log */
-                    fputcsv($handle, [
+                    fputcsv($handle, CsvSanitizer::row([
                         $log->created_at?->toDateTimeString(),
                         $log->event,
                         $log->actor_name,
                         $log->auditable_label,
                         $log->summary,
                         $log->ip_address,
-                    ]);
+                    ]));
                 }
             });
 

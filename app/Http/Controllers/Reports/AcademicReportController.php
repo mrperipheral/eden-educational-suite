@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Reports;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Reports\Concerns\BuildsReportFilterOptions;
 use App\Reports\AcademicReport;
+use App\Support\Csv\CsvSanitizer;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -80,7 +81,7 @@ class AcademicReportController extends Controller
 
         $this->report->studentPerformanceQuery($filters, $user)->chunk(200, function ($chunk) use ($handle) {
             foreach ($chunk as $row) {
-                fputcsv($handle, [
+                fputcsv($handle, CsvSanitizer::row([
                     $row->student?->fullName(),
                     $row->student?->admission_number,
                     $row->academic_level_id,
@@ -89,7 +90,7 @@ class AcademicReportController extends Controller
                     $row->position,
                     $row->class_size,
                     $row->overall_grade_code_snapshot,
-                ]);
+                ]));
             }
         });
     }
@@ -102,12 +103,12 @@ class AcademicReportController extends Controller
         fputcsv($handle, ['Subject', 'Students assessed', 'Average %', 'Grade distribution']);
 
         foreach ($this->report->subjectPerformance($filters, $user) as $row) {
-            fputcsv($handle, [
+            fputcsv($handle, CsvSanitizer::row([
                 $row['subject_name'],
                 $row['students_assessed'],
                 $row['average_percentage'],
                 $this->formatGradeDistribution($row['grades']),
-            ]);
+            ]));
         }
     }
 
@@ -119,13 +120,13 @@ class AcademicReportController extends Controller
         fputcsv($handle, ['Level', 'Arm', 'Students', 'Average %', 'Grade distribution']);
 
         foreach ($this->report->classPerformance($filters, $user) as $row) {
-            fputcsv($handle, [
+            fputcsv($handle, CsvSanitizer::row([
                 $row['level_name'],
                 $row['arm_name'],
                 $row['student_count'],
                 $row['average_percentage'],
                 $this->formatGradeDistribution($row['grades']),
-            ]);
+            ]));
         }
     }
 
@@ -138,14 +139,14 @@ class AcademicReportController extends Controller
 
         $this->report->resultRunSummaryQuery($filters, $user)->chunk(200, function ($chunk) use ($handle) {
             foreach ($chunk as $row) {
-                fputcsv($handle, [
+                fputcsv($handle, CsvSanitizer::row([
                     $row->session?->name,
                     $row->period?->name,
                     $row->level?->name,
                     $row->arm?->name,
                     $row->status?->label(),
                     $row->student_results_count,
-                ]);
+                ]));
             }
         });
     }

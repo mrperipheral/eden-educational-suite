@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Reports;
 
 use App\Http\Controllers\Controller;
 use App\Reports\LearningMaterialReport;
+use App\Support\Csv\CsvSanitizer;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -45,7 +46,7 @@ class LearningMaterialReportController extends Controller
             fputcsv($handle, []);
             fputcsv($handle, ['Subject', 'Materials']);
             foreach ($summary['by_subject'] as $row) {
-                fputcsv($handle, [$row->subject?->name, $row->total]);
+                fputcsv($handle, CsvSanitizer::row([$row->subject?->name, $row->total]));
             }
 
             fclose($handle);
