@@ -272,6 +272,10 @@ Route::middleware(['auth', 'verified', 'active'])->group(function () {
                 ->can('school.settings.update')->name('branding.logo.destroy');
             Route::get('branding/logo', [SchoolSettingsController::class, 'showLogo'])
                 ->can('school.settings.view')->name('branding.logo.show');
+            Route::delete('branding/cover', [SchoolSettingsController::class, 'destroyCover'])
+                ->can('school.settings.update')->name('branding.cover.destroy');
+            Route::get('branding/cover', [SchoolSettingsController::class, 'showCover'])
+                ->can('school.settings.view')->name('branding.cover.show');
 
             Route::get('regional', [SchoolSettingsController::class, 'regional'])
                 ->can('school.settings.view')->name('regional.edit');

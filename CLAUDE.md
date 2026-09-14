@@ -210,3 +210,23 @@ Eloquent `::create()` per row), and a `--fresh` cleanup path that accounts
 for any deliberate `restrictOnDelete()` FKs it needs to work around (e.g.
 `fee_payment_allocations.student_fee_charge_id`). See
 `docs/performance-scalability.md`.
+
+**The product/platform name is Eden Education Suite (M29.5, `config('app.name')`)
+— inside a school's own portal the school's own identity dominates, never
+the platform's.** Extend `SchoolSetting` branding the same way `logo_path`/
+`brand_color` were built: a guarded column + a `put*()`/`clear*()`/`has*()`
+trio for a file, a plain fillable column for text/colour, served only
+through a gated private route, never the public disk. Any UI that paints
+text on top of a custom colour must pick its text colour via
+`SchoolSetting::readableTextColor()`, never assume light or dark. Custom
+colour stays bounded to specific, documented UI spots (never a global
+Tailwind re-theme — see `docs/ui-ux-guidelines.md` §"School branding /
+theme") — this is not a website builder, and no arbitrary CSS/HTML input
+should ever be added to it.
+
+**The sidebar nav's "See more" split (M29.5) lives once, in
+`authenticated.blade.php`, after the existing per-audience `$navLinks` is
+built and permission/module-filtered — do not add a second nav-building
+path for it.** It only toggles visibility (`x-show`); every authorized link
+stays in the rendered HTML either way. See `docs/ui-ux-guidelines.md`
+§"Sidebar navigation" for the exact split.

@@ -819,6 +819,38 @@ assessment-score-backed fixture (reviewed by code inspection instead, since
 it already uses the same proven bulk-insert technique as the rest of the
 codebase), database read replicas / connection pooling / opcache tuning.
 
+## Since Milestone 29 — UI/UX, Branding & Mobile Experience (not a milestone, complete)
+
+A scoped refinement pass, not M30: "Eden Education Suite provides the
+platform. The school owns the experience." The platform is now branded Eden
+Education Suite (`config('app.name')`); inside a school's own portal, the
+school's identity — name, logo, cover image, colours, motto — dominates via
+three new `school_settings` columns (`accent_color`, `cover_image_path`,
+`motto`) extending the existing M6 branding pattern exactly (guarded
+columns, `put*()`/`clear*()`, private-disk storage, gated serving), plus a
+safe-contrast helper (`SchoolSetting::readableTextColor()`) so a custom
+colour never produces unreadable text. Every dashboard gained a
+time-of-day-aware greeting and small, reused-data-only additions (a
+Teacher's/Student's own timetable for today, a Parent's per-child
+fees/results summary, a Bursar's recent payments) — no invented metrics, no
+new per-row queries (the Parent summary is bulk-queried across all linked
+children in one query, not one query per child). The sidebar gained a
+"See more" collapse for long, permission-filtered menus and a proper mobile
+drawer close affordance (button + Escape key); 11 report/report-card tables
+that previously had no small-screen handling now scroll within their own
+container instead of forcing page-wide horizontal scroll. The CBT
+exam-taking screen (`student/cbt/take.blade.php`) was rebuilt for phones —
+sticky timer/progress header, sticky Previous/Next/Submit footer with
+safe-area padding, larger touch targets — with **zero changes** to
+`ExamAttemptService`, `ExamAttempt`, or `StudentExamAttemptController`; all
+111 pre-existing CBT tests pass unchanged, proving server-side exam
+integrity was untouched. Tagged `product-ui-ux-mobile-complete`. Full detail
+in `docs/ui-ux-guidelines.md` and `docs/school-settings.md`.
+
+Deferred, deliberately out of scope: a full per-school theme/CSS override or
+website builder, dark mode, an icon system, a toast/notification system, a
+custom data-grid/table component.
+
 ## Milestone 30+ — Domain Modules
 
 Each domain module checks its `App\Enums\Module` flag (`module:` middleware /

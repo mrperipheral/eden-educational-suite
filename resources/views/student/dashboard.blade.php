@@ -1,5 +1,7 @@
 <x-layouts.authenticated :title="__('Dashboard')">
     <div class="space-y-6">
+        <x-greeting :context="__('Here\'s what\'s on today.')" />
+
         @if (session('status'))
             <x-alert variant="success">{{ session('status') }}</x-alert>
         @endif
@@ -36,6 +38,26 @@
                     <p class="mt-3 text-sm italic text-gray-500">{{ __('Not currently enrolled in a class.') }}</p>
                 @endif
             </x-card>
+
+            @isset($todayClasses)
+                <x-card :title="__('Your classes today')">
+                    @if ($todayClasses->isEmpty())
+                        <x-empty-state :title="__('No classes scheduled for today')" />
+                    @else
+                        <ul class="divide-y divide-gray-100">
+                            @foreach ($todayClasses as $entry)
+                                <li class="flex items-center justify-between gap-3 py-2 text-sm">
+                                    <div class="min-w-0">
+                                        <p class="truncate font-medium text-gray-900">{{ $entry->subject?->name }}</p>
+                                        <p class="truncate text-xs text-gray-500">{{ $entry->teacher?->fullName() }}</p>
+                                    </div>
+                                    <span class="shrink-0 font-mono text-xs text-gray-500">{{ $entry->start_time }}–{{ $entry->end_time }}</span>
+                                </li>
+                            @endforeach
+                        </ul>
+                    @endif
+                </x-card>
+            @endisset
 
             <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 <x-card :title="__('Results')">

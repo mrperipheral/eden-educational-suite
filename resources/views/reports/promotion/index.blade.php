@@ -46,7 +46,8 @@
                 <x-empty-state :title="__('No graduation records match')" />
             @else
                 <x-card :padding="false">
-                    <table class="min-w-full divide-y divide-gray-100 text-sm">
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-100 text-sm">
                         <thead><tr class="text-left text-xs font-medium text-gray-500">
                             <th class="px-4 py-2">{{ __('Student') }}</th><th class="px-4 py-2">{{ __('Admission #') }}</th>
                             <th class="px-4 py-2">{{ __('Graduated on') }}</th><th class="px-4 py-2">{{ __('Session') }}</th>
@@ -62,6 +63,7 @@
                             @endforeach
                         </tbody>
                     </table>
+                    </div>
                 </x-card>
                 {{ $graduationHistory->links() }}
             @endif
@@ -70,7 +72,8 @@
                 <x-empty-state :title="__('No promotion batches match')" />
             @else
                 <x-card :padding="false">
-                    <table class="min-w-full divide-y divide-gray-100 text-sm">
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-100 text-sm">
                         <thead><tr class="text-left text-xs font-medium text-gray-500">
                             <th class="px-4 py-2">{{ __('Source') }}</th><th class="px-4 py-2">{{ __('Target') }}</th>
                             <th class="px-4 py-2">{{ __('Status') }}</th><th class="px-4 py-2">{{ __('Students') }}</th>
@@ -88,6 +91,7 @@
                             @endforeach
                         </tbody>
                     </table>
+                    </div>
                 </x-card>
                 {{ $batches->links() }}
             @endif

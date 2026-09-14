@@ -254,11 +254,107 @@ automatically by `<x-layouts.app>` as alerts.
   (`focus-visible:ring`), use semantic elements, provide `aria-*` on custom
   widgets.
 
+## Product identity (M29.5)
+
+The platform's own name is **Eden Education Suite** (`config('app.name')`).
+Inside a school's own portal, the school's identity dominates — the sidebar
+header shows the school's name, logo (if uploaded) and "School Portal", with
+a single small "Powered by Eden Education Suite" line underneath. Eden
+Education Suite is never shown prominently on a page that already has an
+active school context. It *is* shown prominently: on the pre-auth
+`<x-layouts.guest>` pages (no school context exists yet — see
+"School branding" below), on the platform home page (`resources/views/welcome.blade.php`),
+and on Platform Admin screens with no active school (`/admin/*` before a
+school is entered — the sidebar shows "Eden Education Suite" / "Platform
+Administration" instead of a school name).
+
+## School branding / theme (M29.5)
+
+`SchoolSetting` (`docs/school-settings.md`) carries five branding fields:
+`logo_path`, `cover_image_path` (both file uploads, guarded, served through
+a gated private route — see `docs/school-settings.md` §4), `brand_color`,
+`accent_color` (both `#rrggbb`, validated by regex, normalised lower-case)
+and `motto` (plain text, max 160 chars). All are tenant-scoped like every
+other `SchoolSetting` column — nothing here bypasses `BelongsToSchool` /
+`SchoolScope`. Colour is applied narrowly and deliberately, never as a
+site-wide re-theme: the sidebar's top accent bar and the cover-image overlay
+use `brand_color` via a scoped inline `style` attribute on specific
+elements, not a CSS variable override of the compiled `brand-*` Tailwind
+scale (Tailwind v4's `@theme` tokens are compile-time, not safely
+overridable per-request). `SchoolSetting::readableTextColor()` picks black
+or white text by relative luminance so a custom colour never produces
+unreadable text — use it (never assume a colour is "light" or "dark") if you
+add another spot that paints text on top of a custom colour. This is a
+bounded branding feature, not a website builder: there is no arbitrary
+CSS/HTML input anywhere in it.
+
+## Personalized greeting (M29.5)
+
+`<x-greeting :context="...">` (`resources/views/components/greeting.blade.php`)
+renders "Good morning/afternoon/evening, {first name} 👋" based on the
+server clock (05:00–11:59 morning, 12:00–16:59 afternoon, 17:00–04:59
+evening) plus an optional one-line contextual subtitle. Used at the top of
+each dashboard (`dashboard.blade.php`, `parent/dashboard.blade.php`,
+`student/dashboard.blade.php`, `fees/dashboard.blade.php`,
+`platform/reports/index.blade.php`) — not in the shared layout itself, since
+it's a page-level greeting, not chrome.
+
+## Sidebar navigation — "See more" (M29.5)
+
+The nav array for each audience (default staff/admin, Parent, Student —
+still built in `authenticated.blade.php`, see below) is split after
+authorization filtering: the first 7 items (6 for the Parent/Student
+portals, which are already short) render directly, and everything after
+that sits behind a "See more" / "See less" toggle
+(`x-data="{ moreOpen: ... }"`, no new Alpine plugin — plain `x-show`/
+`x-transition`, matching the existing mobile-drawer pattern). The toggle
+starts open if the current page happens to be one of the collapsed items,
+so a deep link never lands on an apparently-unhighlighted nav. Collapsing is
+purely a `display` toggle — every authorized link is still in the rendered
+HTML, so this never hides functionality from anything that inspects the
+page (tests included) — it only affects what's visible without a click. Do
+not add a second, independent nav-building code path for this: the split
+happens once, after the existing per-audience `$navLinks` collections are
+built and filtered by `allowed`, in `authenticated.blade.php`.
+
+## Mobile CBT (M29.5)
+
+`resources/views/student/cbt/take.blade.php` — the exam-taking screen — was
+restyled for phone-first use (sticky timer/progress header under the app
+bar, sticky Previous/Next/Submit footer with `env(safe-area-inset-bottom)`
+padding, larger touch targets, a slim answered/total progress bar) without
+touching a single line of `App\Services\Cbt\ExamAttemptService`,
+`App\Models\ExamAttempt`, or `StudentExamAttemptController`. The
+timer/progress/answer-selection Alpine `x-data` object is unchanged in
+substance — same properties, same methods, same three server endpoints
+(`student.cbt.answer`, `student.cbt.submit`). **If you touch this view
+again: the client-side timer is cosmetic only** — server-side expiry
+(`ExamAttempt::isExpired()` against a DB-stored `expires_at`) is the only
+thing that ever actually ends an attempt; never let a UI change imply
+otherwise, and never add correctness/marks data to the payload passed into
+`x-data` (see `ResultReleaseTest::test_correct_answers_are_never_present_in_the_take_page_payload`).
+
+## A constant, bounded query for branding
+
+Because the sidebar now reads `$currentSchool->settings` on every
+authenticated page (to show the logo/cover/colour), every page now costs
+exactly one more query than before M29.5 — a flat, non-scaling cost (one
+`SchoolSetting` row, never proportional to a collection). Two existing
+N+1-regression tests had their fixed query-count ceiling raised by 1 to
+absorb this (`TimetableStructureTest::test_the_teacher_view_does_not_n_plus_one`,
+`AssessmentStructureTest::test_the_assessment_list_does_not_n_plus_one`) —
+if you add a *new* page-level query that shows up in every request the same
+way, the right response is the same: confirm it's flat (not proportional to
+a collection), then adjust the specific ceiling(s) it pushes over, with a
+comment saying why — never loosen a budget to "make it pass" without
+identifying the actual cause first.
+
 ## Not yet defined
 
 Dark mode, dense/table layouts, data-grid, charts, iconography system,
 notification/toast system. The primary nav is permission- and
 module-filtered (Dashboard · Members · Students · Guardians · Teachers ·
 Timetable · Attendance · Assessments · Results · Academic · School settings ·
-Schools · Account) but not
-yet role-specific / collapsible. Add here when built.
+Schools · Account), role-specific in content (same filtering, different
+audiences) and collapsible via "See more" (M29.5, above). Add here when
+built.

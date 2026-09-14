@@ -1,5 +1,7 @@
 <x-layouts.authenticated :title="__('Platform Reports')">
     <div class="space-y-6">
+        <x-greeting :context="__('Eden Education Suite — platform-wide activity across every school.')" />
+
         <p class="text-sm"><a href="{{ route('admin.schools.index') }}" class="text-brand-600 hover:text-brand-700">{{ __('← Schools') }}</a></p>
 
         <x-alert variant="info">
@@ -53,7 +55,8 @@
         </x-card>
 
         <x-card :title="__('Module adoption')" :padding="false">
-            <table class="min-w-full divide-y divide-gray-100 text-sm">
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-100 text-sm">
                 <thead><tr class="text-left text-xs font-medium text-gray-500"><th class="px-4 py-2">{{ __('Module') }}</th><th class="px-4 py-2">{{ __('Schools enabled') }}</th></tr></thead>
                 <tbody class="divide-y divide-gray-100">
                     @foreach ($moduleAdoption as $row)
@@ -71,6 +74,7 @@
                     @endforeach
                 </tbody>
             </table>
+            </div>
         </x-card>
     </div>
 </x-layouts.authenticated>

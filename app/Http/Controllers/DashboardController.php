@@ -8,6 +8,8 @@ use App\Enums\Role;
 use App\Enums\UserStatus;
 use App\Models\AuditLog;
 use App\Models\School;
+use App\Models\Teacher;
+use App\Models\TimetableEntry;
 use App\Reports\DashboardReport;
 use App\Support\Modules\SchoolModules;
 use App\Support\Tenancy\TenantContext;
@@ -48,7 +50,44 @@ class DashboardController extends Controller
             // array here just means "nothing this viewer may see yet",
             // never a misleading zero for a disabled module.
             'kpis' => $modules->enabled(Module::Reports) ? $dashboardReport->kpis($request->user()) : [],
+            'todayClasses' => $this->todayClasses($request, $school, $modules),
         ]);
+    }
+
+    /**
+     * M29.5 — a Teacher's own lessons for today, straight from the Timetable
+     * module's own data (no new metric, no new table): the lessons whose
+     * `teacher_id` matches this user's linked {@see Teacher} record, on
+     * today's weekday (in the school's own timezone), from a *published*
+     * timetable only. Two bounded queries (the teacher lookup, the entries
+     * themselves) regardless of how many lessons or teachers the school has.
+     *
+     * @return Collection<int, TimetableEntry>|null null when the module is
+     *                                              off, the viewer can't see timetables, or they have no linked
+     *                                              teacher record (nothing to show, not an error).
+     */
+    private function todayClasses(Request $request, School $school, SchoolModules $modules): ?Collection
+    {
+        if (! $modules->enabled(Module::Timetable) || ! $request->user()->hasPermission(Permission::TimetableView)) {
+            return null;
+        }
+
+        $teacher = Teacher::query()->where('user_id', $request->user()->id)->first();
+
+        if ($teacher === null) {
+            return null;
+        }
+
+        $today = now($school->settings?->timezone ?? config('app.timezone'))->dayOfWeek;
+
+        return TimetableEntry::query()
+            ->where('teacher_id', $teacher->id)
+            ->where('weekday', $today)
+            ->whereHas('timetable', fn ($q) => $q->published())
+            ->with(['level:id,name', 'arm:id,name', 'subject:id,name'])
+            ->orderBy('start_time')
+            ->limit(8)
+            ->get();
     }
 
     /**

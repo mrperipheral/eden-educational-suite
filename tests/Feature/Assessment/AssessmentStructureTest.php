@@ -161,7 +161,11 @@ class AssessmentStructureTest extends AssessmentTestCase
         $queries = count(DB::getQueryLog());
         DB::disableQueryLog();
 
-        $this->assertLessThan(20, $queries, "the assessment list ran {$queries} queries for 15 assessments");
+        // Budget is 21, not 20: M29.5 added one constant, non-scaling query
+        // per authenticated page — the sidebar's school-branding lookup
+        // (`$currentSchool->settings`, resources/views/components/layouts/authenticated.blade.php)
+        // — which this ceiling must absorb once, not per assessment.
+        $this->assertLessThan(21, $queries, "the assessment list ran {$queries} queries for 15 assessments");
     }
 
     public function test_bulk_score_save_does_not_run_a_query_per_student_for_reads(): void

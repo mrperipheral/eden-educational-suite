@@ -32,6 +32,8 @@ Request `authorize()` enforce it.
 | PATCH | `/settings/school/branding` | `settings.school.branding.update` | `school.settings.update` |
 | DELETE | `/settings/school/branding/logo` | `settings.school.branding.logo.destroy` | `school.settings.update` |
 | GET | `/settings/school/branding/logo` | `settings.school.branding.logo.show` | `school.settings.view` |
+| DELETE | `/settings/school/branding/cover` | `settings.school.branding.cover.destroy` | `school.settings.update` |
+| GET | `/settings/school/branding/cover` | `settings.school.branding.cover.show` | `school.settings.view` |
 | GET | `/settings/school/regional` | `settings.school.regional.edit` | `school.settings.view` |
 | PATCH | `/settings/school/regional` | `settings.school.regional.update` | `school.settings.update` |
 
@@ -66,8 +68,17 @@ platform-controlled tenant identifiers, shown read-only on the Profile page.
 | Column | Rules |
 |--------|-------|
 | `brand_color` | nullable, `regex:/^#[0-9a-fA-F]{6}$/`; lower-cased in `prepareForValidation` |
+| `accent_color` (M29.5) | nullable, `regex:/^#[0-9a-fA-F]{6}$/`; lower-cased in `prepareForValidation` |
+| `motto` (M29.5) | nullable, string, max 160 |
 | `logo_path` | **guarded** — never mass-assignable; written only by `SchoolSetting::putLogo()` / `clearLogo()` |
+| `cover_image_path` (M29.5) | **guarded** — never mass-assignable; written only by `SchoolSetting::putCover()` / `clearCover()` |
 | `logo` (input, not a column) | nullable, `file`, `mimetypes:image/jpeg,image/png,image/webp` (content sniff, not extension), `max:2048` KB, `dimensions` 48–1600px each side |
+| `cover` (input, not a column, M29.5) | nullable, `file`, `mimetypes:image/jpeg,image/png,image/webp`, `max:4096` KB, `dimensions` min 320×120 |
+
+`SchoolSetting::readableTextColor(?string $hex): string` (M29.5) picks
+`#111827` (dark) or `#ffffff` (light) by relative luminance, so a UI painting
+text on top of a custom `brand_color`/`accent_color` never produces
+unreadable text — see `docs/ui-ux-guidelines.md` §"School branding / theme".
 
 ### Regional (`UpdateSchoolRegionalRequest`)
 
@@ -92,15 +103,24 @@ Model `$attributes`, the migration column defaults, and
 ## 4. Branding upload & serving
 
 - Stored on the **private `local` disk** (`config/filesystems.php`), never the
-  public disk: `storage/app/private/school-logos/{tenant_id}/{random}.{ext}`.
-- Served only through `GET /settings/school/branding/logo`, gated
-  `school.settings.view`, via `Storage::disk('local')->response()` with
+  public disk: `storage/app/private/school-logos/{tenant_id}/{random}.{ext}`
+  (cover images: `school-covers/{tenant_id}/{random}.{ext}`, M29.5, identical
+  pattern).
+- Served only through `GET /settings/school/branding/logo` (or `.../cover`),
+  gated `school.settings.view`, via `Storage::disk('local')->response()` with
   `Cache-Control: private`. **No path parameter** → no traversal; the handler
-  only ever serves the current tenant's `logo_path`.
+  only ever serves the current tenant's `logo_path` / `cover_image_path`.
 - Cross-school isolation: a School B user in B's context hits B's (empty)
   branding and 404s — school A's file is unreachable (tested).
-- `putLogo()` deletes the previous file on replace; `clearLogo()` deletes on
-  remove. Both go through the model, never mass assignment.
+- `putLogo()` / `putCover()` delete the previous file on replace;
+  `clearLogo()` / `clearCover()` delete on remove. All four go through the
+  model, never mass assignment.
+- Used outside the settings pages: the school-identity block in
+  `resources/views/components/layouts/authenticated.blade.php`'s sidebar
+  (logo + cover as a background, `brand_color` as a top accent bar) and the
+  report card (`results/report-card/show.blade.php`, logo only, unchanged
+  from M6) both read through these same gated routes — never a direct
+  `Storage::` call from a view.
 
 ## 5. Authorization & tenancy
 
@@ -135,6 +155,7 @@ Model `$attributes`, the migration column defaults, and
 | Currencies/countries/locales in `config/`, not a package or table | small, rarely-changed, safe to config-cache; no new dependency |
 | `DateFormat` value = a `date()` string; `Weekday` = Carbon numbering | callers format/compute directly with no mapping layer |
 | Principal/Bursar read-only, no new permission | administrative config is a School Admin function; smaller permission surface |
+| Accent colour used only on bounded UI spots (sidebar bar, cover overlay), never a global re-theme (M29.5) | Tailwind v4 `@theme` tokens are compile-time; a safe, narrow use of custom colour beats an unsafe global override |
 | `academic_year_start_month` lives in settings | it is a school-wide calendar preference; Academic Management reads it |
 
 ## 8. Deferred
@@ -148,3 +169,7 @@ Model `$attributes`, the migration column defaults, and
 - Applying `date_format` / `timezone` / `locale` app-wide at render time (the
   values are stored and validated; wiring display formatting is incremental).
 - Logo CDN / `s3` disk in production (the disk abstraction already supports it).
+- A full per-school theme/CSS override, a website/landing-page builder, or
+  applying `accent_color` beyond the specific bounded UI spots documented in
+  `docs/ui-ux-guidelines.md` §"School branding / theme" — deliberately out of
+  scope for M29.5, not merely unbuilt.

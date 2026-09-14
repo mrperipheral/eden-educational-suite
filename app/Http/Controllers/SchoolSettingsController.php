@@ -63,7 +63,11 @@ class SchoolSettingsController extends Controller
     {
         $settings = $this->settings();
         $before = $settings->getAttributes();
-        $settings->fill(['brand_color' => $request->validated()['brand_color'] ?? null])->save();
+        $settings->fill([
+            'brand_color' => $request->validated()['brand_color'] ?? null,
+            'accent_color' => $request->validated()['accent_color'] ?? null,
+            'motto' => $request->validated()['motto'] ?? null,
+        ])->save();
 
         if ($request->hasFile('logo')) {
             $path = $request->file('logo')->store(
@@ -72,6 +76,15 @@ class SchoolSettingsController extends Controller
             );
 
             $settings->putLogo($path);
+        }
+
+        if ($request->hasFile('cover')) {
+            $path = $request->file('cover')->store(
+                'school-covers/'.$this->tenant->idOrFail(),
+                SchoolSetting::COVER_DISK,
+            );
+
+            $settings->putCover($path);
         }
 
         $settings->markReviewed();
@@ -115,6 +128,35 @@ class SchoolSettingsController extends Controller
 
         return Storage::disk(SchoolSetting::LOGO_DISK)
             ->response($settings->logo_path, 'logo', ['Cache-Control' => 'private, max-age=300']);
+    }
+
+    public function destroyCover(): RedirectResponse
+    {
+        $this->authorize('school.settings.update');
+
+        $settings = $this->settings();
+        $settings->clearCover();
+
+        $this->audit->record(
+            event: 'settings.branding_updated',
+            summary: __(':actor removed the school cover image.', ['actor' => request()->user()->name]),
+            auditable: $settings,
+            auditableLabel: $this->tenant->schoolOrFail()->name,
+        );
+
+        return to_route('settings.school.branding.edit')->with('status', __('Cover image removed.'));
+    }
+
+    public function showCover(): StreamedResponse|Response
+    {
+        $this->authorize('school.settings.view');
+
+        $settings = $this->settings();
+
+        abort_unless($settings->hasCover(), 404);
+
+        return Storage::disk(SchoolSetting::COVER_DISK)
+            ->response($settings->cover_image_path, 'cover', ['Cache-Control' => 'private, max-age=300']);
     }
 
     // -- Regional -----------------------------------------------------

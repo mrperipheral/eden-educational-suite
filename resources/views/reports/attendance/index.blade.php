@@ -72,7 +72,8 @@
                 <x-empty-state :title="__('No attendance data matches')" :description="__('Only submitted registers are counted.')" />
             @else
                 <x-card :padding="false">
-                    <table class="min-w-full divide-y divide-gray-100 text-sm">
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-100 text-sm">
                         <thead><tr class="text-left text-xs font-medium text-gray-500">
                             <th class="px-4 py-2">{{ __('Student') }}</th><th class="px-4 py-2">{{ __('Admission #') }}</th>
                             <th class="px-4 py-2">{{ __('Marked') }}</th><th class="px-4 py-2">{{ __('Present') }}</th>
@@ -92,6 +93,7 @@
                             @endforeach
                         </tbody>
                     </table>
+                    </div>
                 </x-card>
                 {{ $studentAttendance->links() }}
             @endif
@@ -100,7 +102,8 @@
                 <x-empty-state :title="__('No class attendance data matches')" />
             @else
                 <x-card :padding="false">
-                    <table class="min-w-full divide-y divide-gray-100 text-sm">
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-100 text-sm">
                         <thead><tr class="text-left text-xs font-medium text-gray-500">
                             <th class="px-4 py-2">{{ __('Level') }}</th><th class="px-4 py-2">{{ __('Arm') }}</th>
                             <th class="px-4 py-2">{{ __('Registers') }}</th><th class="px-4 py-2">{{ __('Absences') }}</th>
@@ -118,6 +121,7 @@
                             @endforeach
                         </tbody>
                     </table>
+                    </div>
                 </x-card>
             @endif
         @else
@@ -125,7 +129,8 @@
                 <x-empty-state :title="__('No attendance trend data matches')" />
             @else
                 <x-card :padding="false">
-                    <table class="min-w-full divide-y divide-gray-100 text-sm">
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-100 text-sm">
                         <thead><tr class="text-left text-xs font-medium text-gray-500">
                             <th class="px-4 py-2">{{ __('Date') }}</th><th class="px-4 py-2">{{ __('Marked') }}</th>
                             <th class="px-4 py-2">{{ __('Present') }}</th><th class="px-4 py-2">{{ __('Attendance %') }}</th>
@@ -148,6 +153,7 @@
                             @endforeach
                         </tbody>
                     </table>
+                    </div>
                 </x-card>
             @endif
         @endif

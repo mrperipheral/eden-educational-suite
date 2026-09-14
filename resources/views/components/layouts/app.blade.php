@@ -16,12 +16,17 @@
         Application shell.
 
         Desktop  : fixed sidebar + top header + scrollable main content.
-        Mobile   : compact header with a hamburger that opens a slide-in drawer.
+        Mobile   : compact header with a hamburger that opens a slide-in drawer
+                   (closes on backdrop click, Escape, or the drawer's own close
+                   button), capped at 85vw so a small phone never has it fill
+                   the whole screen.
 
-        Role-specific navigation is intentionally NOT built here yet. Later
-        milestones inject navigation via the $navigation slot / a view composer.
+        Role-specific navigation and the school-identity sidebar header are
+        intentionally NOT built here — this shell stays generic. They're
+        injected via the $navigation and $brandHeader slots by
+        <x-layouts.authenticated> (see docs/ui-ux-guidelines.md).
     --}}
-    <div x-data="{ sidebarOpen: false }" class="min-h-full">
+    <div x-data="{ sidebarOpen: false }" @keydown.escape.window="sidebarOpen = false" class="min-h-full">
         {{-- Mobile drawer backdrop --}}
         <div
             x-show="sidebarOpen"
@@ -33,14 +38,24 @@
 
         {{-- Sidebar --}}
         <aside
-            class="fixed inset-y-0 left-0 z-50 w-64 transform border-r border-gray-200 bg-white transition-transform duration-200 ease-in-out lg:translate-x-0"
+            class="fixed inset-y-0 left-0 z-50 flex w-72 max-w-[85vw] transform flex-col border-r border-gray-200 bg-white transition-transform duration-200 ease-in-out lg:w-64 lg:max-w-none lg:translate-x-0"
             :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'"
             x-cloak
         >
-            <div class="flex h-16 items-center gap-2 border-b border-gray-200 px-6">
-                <span class="text-lg font-semibold text-brand-700">{{ config('app.name') }}</span>
-            </div>
-            <nav class="flex flex-col gap-1 p-4" aria-label="Primary">
+            <button
+                type="button"
+                @click="sidebarOpen = false"
+                class="absolute right-3 top-3 rounded-md p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600 lg:hidden"
+                aria-label="{{ __('Close navigation') }}"
+            >
+                <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" />
+                </svg>
+            </button>
+
+            {{ $brandHeader ?? '' }}
+
+            <nav class="flex flex-1 flex-col gap-1 overflow-y-auto p-4" aria-label="{{ __('Primary') }}">
                 {{ $navigation ?? '' }}
             </nav>
         </aside>
@@ -48,23 +63,23 @@
         {{-- Content column --}}
         <div class="lg:pl-64">
             {{-- Header --}}
-            <header class="sticky top-0 z-30 flex h-16 items-center gap-4 border-b border-gray-200 bg-white/95 px-4 backdrop-blur sm:px-6">
+            <header class="sticky top-0 z-30 flex h-16 items-center gap-3 border-b border-gray-200 bg-white/95 px-3 backdrop-blur sm:gap-4 sm:px-6">
                 <button
                     type="button"
                     @click="sidebarOpen = true"
-                    class="-ml-1 rounded-md p-2 text-gray-500 hover:bg-gray-100 lg:hidden"
-                    aria-label="Open navigation"
+                    class="-ml-1 shrink-0 rounded-md p-2 text-gray-500 hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 lg:hidden"
+                    aria-label="{{ __('Open navigation') }}"
                 >
                     <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
                     </svg>
                 </button>
 
-                <div class="flex-1">
+                <div class="min-w-0 flex-1">
                     {{ $header ?? '' }}
                 </div>
 
-                <div class="flex items-center gap-3">
+                <div class="flex shrink-0 items-center gap-2 sm:gap-3">
                     {{ $headerActions ?? '' }}
                 </div>
             </header>

@@ -19,7 +19,8 @@
             @if ($summary['by_subject']->isEmpty())
                 <div class="p-4"><x-empty-state :title="__('No active teaching assignments yet')" /></div>
             @else
-                <table class="min-w-full divide-y divide-gray-100 text-sm">
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-100 text-sm">
                     <thead><tr class="text-left text-xs font-medium text-gray-500"><th class="px-4 py-2">{{ __('Subject') }}</th><th class="px-4 py-2">{{ __('Active assignments') }}</th></tr></thead>
                     <tbody class="divide-y divide-gray-100">
                         @foreach ($summary['by_subject'] as $row)
@@ -27,6 +28,7 @@
                         @endforeach
                     </tbody>
                 </table>
+                </div>
             @endif
         </x-card>
 
@@ -34,7 +36,8 @@
             @if ($summary['workload']->isEmpty())
                 <div class="p-4"><x-empty-state :title="__('No active teaching assignments yet')" /></div>
             @else
-                <table class="min-w-full divide-y divide-gray-100 text-sm">
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-100 text-sm">
                     <thead><tr class="text-left text-xs font-medium text-gray-500"><th class="px-4 py-2">{{ __('Teacher') }}</th><th class="px-4 py-2">{{ __('Active assignments') }}</th></tr></thead>
                     <tbody class="divide-y divide-gray-100">
                         @foreach ($summary['workload'] as $row)
@@ -42,6 +45,7 @@
                         @endforeach
                     </tbody>
                 </table>
+                </div>
             @endif
         </x-card>
     </div>

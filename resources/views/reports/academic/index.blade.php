@@ -75,7 +75,8 @@
                 <x-empty-state :title="__('No result runs match')" />
             @else
                 <x-card :padding="false">
-                    <table class="min-w-full divide-y divide-gray-100 text-sm">
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-100 text-sm">
                         <thead><tr class="text-left text-xs font-medium text-gray-500">
                             <th class="px-4 py-2">{{ __('Session') }}</th><th class="px-4 py-2">{{ __('Period') }}</th>
                             <th class="px-4 py-2">{{ __('Level') }}</th><th class="px-4 py-2">{{ __('Arm') }}</th>
@@ -94,6 +95,7 @@
                             @endforeach
                         </tbody>
                     </table>
+                    </div>
                 </x-card>
                 {{ $runs->links() }}
             @endif
@@ -102,7 +104,8 @@
                 <x-empty-state :title="__('No student results match')" :description="__('Only published or locked result runs appear here.')" />
             @else
                 <x-card :padding="false">
-                    <table class="min-w-full divide-y divide-gray-100 text-sm">
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-100 text-sm">
                         <thead><tr class="text-left text-xs font-medium text-gray-500">
                             <th class="px-4 py-2">{{ __('Student') }}</th><th class="px-4 py-2">{{ __('Admission #') }}</th>
                             <th class="px-4 py-2">{{ __('Average %') }}</th><th class="px-4 py-2">{{ __('Position') }}</th>
@@ -121,6 +124,7 @@
                             @endforeach
                         </tbody>
                     </table>
+                    </div>
                 </x-card>
                 {{ $studentResults->links() }}
             @endif
@@ -129,7 +133,8 @@
                 <x-empty-state :title="__('No subject performance data matches')" />
             @else
                 <x-card :padding="false">
-                    <table class="min-w-full divide-y divide-gray-100 text-sm">
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-100 text-sm">
                         <thead><tr class="text-left text-xs font-medium text-gray-500">
                             <th class="px-4 py-2">{{ __('Subject') }}</th><th class="px-4 py-2">{{ __('Assessed') }}</th>
                             <th class="px-4 py-2">{{ __('Average %') }}</th><th class="px-4 py-2">{{ __('Grade distribution') }}</th>
@@ -149,6 +154,7 @@
                             @endforeach
                         </tbody>
                     </table>
+                    </div>
                 </x-card>
             @endif
         @else
@@ -156,7 +162,8 @@
                 <x-empty-state :title="__('No class performance data matches')" />
             @else
                 <x-card :padding="false">
-                    <table class="min-w-full divide-y divide-gray-100 text-sm">
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-100 text-sm">
                         <thead><tr class="text-left text-xs font-medium text-gray-500">
                             <th class="px-4 py-2">{{ __('Level') }}</th><th class="px-4 py-2">{{ __('Arm') }}</th>
                             <th class="px-4 py-2">{{ __('Students') }}</th><th class="px-4 py-2">{{ __('Average %') }}</th>
@@ -178,6 +185,7 @@
                             @endforeach
                         </tbody>
                     </table>
+                    </div>
                 </x-card>
             @endif
         @endif

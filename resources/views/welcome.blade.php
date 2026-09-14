@@ -22,12 +22,10 @@
 
     <main class="flex flex-1 items-center justify-center px-4 py-16">
         <div class="w-full max-w-lg text-center">
-            <p class="text-sm font-medium uppercase tracking-wide text-brand-600">School Management Platform</p>
-            <h1 class="mt-2 text-2xl font-semibold text-gray-900">One platform for running your school</h1>
+            <p class="text-sm font-medium uppercase tracking-wide text-brand-600">{{ __('Eden Education Suite') }}</p>
+            <h1 class="mt-2 text-2xl font-semibold text-gray-900">{{ __('One platform for running your school') }}</h1>
             <p class="mt-3 text-sm text-gray-500">
-                A multi-school management system for nursery, primary and secondary schools.
-                Sign in to your account, or create one to get started. School setup and the
-                management modules arrive in upcoming releases.
+                {{ __('A multi-school management platform for nursery, primary and secondary schools — your school\'s own portal, powered by Eden Education Suite. Sign in to your account, or create one to get started.') }}
             </p>
         </div>
     </main>

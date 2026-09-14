@@ -48,6 +48,7 @@
 
             <p class="mb-4 text-center text-sm font-semibold uppercase tracking-wide text-gray-700">{{ __('Termly Report Card') }}</p>
 
+            <div class="overflow-x-auto">
             <table class="mb-4 w-full text-sm">
                 <tbody>
                     <tr>
@@ -82,7 +83,9 @@
                     </tr>
                 </tbody>
             </table>
+            </div>
 
+            <div class="overflow-x-auto">
             <table class="mb-4 w-full border-collapse text-xs">
                 <thead>
                     <tr class="border-b-2 border-gray-300 text-left">
@@ -111,8 +114,10 @@
                     @endforelse
                 </tbody>
             </table>
+            </div>
 
             @if ($c->show_overall_total || $c->show_overall_average || $c->show_overall_position || $c->show_overall_class_size)
+                <div class="overflow-x-auto">
                 <table class="mb-4 w-full text-sm">
                     <tbody>
                         <tr>
@@ -139,9 +144,11 @@
                         @endif
                     </tbody>
                 </table>
+                </div>
             @endif
 
             @if (($c->show_attendance_days_opened || $c->show_attendance_days_present || $c->show_attendance_days_absent || $c->show_attendance_percentage) && $studentResult->hasAttendanceData())
+                <div class="overflow-x-auto">
                 <table class="mb-4 w-full text-sm">
                     <tbody>
                         <tr>
@@ -164,6 +171,7 @@
                         </tr>
                     </tbody>
                 </table>
+                </div>
             @endif
 
             @if (($c->show_class_teacher_comment && $studentResult->class_teacher_comment) || ($c->show_principal_comment && $studentResult->principal_comment))

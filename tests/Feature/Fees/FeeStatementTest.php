@@ -173,4 +173,25 @@ class FeeStatementTest extends FeesTestCase
 
         $this->assertLessThan(25, $queries, "the statement ran {$queries} queries for 10 charges + 10 payments");
     }
+
+    /**
+     * M29.5 — the fees dashboard's "Recent payments" widget. Regression
+     * guard: it eager-loads the paying student with a trimmed column list
+     * and calls `Student::fullName()` (which also reads `middle_name`) — a
+     * student with a middle name must render without a
+     * MissingAttributeException.
+     */
+    public function test_the_fees_dashboard_shows_recent_payments_including_the_students_full_name(): void
+    {
+        $school = $this->newSchool();
+        $scaffold = $this->scaffold($school);
+        $student = $this->enrolledStudent($school, $scaffold, ['middle_name' => 'Adaeze']);
+        $this->paymentFor($school, $student, ['amount' => '4000.00']);
+
+        $this->actingAsRole($school, Role::Bursar);
+        $response = $this->get(route('fees.index'))->assertOk();
+
+        $response->assertSee('Recent payments');
+        $response->assertSee($student->fullName());
+    }
 }

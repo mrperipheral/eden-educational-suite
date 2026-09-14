@@ -2,6 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Models\User;
+use Carbon\Carbon;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ViewErrorBag;
@@ -13,6 +16,8 @@ use Tests\TestCase;
  */
 class UiComponentsTest extends TestCase
 {
+    use RefreshDatabase;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -62,5 +67,38 @@ class UiComponentsTest extends TestCase
         $html = Blade::render('<x-layouts.guest>Sign in form</x-layouts.guest>');
 
         $this->assertStringContainsString('Sign in form', $html);
+    }
+
+    // -- M29.5: personalized greeting ------------------------------------
+
+    public function test_greeting_shows_the_right_message_for_the_time_of_day(): void
+    {
+        $this->actingAs(User::factory()->create(['name' => 'Ada Lovelace']));
+
+        $cases = [
+            '05:00' => 'Good morning, Ada',
+            '11:59' => 'Good morning, Ada',
+            '12:00' => 'Good afternoon, Ada',
+            '16:59' => 'Good afternoon, Ada',
+            '17:00' => 'Good evening, Ada',
+            '02:00' => 'Good evening, Ada',
+            '04:59' => 'Good evening, Ada',
+        ];
+
+        foreach ($cases as $time => $expected) {
+            Carbon::setTestNow(Carbon::parse($time));
+            $this->assertStringContainsString($expected, Blade::render('<x-greeting />'), "at {$time}");
+        }
+
+        Carbon::setTestNow();
+    }
+
+    public function test_greeting_shows_an_optional_context_line(): void
+    {
+        $this->actingAs(User::factory()->create(['name' => 'Ada Lovelace']));
+
+        $html = Blade::render('<x-greeting :context="$context" />', ['context' => 'Here is your day.']);
+
+        $this->assertStringContainsString('Here is your day.', $html);
     }
 }

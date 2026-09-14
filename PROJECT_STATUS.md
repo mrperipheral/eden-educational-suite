@@ -5,9 +5,11 @@ _Last updated: 2026-09-13_
 ## Current milestone
 
 **Milestone 29 — Performance, Scalability & Reliability Validation: COMPLETE.**
+Since M29: a non-milestone UI/UX, branding and mobile-experience refinement
+pass (`product-ui-ux-mobile-complete`) — see "Since Milestone 29" below.
 
-Next up: further **Domain Modules**. Not started — do not begin without
-picking one up explicitly. See `docs/roadmap.md`.
+Next up: further **Domain Modules** (M30+). Not started — do not begin
+without picking one up explicitly. See `docs/roadmap.md`.
 
 ## What the application is
 
@@ -61,8 +63,8 @@ Vite · PHPUnit · Pint.
   `docs/audit.md`.
 - **M27 — Advanced Reporting & Analytics** (`advanced-reporting-analytics-complete`) — `docs/reporting.md`.
 - **M28 — Platform Security Hardening** (`platform-security-hardening-complete`) — `docs/security-hardening.md`.
-- **M29 — Performance, Scalability & Reliability Validation** (this
-  milestone, `performance-scalability-complete`) —
+- **M29 — Performance, Scalability & Reliability Validation**
+  (`performance-scalability-complete`) —
   `docs/performance-scalability.md`; see below.
 
 ## Delivered in Milestone 29
@@ -115,6 +117,70 @@ security testing. Full detail in `docs/performance-scalability.md`.
 - **Docs** — new `docs/performance-scalability.md`; `PROJECT_STATUS.md`,
   `docs/roadmap.md`, `CLAUDE.md` updated (the large-data-fixture-stays-
   separate rule).
+
+## Since Milestone 29 — UI/UX, Branding & Mobile Experience
+
+**Not a numbered milestone** (M30 has not started) — a scoped UI/UX, school
+branding and mobile-experience refinement pass across the existing product,
+tagged `product-ui-ux-mobile-complete`. No new domain module, no backend
+architecture change, no route/permission/tenancy change beyond what's listed
+below.
+
+- **Product identity** — the platform is now branded **Eden Education
+  Suite** (`config('app.name')`, `.env`/`.env.example`
+  `APP_NAME="Eden Education Suite"`). Inside a school's own portal the
+  school's identity dominates (sidebar shows the school's name/logo/"School
+  Portal" with a small "Powered by Eden Education Suite" line); Eden
+  Education Suite is shown prominently only pre-auth and on Platform Admin
+  screens with no active school.
+- **School branding extended** — `school_settings` gained `accent_color`,
+  `cover_image_path` and `motto` (migration
+  `2026_10_05_100000_add_theme_fields_to_school_settings_table`), following
+  the exact existing `logo_path`/`brand_color` pattern (guarded columns +
+  `put*()`/`clear*()`/`has*()`, private-disk storage, gated serving routes).
+  New `SchoolSetting::readableTextColor()` picks safe (light/dark) text over
+  a custom colour. Colour use stays bounded to specific UI spots — not a
+  global re-theme, not a website builder. Tenant isolation is automatic
+  (`BelongsToSchool`), proven by 10 new tests alongside the 8 pre-existing
+  ones in `SchoolBrandingTest`.
+- **Dashboards** — every role's dashboard gained a personalized greeting
+  (`<x-greeting>`, time-of-day aware) and reused-data-only additions: a
+  Teacher's/Student's own "Today's classes" (from the existing Timetable
+  module, published timetables only), a Parent's per-child outstanding-fees
+  and latest-result summary (bulk-queried, not per-child — see below), and a
+  Bursar's "Recent payments" panel. No new metrics were invented; every
+  figure reuses an existing model/relationship.
+- **Mobile-first UI** — the mobile nav drawer got a close button, an Escape
+  handler, and an 85vw cap; a new sidebar "See more" collapse (first 6–7 nav
+  items visible, the rest behind a toggle that auto-opens if the current
+  page is in it — every authorized link still renders in the HTML either
+  way); 11 report/report-card tables that previously had no small-screen
+  handling now scroll within their own `overflow-x-auto` container instead
+  of forcing page-wide horizontal scroll.
+- **Mobile CBT (high priority)** — `student/cbt/take.blade.php` rewritten
+  for phone-first use: sticky timer/progress header, sticky Previous/Next/
+  Submit footer (with safe-area padding for notched phones), larger touch
+  targets, a visible answered/total progress bar, `aria-label`s on the
+  question-navigator circles. **Zero changes** to
+  `App\Services\Cbt\ExamAttemptService`, `App\Models\ExamAttempt`, or
+  `StudentExamAttemptController` — server-side timing/marking/authorization
+  is exactly as it was; all 111 pre-existing CBT tests still pass unchanged.
+- **A known, bounded cost** — the sidebar's branding lookup
+  (`$currentSchool->settings`) now runs once per authenticated page, a flat
+  +1 query that doesn't scale with any collection. Two existing fixed-
+  ceiling N+1-regression tests (`TimetableStructureTest`,
+  `AssessmentStructureTest`) had their budget raised by exactly 1, with a
+  comment explaining why — found by running the full suite, not assumed.
+- **Docs** — `docs/ui-ux-guidelines.md` gained five new sections (product
+  identity, school branding/theme, greeting, "See more" nav, mobile CBT, the
+  constant-query note); `docs/school-settings.md` updated for the three new
+  branding fields and routes; `CLAUDE.md` updated with the branding-
+  extension and nav-split conventions.
+- **21 new/extended tests**, all genuine (10 new branding-field tests, 2 new
+  greeting tests, 5 new navigation tests, plus the 2 query-budget fixes and
+  the pre-existing N+1 guard for the Parent dashboard's new per-child
+  summary, which is bulk-queried — see `ParentPortalController` — so it
+  stays flat as a guardian's children count grows).
 
 ## Delivered in Milestone 28
 

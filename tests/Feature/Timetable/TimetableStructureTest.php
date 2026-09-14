@@ -135,7 +135,11 @@ class TimetableStructureTest extends TimetableTestCase
         $queries = count(DB::getQueryLog());
         DB::disableQueryLog();
 
-        $this->assertLessThan(15, $queries, "teacher view ran {$queries} queries for 6 lessons");
+        // Budget is 16, not 15: M29.5 added one constant, non-scaling query
+        // per authenticated page — the sidebar's school-branding lookup
+        // (`$currentSchool->settings`, resources/views/components/layouts/authenticated.blade.php)
+        // — which this ceiling must absorb once, not per lesson.
+        $this->assertLessThan(16, $queries, "teacher view ran {$queries} queries for 6 lessons");
     }
 
     public function test_overlap_checks_are_bounded_when_adding_to_a_busy_timetable(): void

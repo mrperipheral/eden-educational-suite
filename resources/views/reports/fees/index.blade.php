@@ -92,7 +92,8 @@
                 <x-empty-state :title="__('No outstanding charges match')" />
             @else
                 <x-card :padding="false">
-                    <table class="min-w-full divide-y divide-gray-100 text-sm">
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-100 text-sm">
                         <thead><tr class="text-left text-xs font-medium text-gray-500">
                             <th class="px-4 py-2">{{ __('Student') }}</th><th class="px-4 py-2">{{ __('Admission #') }}</th>
                             <th class="px-4 py-2">{{ __('Charged') }}</th><th class="px-4 py-2">{{ __('Discount') }}</th>
@@ -111,6 +112,7 @@
                             @endforeach
                         </tbody>
                     </table>
+                    </div>
                 </x-card>
                 {{ $outstanding->links() }}
             @endif
@@ -119,7 +121,8 @@
                 <x-empty-state :title="__('No payments match')" />
             @else
                 <x-card :padding="false">
-                    <table class="min-w-full divide-y divide-gray-100 text-sm">
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-100 text-sm">
                         <thead><tr class="text-left text-xs font-medium text-gray-500">
                             <th class="px-4 py-2">{{ __('Date') }}</th><th class="px-4 py-2">{{ __('Student') }}</th>
                             <th class="px-4 py-2">{{ __('Amount') }}</th><th class="px-4 py-2">{{ __('Method') }}</th><th class="px-4 py-2">{{ __('Reference') }}</th>
@@ -136,6 +139,7 @@
                             @endforeach
                         </tbody>
                     </table>
+                    </div>
                 </x-card>
                 {{ $payments->links() }}
             @endif

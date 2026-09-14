@@ -13,7 +13,8 @@
             <x-empty-state :title="__('No attempts yet')" />
         @else
             <x-card :padding="false">
-                <table class="min-w-full divide-y divide-gray-100 text-sm">
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-100 text-sm">
                     <thead><tr class="text-left text-xs font-medium text-gray-500">
                         <th class="px-4 py-2">{{ __('Student') }}</th><th class="px-4 py-2">{{ __('Status') }}</th>
                         <th class="px-4 py-2">{{ __('Score') }}</th><th class="px-4 py-2">{{ __('Percentage') }}</th>
@@ -40,6 +41,7 @@
                         @endforeach
                     </tbody>
                 </table>
+                </div>
             </x-card>
             {{ $attempts->links() }}
         @endif

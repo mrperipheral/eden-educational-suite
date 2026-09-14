@@ -60,7 +60,8 @@
             @if ($summary['by_level']->isEmpty())
                 <div class="p-4"><x-empty-state :title="__('No enrollment data yet')" /></div>
             @else
-                <table class="min-w-full divide-y divide-gray-100 text-sm">
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-100 text-sm">
                     <thead><tr class="text-left text-xs font-medium text-gray-500"><th class="px-4 py-2">{{ __('Level') }}</th><th class="px-4 py-2">{{ __('Students') }}</th></tr></thead>
                     <tbody class="divide-y divide-gray-100">
                         @foreach ($summary['by_level'] as $row)
@@ -68,6 +69,7 @@
                         @endforeach
                     </tbody>
                 </table>
+                </div>
             @endif
         </x-card>
 
@@ -75,7 +77,8 @@
             @if ($summary['by_arm']->isEmpty())
                 <div class="p-4"><x-empty-state :title="__('No arm-level enrollment data yet')" /></div>
             @else
-                <table class="min-w-full divide-y divide-gray-100 text-sm">
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-100 text-sm">
                     <thead><tr class="text-left text-xs font-medium text-gray-500"><th class="px-4 py-2">{{ __('Level') }}</th><th class="px-4 py-2">{{ __('Arm') }}</th><th class="px-4 py-2">{{ __('Students') }}</th></tr></thead>
                     <tbody class="divide-y divide-gray-100">
                         @foreach ($summary['by_arm'] as $row)
@@ -83,6 +86,7 @@
                         @endforeach
                     </tbody>
                 </table>
+                </div>
             @endif
         </x-card>
     </div>

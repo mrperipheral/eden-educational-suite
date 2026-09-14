@@ -1,5 +1,7 @@
 <x-layouts.authenticated :title="__('Dashboard')">
     <div class="space-y-6">
+        <x-greeting :context="__('Here\'s what\'s happening at :school today.', ['school' => $school->name])" />
+
         @if (session('status'))
             <x-alert variant="success">{{ session('status') }}</x-alert>
         @endif
@@ -36,10 +38,36 @@
                 {{ __('You are working in') }}
                 <strong>{{ $school->name }}</strong>.
             </p>
+            @if ($school->settings?->motto)
+                <p class="mt-1 text-sm italic text-gray-500">&ldquo;{{ $school->settings->motto }}&rdquo;</p>
+            @endif
             <p class="mt-1 text-xs text-gray-500">
                 {{ __('Everything you see and do is scoped to this school. Other schools\' data is never visible here.') }}
             </p>
         </x-card>
+
+        @isset($todayClasses)
+            <x-card :title="__('Your classes today')">
+                @if ($todayClasses->isEmpty())
+                    <x-empty-state :title="__('No classes scheduled for you today')" />
+                @else
+                    <ul class="divide-y divide-gray-100">
+                        @foreach ($todayClasses as $entry)
+                            <li class="flex items-center justify-between gap-3 py-2 text-sm">
+                                <div class="min-w-0">
+                                    <p class="truncate font-medium text-gray-900">{{ $entry->subject?->name }}</p>
+                                    <p class="truncate text-xs text-gray-500">
+                                        {{ $entry->level?->name }}{{ $entry->arm ? ' — '.$entry->arm->name : '' }}
+                                        @if ($entry->room) · {{ $entry->room }} @endif
+                                    </p>
+                                </div>
+                                <span class="shrink-0 font-mono text-xs text-gray-500">{{ $entry->start_time }}–{{ $entry->end_time }}</span>
+                            </li>
+                        @endforeach
+                    </ul>
+                @endif
+            </x-card>
+        @endisset
 
         @isset($administration)
             <x-card :title="__('Administration')">
@@ -137,7 +165,7 @@
         @else
             <x-empty-state
                 :title="__('Nothing to show yet')"
-                :description="__('This is a placeholder dashboard. Once the school modules are built, this area will show what needs your attention in :school.', ['school' => $school->name])"
+                :description="__('You don\'t currently have access to any reporting cards for :school — ask a School Admin if you believe this is wrong.', ['school' => $school->name])"
             >
                 <x-slot:actions>
                     <x-button :href="route('settings.profile.edit')" variant="secondary" size="sm">

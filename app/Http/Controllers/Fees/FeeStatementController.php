@@ -51,6 +51,15 @@ class FeeStatementController extends Controller
             'totalCharged' => (string) (StudentFeeCharge::query()->selectRaw('COALESCE(SUM(amount), 0) as total')->value('total') ?? '0.00'),
             'totalDiscounted' => (string) (StudentFeeCharge::query()->selectRaw('COALESCE(SUM(discount_amount), 0) as total')->value('total') ?? '0.00'),
             'totalCollected' => (string) (FeePayment::query()->notVoided()->selectRaw('COALESCE(SUM(amount), 0) as total')->value('total') ?? '0.00'),
+            // M29.5 — a small, fixed-size (5) recent-activity list for the
+            // dashboard; not a report, just orientation for the person
+            // opening this screen for the day.
+            'recentPayments' => FeePayment::query()
+                ->notVoided()
+                ->with('student:id,first_name,middle_name,last_name')
+                ->ordered()
+                ->limit(5)
+                ->get(),
         ]);
     }
 

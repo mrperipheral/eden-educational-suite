@@ -1,5 +1,7 @@
 <x-layouts.authenticated :title="__('My Children')">
     <div class="space-y-6">
+        <x-greeting :context="__('A quick look at your children today.')" />
+
         @if (session('status'))
             <x-alert variant="success">{{ session('status') }}</x-alert>
         @endif
@@ -43,6 +45,22 @@
                                 <div class="italic">{{ __('Not currently enrolled in a class.') }}</div>
                             @endif
                         </dl>
+
+                        @if (isset($outstandingByStudent) || isset($latestResultByStudent))
+                            <div class="mt-3 flex flex-wrap gap-x-4 gap-y-1 border-t border-gray-100 pt-3 text-xs">
+                                @if (isset($outstandingByStudent))
+                                    @php($owed = $outstandingByStudent[$student->id] ?? '0.00')
+                                    <span class="{{ bccomp($owed, '0.00', 2) === 1 ? 'font-medium text-red-700' : 'text-gray-500' }}">
+                                        {{ __('Fees owed') }}: {{ $owed }}
+                                    </span>
+                                @endif
+                                @if (isset($latestResultByStudent) && ($result = $latestResultByStudent[$student->id] ?? null))
+                                    <span class="text-gray-500">
+                                        {{ __('Latest result') }}: {{ $result->resultRun?->period?->name ?? $result->resultRun?->session?->name }}
+                                    </span>
+                                @endif
+                            </div>
+                        @endif
 
                         <div class="mt-4">
                             <x-button :href="route('parent.children.show', $student->id)" size="sm" variant="secondary">{{ __('View profile') }}</x-button>

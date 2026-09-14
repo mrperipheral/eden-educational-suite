@@ -142,4 +142,130 @@ class SchoolBrandingTest extends TestCase
             $this->delete('/settings/school/branding/logo')->assertForbidden();
         }
     }
+
+    // -- M29.5: accent colour, motto, cover image ----------------------
+
+    public function test_admin_can_set_an_accent_colour_and_motto(): void
+    {
+        $school = $this->newSchool();
+        $this->actingAsMemberOf($school, Role::SchoolAdmin);
+
+        $this->patch('/settings/school/branding', [
+            'accent_color' => '#F59E0B',
+            'motto' => 'Knowledge. Character. Excellence.',
+        ])->assertRedirect(route('settings.school.branding.edit'));
+
+        $settings = $this->stored($school->id);
+        $this->assertSame('#f59e0b', $settings->accent_color, 'colour is normalised to lower case');
+        $this->assertSame('Knowledge. Character. Excellence.', $settings->motto);
+    }
+
+    public function test_invalid_accent_colour_is_rejected(): void
+    {
+        $school = $this->newSchool();
+        $this->actingAsMemberOf($school, Role::SchoolAdmin);
+
+        $this->from('/settings/school/branding')->patch('/settings/school/branding', [
+            'accent_color' => 'not-a-colour',
+        ])->assertSessionHasErrors('accent_color');
+    }
+
+    public function test_motto_over_160_characters_is_rejected(): void
+    {
+        $school = $this->newSchool();
+        $this->actingAsMemberOf($school, Role::SchoolAdmin);
+
+        $this->from('/settings/school/branding')->patch('/settings/school/branding', [
+            'motto' => str_repeat('a', 161),
+        ])->assertSessionHasErrors('motto');
+    }
+
+    public function test_admin_can_upload_a_cover_image(): void
+    {
+        $school = $this->newSchool();
+        $this->actingAsMemberOf($school, Role::SchoolAdmin);
+
+        $this->patch('/settings/school/branding', [
+            'cover' => UploadedFile::fake()->image('cover.jpg', 800, 300),
+        ])->assertRedirect(route('settings.school.branding.edit'));
+
+        $settings = $this->stored($school->id);
+        $this->assertNotNull($settings->cover_image_path);
+        $this->assertStringStartsWith("school-covers/{$school->id}/", $settings->cover_image_path);
+        Storage::disk('local')->assertExists($settings->cover_image_path);
+    }
+
+    public function test_cover_image_is_served_only_to_authorised_users_and_is_school_scoped(): void
+    {
+        $school = $this->newSchool();
+        $this->actingAsMemberOf($school, Role::SchoolAdmin);
+        $this->patch('/settings/school/branding', ['cover' => UploadedFile::fake()->image('cover.jpg', 800, 300)]);
+
+        // Same school, view-only role: allowed.
+        $this->flushSession();
+        $this->actingAsMemberOf($school, Role::Principal);
+        $this->get('/settings/school/branding/cover')->assertOk();
+
+        // Same school, no settings-view permission: forbidden.
+        $this->flushSession();
+        $this->actingAsMemberOf($school, Role::Teacher);
+        $this->get('/settings/school/branding/cover')->assertForbidden();
+
+        // Another school entirely: cannot reach school A's cover image.
+        $other = $this->newSchool();
+        $this->flushSession();
+        $this->actingAsMemberOf($other, Role::SchoolAdmin);
+        $this->get('/settings/school/branding/cover')->assertNotFound();
+    }
+
+    public function test_admin_can_remove_the_cover_image(): void
+    {
+        $school = $this->newSchool();
+        $this->actingAsMemberOf($school, Role::SchoolAdmin);
+        $this->patch('/settings/school/branding', ['cover' => UploadedFile::fake()->image('cover.jpg', 800, 300)]);
+
+        $path = $this->stored($school->id)->cover_image_path;
+
+        $this->delete('/settings/school/branding/cover')->assertRedirect(route('settings.school.branding.edit'));
+
+        $this->assertNull($this->stored($school->id)->cover_image_path);
+        Storage::disk('local')->assertMissing($path);
+        $this->get('/settings/school/branding/cover')->assertNotFound();
+    }
+
+    public function test_replacing_a_cover_image_deletes_the_previous_file(): void
+    {
+        $school = $this->newSchool();
+        $this->actingAsMemberOf($school, Role::SchoolAdmin);
+
+        $this->patch('/settings/school/branding', ['cover' => UploadedFile::fake()->image('one.jpg', 800, 300)]);
+        $first = $this->stored($school->id)->cover_image_path;
+
+        $this->patch('/settings/school/branding', ['cover' => UploadedFile::fake()->image('two.jpg', 800, 300)]);
+        $second = $this->stored($school->id)->cover_image_path;
+
+        $this->assertNotSame($first, $second);
+        Storage::disk('local')->assertMissing($first);
+        Storage::disk('local')->assertExists($second);
+    }
+
+    public function test_undersized_cover_images_are_rejected_by_the_dimensions_rule(): void
+    {
+        $school = $this->newSchool();
+        $this->actingAsMemberOf($school, Role::SchoolAdmin);
+
+        $this->from('/settings/school/branding')->patch('/settings/school/branding', [
+            'cover' => UploadedFile::fake()->image('tiny.jpg', 100, 50),
+        ])->assertSessionHasErrors('cover');
+    }
+
+    public function test_readable_text_color_chooses_dark_text_on_light_backgrounds_and_light_text_on_dark(): void
+    {
+        $this->assertSame('#111827', SchoolSetting::readableTextColor('#ffffff'));
+        $this->assertSame('#ffffff', SchoolSetting::readableTextColor('#000000'));
+        $this->assertSame('#ffffff', SchoolSetting::readableTextColor('#0b3d66'));
+        // Malformed/missing input never produces an unreadable/blank result.
+        $this->assertSame('#111827', SchoolSetting::readableTextColor(null));
+        $this->assertSame('#111827', SchoolSetting::readableTextColor('not-a-colour'));
+    }
 }

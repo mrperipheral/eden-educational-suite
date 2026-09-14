@@ -11,6 +11,8 @@
     @endcan
 
     <div class="space-y-6">
+        <x-greeting :context="__('Here\'s the fees picture for today.')" />
+
         @if (session('status'))
             <x-alert variant="success">{{ session('status') }}</x-alert>
         @endif
@@ -29,6 +31,26 @@
                 <p class="mt-1 text-2xl font-semibold text-green-700">{{ $money($totalCollected) }}</p>
             </x-card>
         </div>
+
+        @isset($recentPayments)
+            <x-card :title="__('Recent payments')">
+                @if ($recentPayments->isEmpty())
+                    <x-empty-state :title="__('No payments recorded yet')" />
+                @else
+                    <ul class="divide-y divide-gray-100">
+                        @foreach ($recentPayments as $payment)
+                            <li class="flex items-center justify-between gap-3 py-2 text-sm">
+                                <div class="min-w-0">
+                                    <p class="truncate font-medium text-gray-900">{{ $payment->student?->fullName() }}</p>
+                                    <p class="text-xs text-gray-500">{{ $payment->created_at?->diffForHumans() }}</p>
+                                </div>
+                                <span class="shrink-0 font-semibold text-green-700">{{ $money($payment->amount) }}</span>
+                            </li>
+                        @endforeach
+                    </ul>
+                @endif
+            </x-card>
+        @endisset
 
         <form method="GET" action="{{ route('fees.index') }}" class="flex flex-wrap items-end gap-2">
             <div class="flex-1 min-w-[200px]">
