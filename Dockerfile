@@ -53,4 +53,13 @@ RUN sed -ri \
 
 RUN php -m | grep -E 'pgsql|pdo_pgsql' || true
 
+# Run pending migrations against the production database before Apache
+# starts, since Render's free tier has no Shell / Pre-Deploy Command to run
+# them as a one-off. Safe on every boot: Laravel's migration table makes
+# this a no-op once the schema is already up to date.
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
 EXPOSE 80
+
+ENTRYPOINT ["docker-entrypoint.sh"]
