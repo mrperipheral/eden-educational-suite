@@ -1,3 +1,15 @@
+# Build frontend assets separately so Node itself never ships in the final
+# PHP/Apache image.
+FROM node:22-slim AS assets
+
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+RUN npm ci
+
+COPY . .
+RUN npm run build
+
 FROM php:8.3-apache
 
 # Install system dependencies and PHP extensions required by Laravel
@@ -36,6 +48,9 @@ COPY . .
 
 # Install PHP dependencies
 RUN composer install --no-dev --optimize-autoloader --no-interaction
+
+# Compiled frontend assets built in the "assets" stage above
+COPY --from=assets /app/public/build /var/www/html/public/build
 
 # Laravel writable directories
 RUN chown -R www-data:www-data \
