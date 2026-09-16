@@ -88,4 +88,74 @@ class NavigationTest extends TestCase
         $this->assertStringContainsString('Platform Administration', $html);
         $this->assertStringNotContainsString('School Portal', $html);
     }
+
+    public function test_platform_admin_sidebar_shows_the_actual_eden_logo_image(): void
+    {
+        $this->actingAsPlatformAdmin();
+
+        $html = $this->get('/admin/schools')->assertOk()->getContent();
+
+        $this->assertStringContainsString('branding/eden-education-suite-logo.png', $html);
+    }
+
+    // -- M29.5: the sidebar washes in the school's own primary colour -----
+
+    public function test_the_sidebar_uses_the_schools_own_primary_colour_when_configured(): void
+    {
+        $school = $this->newSchool();
+        $this->actingAsMemberOf($school, Role::SchoolAdmin);
+        $this->patch('/settings/school/branding', ['brand_color' => '#123456']);
+
+        $html = $this->get('/dashboard')->assertOk()->getContent();
+
+        $this->assertStringContainsString('background-color: #123456', $html);
+    }
+
+    public function test_the_sidebar_stays_neutral_white_with_no_colour_configured(): void
+    {
+        $school = $this->newSchool();
+        $this->actingAsMemberOf($school, Role::SchoolAdmin);
+
+        $html = $this->get('/dashboard')->assertOk()->getContent();
+
+        $this->assertStringNotContainsString('background-color: #', $html);
+    }
+
+    public function test_school_a_and_school_b_sidebar_colours_never_leak_into_each_other(): void
+    {
+        $a = $this->newSchool();
+        $this->actingAsMemberOf($a, Role::SchoolAdmin);
+        $this->patch('/settings/school/branding', ['brand_color' => '#111111']);
+        $this->flushSession();
+
+        $b = $this->newSchool();
+        $this->actingAsMemberOf($b, Role::SchoolAdmin);
+        $this->patch('/settings/school/branding', ['brand_color' => '#222222']);
+
+        $html = $this->get('/dashboard')->assertOk()->getContent();
+
+        $this->assertStringContainsString('background-color: #222222', $html);
+        $this->assertStringNotContainsString('background-color: #111111', $html);
+    }
+
+    // -- M29.5: item 4 — no "Powered by" line on Parent/Student pages -----
+
+    public function test_the_powered_by_line_never_shows_on_parent_or_student_pages(): void
+    {
+        $school = $this->newSchool();
+
+        $this->actingAsMemberOf($school, Role::Parent);
+        $this->assertStringNotContainsString(
+            'Powered by Eden Education Suite',
+            $this->get('/parent')->assertOk()->getContent(),
+        );
+
+        $this->flushSession();
+
+        $this->actingAsMemberOf($school, Role::Student);
+        $this->assertStringNotContainsString(
+            'Powered by Eden Education Suite',
+            $this->get('/student')->assertOk()->getContent(),
+        );
+    }
 }

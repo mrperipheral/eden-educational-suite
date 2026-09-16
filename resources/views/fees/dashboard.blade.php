@@ -28,7 +28,7 @@
             </x-card>
             <x-card>
                 <p class="text-xs font-medium text-gray-500">{{ __('Total collected') }}</p>
-                <p class="mt-1 text-2xl font-semibold text-green-700">{{ $money($totalCollected) }}</p>
+                <p class="mt-1 text-2xl font-bold text-green-700">{{ $money($totalCollected) }}</p>
             </x-card>
         </div>
 
@@ -44,7 +44,7 @@
                                     <p class="truncate font-medium text-gray-900">{{ $payment->student?->fullName() }}</p>
                                     <p class="text-xs text-gray-500">{{ $payment->created_at?->diffForHumans() }}</p>
                                 </div>
-                                <span class="shrink-0 font-semibold text-green-700">{{ $money($payment->amount) }}</span>
+                                <span class="shrink-0 font-bold text-green-700">{{ $money($payment->amount) }}</span>
                             </li>
                         @endforeach
                     </ul>

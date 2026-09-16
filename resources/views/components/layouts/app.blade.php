@@ -1,3 +1,8 @@
+@props([
+    'title' => null,
+    'sidebarBg' => null,
+    'sidebarFg' => null,
+])
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="h-full">
 <head>
@@ -36,16 +41,27 @@
             x-cloak
         ></div>
 
-        {{-- Sidebar --}}
+        {{-- Sidebar — a school's own primary colour (if configured) washes the
+             whole panel, matching the product's "school owns the experience"
+             branding; with no colour configured it stays the neutral white
+             default. See docs/ui-ux-guidelines.md §"School branding / theme". --}}
         <aside
-            class="fixed inset-y-0 left-0 z-50 flex w-72 max-w-[85vw] transform flex-col border-r border-gray-200 bg-white transition-transform duration-200 ease-in-out lg:w-64 lg:max-w-none lg:translate-x-0"
+            @class([
+                'fixed inset-y-0 left-0 z-50 flex w-72 max-w-[85vw] transform flex-col transition-transform duration-200 ease-in-out lg:w-64 lg:max-w-none lg:translate-x-0',
+                'border-r border-gray-200 bg-white' => ! ($sidebarBg ?? null),
+            ])
             :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'"
+            @if(! empty($sidebarBg)) style="background-color: {{ $sidebarBg }};" @endif
             x-cloak
         >
             <button
                 type="button"
                 @click="sidebarOpen = false"
-                class="absolute right-3 top-3 rounded-md p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600 lg:hidden"
+                @class([
+                    'absolute right-3 top-3 rounded-md p-2 lg:hidden',
+                    'text-gray-400 hover:bg-gray-100 hover:text-gray-600' => empty($sidebarBg),
+                ])
+                @if(! empty($sidebarBg)) style="color: {{ $sidebarFg ?? '#ffffff' }};" @endif
                 aria-label="{{ __('Close navigation') }}"
             >
                 <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">

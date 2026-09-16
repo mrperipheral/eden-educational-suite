@@ -1,7 +1,7 @@
-<x-layouts.guest :title="__('Sign in')">
+<x-layouts.guest :title="__('Sign in')" :school="$school ?? null">
     <x-auth-heading
         :title="__('Sign in')"
-        :description="__('Welcome back. Enter your details to continue.')"
+        :description="isset($school) && $school ? __('Sign in to :school.', ['school' => $school->name]) : __('Welcome back. Enter your details to continue.')"
     />
 
     @if (session('status'))
@@ -40,7 +40,7 @@
     @if (Route::has('register'))
         <p class="mt-6 text-center text-sm text-gray-500">
             {{ __("Don't have an account?") }}
-            <a href="{{ route('register') }}" class="font-medium text-brand-600 hover:text-brand-700">{{ __('Create one') }}</a>
+            <a href="{{ route('register', isset($school) && $school ? ['school' => $school->slug] : []) }}" class="font-medium text-brand-600 hover:text-brand-700">{{ __('Create one') }}</a>
         </p>
     @endif
 </x-layouts.guest>

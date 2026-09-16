@@ -121,4 +121,73 @@ class SchoolContextControllerTest extends TestCase
 
         $this->assertSame($school->id, session(EnforceTenant::SESSION_KEY));
     }
+
+    // -- M29.5: only a Platform Admin may switch ---------------------------
+
+    public function test_a_non_admin_already_working_in_a_school_cannot_switch_to_a_different_one(): void
+    {
+        $current = $this->newSchool();
+        $other = $this->newSchool();
+        $user = $this->memberOf($current);
+        $user->joinSchool($other);
+
+        $this->actingAs($user)->withSession([EnforceTenant::SESSION_KEY => $current->id])
+            ->post('/school', ['school' => $other->id])
+            ->assertForbidden();
+
+        // Session is untouched — still in the original school.
+        $this->assertSame($current->id, session(EnforceTenant::SESSION_KEY));
+    }
+
+    public function test_a_non_admin_already_working_in_a_school_is_sent_to_the_dashboard_not_the_picker(): void
+    {
+        $current = $this->newSchool();
+        $other = $this->newSchool();
+        $user = $this->memberOf($current);
+        $user->joinSchool($other);
+
+        $this->actingAs($user)->withSession([EnforceTenant::SESSION_KEY => $current->id])
+            ->get('/school')
+            ->assertRedirect(route('dashboard'));
+    }
+
+    public function test_a_non_admin_member_of_two_schools_can_still_pick_one_on_first_entry(): void
+    {
+        // No active session school yet (e.g. fresh sign-in with no stored
+        // choice) — this is a legitimate first entry, not a "switch", and
+        // must still work even though the member belongs to more than one
+        // school.
+        $a = $this->newSchool();
+        $b = $this->newSchool();
+        $user = $this->memberOf($a);
+        $user->joinSchool($b);
+
+        $this->actingAs($user)->post('/school', ['school' => $a->id])
+            ->assertRedirect(route('dashboard'));
+
+        $this->assertSame($a->id, session(EnforceTenant::SESSION_KEY));
+    }
+
+    public function test_a_platform_admin_can_switch_from_an_already_active_school_to_a_different_one(): void
+    {
+        $current = $this->newSchool();
+        $other = $this->newSchool();
+        $admin = User::factory()->platformAdmin()->create();
+
+        $this->actingAs($admin)->withSession([EnforceTenant::SESSION_KEY => $current->id])
+            ->post('/school', ['school' => $other->id])
+            ->assertRedirect(route('dashboard'));
+
+        $this->assertSame($other->id, session(EnforceTenant::SESSION_KEY));
+    }
+
+    public function test_re_selecting_the_same_school_is_not_treated_as_a_switch(): void
+    {
+        $school = $this->newSchool();
+        $user = $this->memberOf($school);
+
+        $this->actingAs($user)->withSession([EnforceTenant::SESSION_KEY => $school->id])
+            ->post('/school', ['school' => $school->id])
+            ->assertRedirect(route('dashboard'));
+    }
 }

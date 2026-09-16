@@ -1,6 +1,10 @@
 @php
     $selectClass = 'block w-full rounded-md border-0 px-3 py-2 text-sm text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-inset focus:ring-brand-500';
     $tabs = ['summary' => __('Collection summary'), 'outstanding' => __('Outstanding balances'), 'payments' => __('Payment activity')];
+    // Report values arrive as plain 2-decimal strings with no thousands
+    // separator (deliberately — the same values also feed the CSV export,
+    // where a stray comma is undesirable). Comma-format only for display.
+    $money = fn ($n) => number_format((float) $n, 2);
 @endphp
 
 <x-layouts.authenticated :title="__('Fee Reports')">
@@ -80,12 +84,24 @@
         </form>
 
         @if ($tab === 'summary')
-            <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-                <x-card><p class="text-xs text-gray-500">{{ __('Total charged') }}</p><p class="mt-1 text-xl font-semibold text-gray-900">{{ $summary['total_charged'] }}</p></x-card>
-                <x-card><p class="text-xs text-gray-500">{{ __('Total discount') }}</p><p class="mt-1 text-xl font-semibold text-gray-900">{{ $summary['total_discount'] }}</p></x-card>
-                <x-card><p class="text-xs text-gray-500">{{ __('Total waived') }}</p><p class="mt-1 text-xl font-semibold text-gray-900">{{ $summary['total_waived'] }}</p></x-card>
-                <x-card><p class="text-xs text-gray-500">{{ __('Total collected') }}</p><p class="mt-1 text-xl font-semibold text-green-700">{{ $summary['total_collected'] }}</p></x-card>
-                <x-card><p class="text-xs text-gray-500">{{ __('Total outstanding') }}</p><p class="mt-1 text-xl font-semibold text-red-700">{{ $summary['total_outstanding'] }}</p></x-card>
+            {{-- Collected / Outstanding are the headline pair — larger, two
+                 per row, Outstanding given prominence on the right. Amounts
+                 are comma-formatted so a value in the millions stays readable
+                 (the underlying figures are unchanged, see $money above). --}}
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <x-card>
+                    <p class="text-xs font-medium text-gray-500">{{ __('Total collected') }}</p>
+                    <p class="mt-1 break-all text-2xl font-bold text-green-700 sm:text-3xl">{{ $money($summary['total_collected']) }}</p>
+                </x-card>
+                <x-card>
+                    <p class="text-xs font-medium text-gray-500">{{ __('Total outstanding') }}</p>
+                    <p class="mt-1 break-all text-2xl font-bold text-red-700 sm:text-3xl">{{ $money($summary['total_outstanding']) }}</p>
+                </x-card>
+            </div>
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <x-card><p class="text-xs text-gray-500">{{ __('Total charged') }}</p><p class="mt-1 break-all text-xl font-semibold text-gray-900">{{ $money($summary['total_charged']) }}</p></x-card>
+                <x-card><p class="text-xs text-gray-500">{{ __('Total discount') }}</p><p class="mt-1 break-all text-xl font-semibold text-gray-900">{{ $money($summary['total_discount']) }}</p></x-card>
+                <x-card><p class="text-xs text-gray-500">{{ __('Total waived') }}</p><p class="mt-1 break-all text-xl font-semibold text-gray-900">{{ $money($summary['total_waived']) }}</p></x-card>
             </div>
         @elseif ($tab === 'outstanding')
             @if ($outstanding->isEmpty())
@@ -104,10 +120,10 @@
                                 <tr>
                                     <td class="px-4 py-2">{{ $row->student?->fullName() }}</td>
                                     <td class="px-4 py-2">{{ $row->student?->admission_number }}</td>
-                                    <td class="px-4 py-2">{{ $row->total_amount }}</td>
-                                    <td class="px-4 py-2">{{ $row->total_discount }}</td>
-                                    <td class="px-4 py-2">{{ $row->total_waived }}</td>
-                                    <td class="px-4 py-2 font-medium text-red-700">{{ $row->outstanding_balance }}</td>
+                                    <td class="px-4 py-2">{{ $money($row->total_amount) }}</td>
+                                    <td class="px-4 py-2">{{ $money($row->total_discount) }}</td>
+                                    <td class="px-4 py-2">{{ $money($row->total_waived) }}</td>
+                                    <td class="px-4 py-2 font-bold text-red-700">{{ $money($row->outstanding_balance) }}</td>
                                 </tr>
                             @endforeach
                         </tbody>
@@ -132,7 +148,7 @@
                                 <tr>
                                     <td class="px-4 py-2">{{ $payment->payment_date?->format('d M Y') }}</td>
                                     <td class="px-4 py-2">{{ $payment->student?->fullName() }}</td>
-                                    <td class="px-4 py-2">{{ $payment->amount }}</td>
+                                    <td class="px-4 py-2 font-bold text-green-700">{{ $money($payment->amount) }}</td>
                                     <td class="px-4 py-2"><x-badge variant="gray">{{ $payment->method?->label() }}</x-badge></td>
                                     <td class="px-4 py-2 text-xs text-gray-500">{{ $payment->reference }}</td>
                                 </tr>

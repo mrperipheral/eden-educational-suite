@@ -80,6 +80,7 @@ use App\Http\Controllers\Results\ResultRunController;
 use App\Http\Controllers\Results\ResultWeightingSchemeController;
 use App\Http\Controllers\Results\ResultWeightingSchemeItemController;
 use App\Http\Controllers\SchoolContextController;
+use App\Http\Controllers\SchoolHomeController;
 use App\Http\Controllers\SchoolModuleController;
 use App\Http\Controllers\SchoolSettingsController;
 use App\Http\Controllers\Settings\PasswordController;
@@ -104,6 +105,12 @@ Route::get('/health', HealthController::class)->name('health');
 // which also resolves the owning school from its own stored transaction data
 // (never from request input). CSRF-exempted in bootstrap/app.php.
 Route::post('/webhooks/paystack', [PaystackWebhookController::class, 'handle'])->name('webhooks.paystack');
+
+// A school's own public entry page — no login required, bound by slug (never
+// exposes a raw school id), never establishes a tenant context. Deliberately
+// minimal — not a website builder (see SchoolHomeController).
+Route::get('/schools/{school}', [SchoolHomeController::class, 'show'])->name('schools.home');
+Route::get('/schools/{school}/logo', [SchoolHomeController::class, 'logo'])->name('schools.logo.show');
 
 /*
 | Authenticated — account level (no school context required).
@@ -283,10 +290,13 @@ Route::middleware(['auth', 'verified', 'active'])->group(function () {
                 ->can('school.settings.update')->name('regional.update');
 
             // Feature / module activation (see docs/module-activation.md).
+            // Platform-Admin only, not `school.settings.*` — reuses the same
+            // "is platform admin" Gate ability as /admin/* and the nav's
+            // Schools/Platform Reports links (SchoolPolicy::viewAny).
             Route::get('modules', [SchoolModuleController::class, 'edit'])
-                ->can('school.settings.view')->name('modules.edit');
+                ->can('viewAny', School::class)->name('modules.edit');
             Route::patch('modules/{module}', [SchoolModuleController::class, 'update'])
-                ->can('school.settings.update')->name('modules.update');
+                ->can('viewAny', School::class)->name('modules.update');
 
             // Online payment / Paystack configuration (M20, docs/paystack.md).
             Route::get('payments', [SchoolSettingsController::class, 'payments'])

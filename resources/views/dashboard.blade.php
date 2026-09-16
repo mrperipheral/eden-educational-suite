@@ -33,19 +33,6 @@
             @endif
         @endisset
 
-        <x-card :title="__('Current school')">
-            <p class="text-sm text-gray-700">
-                {{ __('You are working in') }}
-                <strong>{{ $school->name }}</strong>.
-            </p>
-            @if ($school->settings?->motto)
-                <p class="mt-1 text-sm italic text-gray-500">&ldquo;{{ $school->settings->motto }}&rdquo;</p>
-            @endif
-            <p class="mt-1 text-xs text-gray-500">
-                {{ __('Everything you see and do is scoped to this school. Other schools\' data is never visible here.') }}
-            </p>
-        </x-card>
-
         @isset($todayClasses)
             <x-card :title="__('Your classes today')">
                 @if ($todayClasses->isEmpty())
@@ -149,8 +136,11 @@
 
                     @if (isset($kpis['fees']))
                         <x-card :title="__('Fees')">
-                            <p class="text-2xl font-semibold text-red-700">{{ $kpis['fees']['total_outstanding'] }}</p>
-                            <p class="text-xs text-gray-500">{{ __('Outstanding') }} · {{ __('Collected') }}: {{ $kpis['fees']['total_collected'] }}</p>
+                            <p class="text-2xl font-bold text-red-700">{{ number_format((float) $kpis['fees']['total_outstanding'], 2) }}</p>
+                            <p class="text-xs text-gray-500">
+                                {{ __('Outstanding') }} ·
+                                {{ __('Collected') }}: <span class="font-bold text-green-700">{{ number_format((float) $kpis['fees']['total_collected'], 2) }}</span>
+                            </p>
                         </x-card>
                     @endif
 

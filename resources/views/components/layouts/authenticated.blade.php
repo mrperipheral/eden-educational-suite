@@ -81,46 +81,73 @@
     $moreNavLinks = $navLinks->slice($primaryNavCount)->values();
     $moreNavHasActive = $moreNavLinks->contains(fn ($link) => request()->routeIs($link['active']));
 
-    $canSwitchSchool = $currentSchool !== null
-        && (auth()->user()->isPlatformAdmin() || auth()->user()->schools()->count() > 1);
+    // Only a Platform Admin may switch which school they're working in —
+    // enforced server-side too, in SchoolContextController::store() /
+    // SchoolPolicy — this is just the affordance, not the authorization.
+    $canSwitchSchool = $currentSchool !== null && auth()->user()->isPlatformAdmin();
 
     $settings = $currentSchool?->settings;
     $schoolLogoUrl = $settings?->hasLogo() ? route('settings.school.branding.logo.show') : null;
     $schoolCoverUrl = $settings?->hasCover() ? route('settings.school.branding.cover.show') : null;
+
+    // The school's own primary colour washes the whole sidebar (see
+    // resources/views/components/layouts/app.blade.php); text/hover/active
+    // states switch to light or dark automatically via
+    // SchoolSetting::readableTextColor() so it's never unreadable. With no
+    // colour configured, the sidebar stays the neutral white default.
+    $sidebarBg = $settings?->brand_color;
+    $sidebarFg = $sidebarBg ? \App\Models\SchoolSetting::readableTextColor($sidebarBg) : null;
+    $sidebarIsDark = $sidebarFg === '#ffffff';
+    $sidebarBorderColor = $sidebarBg ? ($sidebarIsDark ? 'rgba(255,255,255,.15)' : 'rgba(0,0,0,.1)') : null;
+    $sidebarMutedColor = $sidebarBg ? ($sidebarIsDark ? 'rgba(255,255,255,.7)' : 'rgba(17,24,39,.6)') : null;
 @endphp
 
 @php
     $navLinkClasses = fn (array $link) => [
-        'flex items-center rounded-md px-3 py-2.5 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 lg:py-2',
-        'bg-brand-50 text-brand-700' => request()->routeIs($link['active']),
-        'text-gray-700 hover:bg-gray-100' => ! request()->routeIs($link['active']),
+        'flex items-center rounded-md px-3 py-2.5 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 lg:py-2',
+        'focus-visible:ring-brand-500' => ! $sidebarBg,
+        'focus-visible:ring-offset-1' => (bool) $sidebarBg,
+        ($sidebarIsDark ? 'focus-visible:ring-white' : 'focus-visible:ring-gray-900') => (bool) $sidebarBg,
+        'bg-brand-50 text-brand-700' => request()->routeIs($link['active']) && ! $sidebarBg,
+        'text-gray-700 hover:bg-gray-100' => ! request()->routeIs($link['active']) && ! $sidebarBg,
+        ($sidebarIsDark ? 'bg-white/15' : 'bg-black/10') => request()->routeIs($link['active']) && $sidebarBg,
+        ($sidebarIsDark ? 'hover:bg-white/10' : 'hover:bg-black/5') => ! request()->routeIs($link['active']) && $sidebarBg,
     ];
+    $navLinkStyle = fn () => $sidebarFg ? "color: {$sidebarFg};" : null;
 @endphp
 
-<x-layouts.app :title="$title">
+<x-layouts.app :title="$title" :sidebar-bg="$sidebarBg" :sidebar-fg="$sidebarFg">
     <x-slot:brandHeader>
         @if ($currentSchool)
             <div
-                class="relative flex h-20 shrink-0 items-center gap-3 overflow-hidden border-b border-gray-200 px-4"
-                @if ($schoolCoverUrl) style="background-image: linear-gradient(to bottom, rgba(17,24,39,.6), rgba(17,24,39,.6)), url('{{ $schoolCoverUrl }}'); background-size: cover; background-position: center;" @endif
+                class="relative flex h-20 shrink-0 items-center gap-3 overflow-hidden px-4"
+                style="
+                    @if ($schoolCoverUrl) background-image: linear-gradient(to bottom, rgba(17,24,39,.6), rgba(17,24,39,.6)), url('{{ $schoolCoverUrl }}'); background-size: cover; background-position: center; @endif
+                    border-bottom: 1px solid {{ $schoolCoverUrl ? 'rgba(255,255,255,.2)' : ($sidebarBorderColor ?? '#e5e7eb') }};
+                "
             >
-                @if ($settings?->brand_color)
-                    <span class="absolute inset-x-0 top-0 h-1" style="background-color: {{ $settings->brand_color }}"></span>
+                @if ($settings?->accent_color)
+                    <span class="absolute inset-x-0 top-0 h-1" style="background-color: {{ $settings->accent_color }}"></span>
                 @endif
                 @if ($schoolLogoUrl)
-                    <img src="{{ $schoolLogoUrl }}" alt="" class="h-10 w-10 shrink-0 rounded-md bg-white object-contain p-0.5 ring-1 ring-black/5">
+                    <img src="{{ $schoolLogoUrl }}" alt="" class="h-11 w-11 shrink-0 rounded-full bg-white object-contain p-1 ring-1 ring-black/5">
                 @endif
                 <div class="min-w-0 flex-1">
-                    <p @class(['truncate text-sm font-semibold', $schoolCoverUrl ? 'text-white' : 'text-gray-900'])>{{ $currentSchool->name }}</p>
-                    <p @class(['text-[11px]', $schoolCoverUrl ? 'text-gray-200' : 'text-gray-500'])>{{ __('School Portal') }}</p>
+                    <p class="truncate text-sm font-semibold" style="color: {{ $schoolCoverUrl ? '#ffffff' : ($sidebarFg ?? '#111827') }};">{{ $currentSchool->name }}</p>
+                    <p class="text-[11px]" style="color: {{ $schoolCoverUrl ? '#e5e7eb' : ($sidebarMutedColor ?? '#6b7280') }};">{{ __('School Portal') }}</p>
                 </div>
             </div>
-            <p class="shrink-0 border-b border-gray-100 px-4 py-1.5 text-center text-[10px] tracking-wide text-gray-400">
-                {{ __('Powered by Eden Education Suite') }}
-            </p>
+            @unless ($isParentPortal || $isStudentPortal)
+                <p
+                    class="shrink-0 px-4 py-1.5 text-center text-[10px] tracking-wide"
+                    style="border-bottom: 1px solid {{ $sidebarBorderColor ?? '#f3f4f6' }}; color: {{ $sidebarMutedColor ?? '#9ca3af' }};"
+                >
+                    {{ __('Powered by Eden Education Suite') }}
+                </p>
+            @endunless
         @else
             <div class="flex h-16 shrink-0 items-center gap-2 border-b border-gray-200 px-6">
-                <span class="text-lg font-semibold text-brand-700">{{ config('app.name') }}</span>
+                <img src="{{ asset('branding/eden-education-suite-logo.png') }}" alt="{{ config('app.name') }}" class="h-8 w-auto">
             </div>
             @if (auth()->user()->isPlatformAdmin())
                 <p class="shrink-0 border-b border-gray-100 px-4 py-1.5 text-center text-[10px] font-medium uppercase tracking-wide text-gray-400">
@@ -132,7 +159,7 @@
 
     <x-slot:navigation>
         @foreach ($primaryNavLinks as $link)
-            <a href="{{ route($link['route']) }}" @class($navLinkClasses($link)) @if (request()->routeIs($link['active'])) aria-current="page" @endif>
+            <a href="{{ route($link['route']) }}" @class($navLinkClasses($link)) @if($navLinkStyle()) style="{{ $navLinkStyle() }}" @endif @if (request()->routeIs($link['active'])) aria-current="page" @endif>
                 {{ $link['label'] }}
             </a>
         @endforeach
@@ -142,7 +169,12 @@
                 <button
                     type="button"
                     @click="moreOpen = ! moreOpen"
-                    class="flex w-full items-center justify-between rounded-md px-3 py-2.5 text-sm font-medium text-gray-500 hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 lg:py-2"
+                    @class([
+                        'flex w-full items-center justify-between rounded-md px-3 py-2.5 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 lg:py-2',
+                        'text-gray-500 hover:bg-gray-100 focus-visible:ring-brand-500' => ! $sidebarBg,
+                        ($sidebarIsDark ? 'hover:bg-white/10 focus-visible:ring-white' : 'hover:bg-black/5 focus-visible:ring-gray-900') => (bool) $sidebarBg,
+                    ])
+                    @if ($sidebarMutedColor) style="color: {{ $sidebarMutedColor }};" @endif
                     :aria-expanded="moreOpen"
                     aria-controls="primary-nav-more"
                 >
@@ -153,7 +185,7 @@
                 </button>
                 <div id="primary-nav-more" x-show="moreOpen" x-transition x-cloak class="flex flex-col gap-1 pt-1">
                     @foreach ($moreNavLinks as $link)
-                        <a href="{{ route($link['route']) }}" @class($navLinkClasses($link)) @if (request()->routeIs($link['active'])) aria-current="page" @endif>
+                        <a href="{{ route($link['route']) }}" @class($navLinkClasses($link)) @if($navLinkStyle()) style="{{ $navLinkStyle() }}" @endif @if (request()->routeIs($link['active'])) aria-current="page" @endif>
                             {{ $link['label'] }}
                         </a>
                     @endforeach
@@ -191,7 +223,7 @@
                     <span class="mt-1 inline-block"><x-badge variant="gray">{{ __('Platform admin') }}</x-badge></span>
                 @endif
             </div>
-            @if ($currentSchool)
+            @if ($canSwitchSchool)
                 <a href="{{ route('school-context.create') }}" class="block px-3 py-2 text-sm text-gray-700 hover:bg-gray-50" role="menuitem">
                     {{ __('Switch school') }}
                 </a>

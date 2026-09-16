@@ -7,17 +7,19 @@ use App\Http\Requests\Settings\UpdateSchoolModuleRequest;
 use App\Services\Audit\AuditRecorder;
 use App\Support\Modules\SchoolModules;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 /**
  * The active school's feature/module activation (see `docs/module-activation.md`).
  *
- * Tenant-scoped and gated exactly like the rest of school settings:
- * `school.settings.view` reads the catalogue page, `school.settings.update`
- * toggles a module. State is school-owned via `SchoolModule` / `SchoolModules`,
- * so another school's configuration is unreachable here and `school_id` is never
- * read from input.
+ * Tenant-scoped, but gated to **Platform Admin only** — not the
+ * `school.settings.*` permissions the rest of school settings uses, even
+ * though School Admin otherwise holds every permission. Module activation is
+ * platform-level configuration a school doesn't self-serve. State is
+ * school-owned via `SchoolModule` / `SchoolModules`, so another school's
+ * configuration is unreachable here and `school_id` is never read from input.
  *
  * Activation is configuration only — turning a module on grants nobody any
  * permission (M4 authorization stays authoritative).
@@ -26,9 +28,9 @@ class SchoolModuleController extends Controller
 {
     public function __construct(private readonly SchoolModules $modules, private readonly AuditRecorder $audit) {}
 
-    public function edit(): View
+    public function edit(Request $request): View
     {
-        $this->authorize('school.settings.view');
+        abort_unless($request->user()?->isPlatformAdmin(), 403);
 
         $states = $this->modules->states();
 

@@ -1,7 +1,7 @@
-<x-layouts.guest :title="__('Create your account')">
+<x-layouts.guest :title="__('Create your account')" :school="$school ?? null">
     <x-auth-heading
         :title="__('Create your account')"
-        :description="__('Set up your login. School details come later.')"
+        :description="isset($school) && $school ? __('Set up your login for :school. Your school links your account afterwards.', ['school' => $school->name]) : __('Set up your login. School details come later.')"
     />
 
     <form method="POST" action="{{ route('register') }}" class="space-y-4">
@@ -39,6 +39,6 @@
 
     <p class="mt-6 text-center text-sm text-gray-500">
         {{ __('Already have an account?') }}
-        <a href="{{ route('login') }}" class="font-medium text-brand-600 hover:text-brand-700">{{ __('Sign in') }}</a>
+        <a href="{{ route('login', isset($school) && $school ? ['school' => $school->slug] : []) }}" class="font-medium text-brand-600 hover:text-brand-700">{{ __('Sign in') }}</a>
     </p>
 </x-layouts.guest>

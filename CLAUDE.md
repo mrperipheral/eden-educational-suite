@@ -95,7 +95,17 @@ See `docs/architecture.md` for the full rationale. In short:
 - **Tests** — feature tests for every route and each authorization boundary; unit
   tests for services, enums and value objects. Tenant isolation gets explicit
   cross-tenant "cannot see / cannot touch" tests once schools exist. Tests that
-  render views call `$this->withoutVite()`.
+  render views call `$this->withoutVite()`. When a test switches identity mid-test
+  (e.g. `actingAsMemberOf($schoolA, ...)`, do something, then
+  `actingAsMemberOf($schoolB, ...)`), reset with `$this->flushSession()` alone —
+  **do not also call `$this->app->forgetScopedInstances()`** for a *permission*-gated
+  route (`->can('some.permission')`). It leaves that route's Gate check resolving
+  against a stale closure and every request 403s even though the new user
+  genuinely holds the permission (confirmed by calling `hasPermission()` directly).
+  `forgetScopedInstances()` is fine after the lower-level `enterSchool()` helper,
+  and empirically fine for platform-admin-only routes (`->can('viewAny', School::class)`,
+  or anything `isPlatformAdmin()` short-circuits) — the failure is specific to the
+  Permission-string Gate path.
 
 ## Guardrails
 

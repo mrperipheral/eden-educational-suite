@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\Role;
 use App\Enums\SchoolStatus;
+use App\Support\Tenancy\TenantContext;
 use Database\Factories\SchoolFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
@@ -201,5 +202,33 @@ class School extends Model
     public function getRouteKeyName(): string
     {
         return 'slug';
+    }
+
+    /**
+     * Look up an *active* school by its public slug — used only for display
+     * branding on pages that run before any tenant context exists (the
+     * school-specific homepage, a branding hint on the login/register
+     * pages). Never used to establish `TenantContext`: that only ever
+     * happens through `EnforceTenant` / `SchoolContextController`, and
+     * authentication/authorization are completely unaffected by this
+     * lookup — it is purely "whose logo/colours do we show here".
+     *
+     * `settings` is eager-loaded inside {@see TenantContext::runWithoutScope()}
+     * because `SchoolSetting` is `BelongsToSchool`-scoped and there is no
+     * active tenant on these pre-auth pages — loading it here, once, means
+     * every later `$school->settings` read (in a view, say) just reads the
+     * already-hydrated relation rather than re-querying and hitting that
+     * scope. This is the one deliberate, narrow cross-tenant read for
+     * public branding display — never for anything else.
+     */
+    public static function resolveActiveBySlug(?string $slug): ?self
+    {
+        if (! is_string($slug) || $slug === '') {
+            return null;
+        }
+
+        return app(TenantContext::class)->runWithoutScope(
+            fn () => static::query()->active()->where('slug', $slug)->with('settings')->first(),
+        );
     }
 }

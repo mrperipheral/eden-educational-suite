@@ -130,8 +130,11 @@ class AuditLogTest extends AuditTestCase
 
     public function test_module_toggle_captures_before_and_after(): void
     {
+        // Module activation is Platform-Admin only (M29.5) — not School Admin,
+        // even though School Admin holds every other `school.settings.*`
+        // permission. See SchoolModuleController.
         $school = School::factory()->create();
-        $this->actingAsRole($school, Role::SchoolAdmin);
+        $this->actingAsPlatformAdmin($school);
 
         $this->patch('/settings/school/modules/fees', ['enabled' => 0])->assertRedirect();
 

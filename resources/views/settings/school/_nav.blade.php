@@ -3,7 +3,12 @@
         ['route' => 'settings.school.edit', 'label' => __('Profile'), 'active' => 'settings.school.edit'],
         ['route' => 'settings.school.branding.edit', 'label' => __('Branding'), 'active' => 'settings.school.branding.*'],
         ['route' => 'settings.school.regional.edit', 'label' => __('Regional'), 'active' => 'settings.school.regional.*'],
-        ['route' => 'settings.school.modules.edit', 'label' => __('Modules'), 'active' => 'settings.school.modules.*'],
+        // Module activation is Platform-Admin only (see SchoolModuleController)
+        // — never shown to a School Admin, even though they reach every other
+        // tab here via school.settings.view.
+        ...(auth()->user()->isPlatformAdmin()
+            ? [['route' => 'settings.school.modules.edit', 'label' => __('Modules'), 'active' => 'settings.school.modules.*']]
+            : []),
         ['route' => 'settings.school.payments.edit', 'label' => __('Payments'), 'active' => 'settings.school.payments.*'],
     ];
 @endphp

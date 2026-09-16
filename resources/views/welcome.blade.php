@@ -9,7 +9,7 @@
 </head>
 <body class="flex min-h-full flex-col bg-gray-50 text-gray-900 antialiased">
     <header class="flex items-center justify-between px-6 py-4">
-        <span class="text-sm font-semibold text-brand-700">{{ config('app.name') }}</span>
+        <img src="{{ asset('branding/eden-education-suite-logo.png') }}" alt="{{ config('app.name') }}" class="h-8 w-auto">
         <nav class="flex items-center gap-2">
             @auth
                 <x-button :href="url('/dashboard')" size="sm">{{ __('Go to dashboard') }}</x-button>
