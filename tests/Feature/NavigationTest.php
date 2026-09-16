@@ -89,15 +89,6 @@ class NavigationTest extends TestCase
         $this->assertStringNotContainsString('School Portal', $html);
     }
 
-    public function test_platform_admin_sidebar_shows_the_actual_eden_logo_image(): void
-    {
-        $this->actingAsPlatformAdmin();
-
-        $html = $this->get('/admin/schools')->assertOk()->getContent();
-
-        $this->assertStringContainsString('branding/eden-education-suite-logo.png', $html);
-    }
-
     // -- M29.5: the sidebar washes in the school's own primary colour -----
 
     public function test_the_sidebar_uses_the_schools_own_primary_colour_when_configured(): void

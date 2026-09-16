@@ -36,7 +36,7 @@
                 <span class="text-xl font-semibold text-gray-900">{{ $school->name }}</span>
                 <span class="text-xs text-gray-500">{{ __('School Portal') }}</span>
             @else
-                <img src="{{ asset('branding/eden-education-suite-logo.png') }}" alt="{{ config('app.name') }}" class="h-10 w-auto">
+                <span class="text-xl font-semibold text-brand-700">{{ config('app.name') }}</span>
             @endif
         </div>
 

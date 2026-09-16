@@ -147,7 +147,7 @@
             @endunless
         @else
             <div class="flex h-16 shrink-0 items-center gap-2 border-b border-gray-200 px-6">
-                <img src="{{ asset('branding/eden-education-suite-logo.png') }}" alt="{{ config('app.name') }}" class="h-8 w-auto">
+                <span class="text-lg font-semibold text-brand-700">{{ config('app.name') }}</span>
             </div>
             @if (auth()->user()->isPlatformAdmin())
                 <p class="shrink-0 border-b border-gray-100 px-4 py-1.5 text-center text-[10px] font-medium uppercase tracking-wide text-gray-400">
