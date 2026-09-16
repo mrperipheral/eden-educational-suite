@@ -37,6 +37,8 @@ COPY . .
 # Install PHP dependencies
 RUN composer install --no-dev --optimize-autoloader --no-interaction
 
+RUN php artisan optimize:clear
+
 # Laravel writable directories
 RUN chown -R www-data:www-data \
     storage \
