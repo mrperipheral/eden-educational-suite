@@ -51,4 +51,6 @@ RUN sed -ri \
     /etc/apache2/apache2.conf \
     /etc/apache2/conf-available/*.conf
 
+RUN php -m | grep -E 'pgsql|pdo_pgsql' || true
+
 EXPOSE 80
