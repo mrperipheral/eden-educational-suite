@@ -16,6 +16,15 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // Render (and most PaaS hosts) terminate TLS at their own edge and
+        // forward requests to this container over plain HTTP, setting
+        // X-Forwarded-* headers. Without trusting them, Laravel thinks every
+        // request is HTTP, which breaks signed URLs (email verification,
+        // password reset) generated with a forced https:// scheme. The
+        // container has no other inbound path, so trusting "whichever proxy
+        // is in front of us" is safe here.
+        $middleware->trustProxies(at: '*');
+
         $middleware->alias([
             'active' => EnsureAccountIsActive::class,
             'tenant' => EnforceTenant::class,
