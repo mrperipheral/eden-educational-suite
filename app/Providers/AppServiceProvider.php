@@ -8,10 +8,13 @@ use App\Support\Tenancy\TenantContext;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Blade;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
+use Symfony\Component\Mailer\Bridge\Brevo\Transport\BrevoTransportFactory;
+use Symfony\Component\Mailer\Transport\Dsn;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -77,5 +80,13 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('exports', fn ($request) => Limit::perMinute(20)->by($request->user()?->getAuthIdentifier()));
 
         RateLimiter::for('payment-initiation', fn ($request) => Limit::perMinute(10)->by($request->user()?->getAuthIdentifier()));
+
+        // Brevo over its HTTP API rather than SMTP — Render's free tier
+        // blocks outbound traffic on the SMTP ports (25, 465, 587).
+        Mail::extend('brevo', function () {
+            return (new BrevoTransportFactory)->create(
+                new Dsn('brevo+api', 'default', config('services.brevo.key')),
+            );
+        });
     }
 }
